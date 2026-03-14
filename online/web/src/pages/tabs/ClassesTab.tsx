@@ -1,0 +1,149 @@
+import React, { useState } from "react";
+import * as api from "../../api";
+import { useToast } from "../../context/ToastContext";
+
+type SchoolClass = Awaited<ReturnType<typeof api.listClasses>>[0];
+
+interface Props {
+  pid: number;
+  classes: SchoolClass[];
+  teachers: Awaited<ReturnType<typeof api.listTeachers>>;
+  rooms: Awaited<ReturnType<typeof api.listRooms>>;
+  onChange: (c: SchoolClass[]) => void;
+  onNext: () => void;
+}
+
+export default function ClassesTab({ pid, classes, onChange, onNext }: Props) {
+  const toast = useToast();
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editClass, setEditClass] = useState<SchoolClass | null>(null);
+  const importRef = React.createRef<HTMLInputElement>();
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ success_count: number; errors: { row: number; message: string }[] } | null>(null);
+
+  /* Form state */
+  const [fGrade, setFGrade] = useState("");
+  const [fSection, setFSection] = useState("");
+  const [fStream, setFStream] = useState("");
+  const [fName, setFName] = useState("");
+  const [fCode, setFCode] = useState("");
+  const [fColor, setFColor] = useState("#50C878");
+  const [fStrength, setFStrength] = useState(30);
+
+  function openAdd() {
+    setEditClass(null);
+    setFGrade(""); setFSection(""); setFStream(""); setFName(""); setFCode(""); setFColor("#50C878"); setFStrength(30);
+    setModalOpen(true);
+  }
+
+  function openEdit(c?: SchoolClass) {
+    const cls = c || classes.find(x => x.id === selectedId);
+    if (!cls) return;
+    setEditClass(cls);
+    setFGrade(cls.grade); setFSection(cls.section); setFStream(cls.stream);
+    setFName(cls.name); setFCode(cls.code); setFColor(cls.color || "#50C878"); setFStrength(cls.strength);
+    setModalOpen(true);
+  }
+
+  async function saveClass() {
+    if (!fGrade.trim()) return;
+    const data = { grade: fGrade.trim(), section: fSection.trim(), stream: fStream.trim(), name: fName.trim() || `Grade ${fGrade.trim()} ${fSection.trim()}`.trim(), code: fCode.trim(), color: fColor, strength: fStrength };
+    try {
+      if (editClass) {
+        await api.updateClass(pid, editClass.id, data);
+        onChange(classes.map(c => c.id === editClass.id ? { ...c, ...data } : c));
+        toast("success", "Class updated.");
+      } else {
+        const created = await api.createClass(pid, data);
+        onChange([...classes, { ...created, ...data } as SchoolClass]);
+        toast("success", "Class added.");
+      }
+      setModalOpen(false);
+    } catch (err) { toast("error", err instanceof Error ? err.message : "Save failed"); }
+  }
+
+  async function deleteSelected() {
+    if (selectedId == null) return;
+    const name = classes.find(c => c.id === selectedId)?.name ?? "";
+    if (!confirm(`Delete class "${name}"? This will also remove related lessons.`)) return;
+    try {
+      await api.deleteClass(pid, selectedId);
+      onChange(classes.filter(c => c.id !== selectedId));
+      setSelectedId(null);
+      toast("success", "Class deleted.");
+    } catch (err) { toast("error", err instanceof Error ? err.message : "Delete failed"); }
+  }
+
+  async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return;
+    setImporting(true); setImportResult(null);
+    try {
+      const res = await api.importClassesExcel(pid, file);
+      setImportResult(res);
+      if (res.success_count > 0) { const list = await api.listClasses(pid); onChange(list); }
+    } catch (err) { toast("error", err instanceof Error ? err.message : "Import failed"); }
+    finally { setImporting(false); e.target.value = ""; }
+  }
+
+  return (
+    <div className="card">
+      <h2 style={{ marginTop: 0 }}>Classes &amp; Sections</h2>
+      <p className="subheading">Add and manage classes, sections, and streams.</p>
+
+      <div className="toolbar" style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+        <button type="button" className="btn btn-primary" onClick={openAdd}>+ Add Class</button>
+        <input type="file" ref={importRef} accept=".xlsx,.xls" style={{ display: "none" }} onChange={onImportFile} />
+        <button type="button" className="btn" onClick={() => importRef.current?.click()} disabled={importing}>{importing ? "Importing…" : "Import from Excel"}</button>
+        <button type="button" className="btn" onClick={() => api.downloadTemplate("classes")}>Download Template</button>
+        <button type="button" className="btn" onClick={() => openEdit()} disabled={selectedId == null}>Edit</button>
+        <button type="button" className="btn btn-danger" onClick={deleteSelected} disabled={selectedId == null}>Delete</button>
+      </div>
+
+      {importResult && (
+        <div className="alert alert-success" style={{ marginBottom: "1rem" }}>
+          Imported {importResult.success_count} class(es).{importResult.errors.length > 0 && ` Errors: ${importResult.errors.map(e => `Row ${e.row}: ${e.message}`).join("; ")}`}
+        </div>
+      )}
+
+      {classes.length === 0 && <p className="subheading" style={{ textAlign: "center" }}>No classes added yet. Import from Excel or add manually.</p>}
+      <table className="data-table">
+        <thead><tr><th style={{ width: 40 }}>#</th><th>Name</th><th>Grade</th><th>Section</th><th>Stream</th><th>Code</th><th style={{ width: 60 }}>Color</th><th>Strength</th></tr></thead>
+        <tbody>
+          {classes.map((c, i) => (
+            <tr key={c.id} className={selectedId === c.id ? "selected" : ""} onClick={() => setSelectedId(c.id)} onDoubleClick={() => openEdit(c)}>
+              <td>{i + 1}</td><td>{c.name}</td><td>{c.grade}</td><td>{c.section}</td><td>{c.stream}</td><td>{c.code}</td>
+              <td><span className="color-swatch" style={{ backgroundColor: c.color || "#50C878" }} /></td>
+              <td>{c.strength}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="nav-footer">
+        <button type="button" className="btn" onClick={onNext}>Next: Classrooms →</button>
+      </div>
+
+      {modalOpen && (
+        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+          <div className="modal-dialog" onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>{editClass ? "Edit Class" : "New Class"}</h3>
+            <div className="modal-form">
+              <div className="modal-field"><label className="modal-label required">Grade:</label><input value={fGrade} onChange={e => setFGrade(e.target.value)} placeholder="e.g., 10" autoFocus /></div>
+              <div className="modal-field"><label className="modal-label">Section:</label><input value={fSection} onChange={e => setFSection(e.target.value)} placeholder="e.g., A" /></div>
+              <div className="modal-field"><label className="modal-label">Stream:</label><input value={fStream} onChange={e => setFStream(e.target.value)} placeholder="e.g., Science" /></div>
+              <div className="modal-field"><label className="modal-label">Display Name:</label><input value={fName} onChange={e => setFName(e.target.value)} placeholder="Auto: Grade + Section" /></div>
+              <div className="modal-field"><label className="modal-label">Code:</label><input value={fCode} onChange={e => setFCode(e.target.value)} placeholder="e.g., 10A" /></div>
+              <div className="modal-field"><label className="modal-label">Color:</label><input type="color" value={fColor} onChange={e => setFColor(e.target.value)} style={{ width: 48, height: 32, padding: 0 }} /></div>
+              <div className="modal-field"><label className="modal-label">Strength:</label><input type="number" min={1} value={fStrength} onChange={e => setFStrength(Number(e.target.value))} style={{ width: 80 }} /></div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={() => setModalOpen(false)}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={saveClass}>OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
