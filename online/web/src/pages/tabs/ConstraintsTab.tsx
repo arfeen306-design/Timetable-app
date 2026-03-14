@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import * as api from "../../api";
 import { useToast } from "../../context/ToastContext";
 
@@ -26,121 +26,124 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
   const [entityId, setEntityId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
-  /* ── Derived values ── */
+  /* ── LOCAL unavailable set — toggles happen instantly in memory ── */
+  const [localUnavailable, setLocalUnavailable] = useState<Set<string>>(new Set());
+  const [dirty, setDirty] = useState(false);
+
   const numDays = settings?.days_per_week ?? 5;
   const numPeriods = settings?.periods_per_day ?? 7;
   const days = DAY_NAMES.slice(0, numDays);
 
-  /* ── Entity list based on type ── */
-  const entityList: { id: number; label: string }[] =
-    entityType === "teacher"
-      ? teachers.map(t => ({ id: t.id, label: `${t.title || ""} ${t.first_name} ${t.last_name}`.trim() + (t.code ? ` (${t.code})` : "") }))
-      : entityType === "class"
-        ? classes.map(c => ({ id: c.id, label: c.name + (c.code ? ` (${c.code})` : "") }))
-        : rooms.map(r => ({ id: r.id, label: r.name + (r.code ? ` (${r.code})` : "") }));
+  /* ── Entity list ── */
+  const entityList = useMemo(() => {
+    if (entityType === "teacher")
+      return teachers.map(t => ({ id: t.id, label: `${t.title || ""} ${t.first_name} ${t.last_name}`.trim() + (t.code ? ` (${t.code})` : "") }));
+    if (entityType === "class")
+      return classes.map(c => ({ id: c.id, label: c.name + (c.code ? ` (${c.code})` : "") }));
+    return rooms.map(r => ({ id: r.id, label: r.name + (r.code ? ` (${r.code})` : "") }));
+  }, [entityType, teachers, classes, rooms]);
 
   /* Auto-select first entity when type changes */
   useEffect(() => {
-    if (entityList.length > 0 && !entityList.find(e => e.id === entityId)) {
-      setEntityId(entityList[0].id);
+    if (entityList.length > 0) {
+      setEntityId(prev => entityList.find(e => e.id === prev) ? prev : entityList[0].id);
+    } else {
+      setEntityId(null);
     }
-  }, [entityType, entityList.length]);
+  }, [entityType, entityList]);
 
-  /* ── Build a set of unavailable (day, period) pairs for current entity ── */
-  const unavailableSet = new Set<string>();
-  if (entityId != null) {
+  /* ── Sync local state from server constraints when entity changes ── */
+  useEffect(() => {
+    if (entityId == null) { setLocalUnavailable(new Set()); return; }
+    const s = new Set<string>();
     constraints
       .filter(c => c.entity_type === entityType && c.entity_id === entityId)
-      .forEach(c => unavailableSet.add(`${c.day_index}-${c.period_index}`));
-  }
+      .forEach(c => s.add(`${c.day_index}-${c.period_index}`));
+    setLocalUnavailable(s);
+    setDirty(false);
+  }, [entityId, entityType, constraints]);
 
-  /* ── Check if a slot is available (checked = available, no constraint) ── */
-  const isAvailable = useCallback((day: number, period: number) => {
-    return !unavailableSet.has(`${day}-${period}`);
-  }, [unavailableSet]);
-
-  /* ── Check if whole day is unavailable (all periods unchecked for a day) ── */
-  function isWholeDayUnavailable(day: number): boolean {
-    for (let p = 0; p < numPeriods; p++) {
-      if (isAvailable(day, p)) return false;
-    }
-    return true;
-  }
-
-  /* ── Toggle a single slot ── */
-  async function toggleSlot(day: number, period: number) {
-    if (entityId == null) return;
+  /* ── Toggle a single slot (local only — instant) ── */
+  function toggleSlot(day: number, period: number) {
     const key = `${day}-${period}`;
-    if (unavailableSet.has(key)) {
-      /* Remove constraint — make available */
-      const existing = constraints.find(
-        c => c.entity_type === entityType && c.entity_id === entityId && c.day_index === day && c.period_index === period
-      );
-      if (existing) {
-        try {
-          await api.deleteConstraint(pid, existing.id);
-          onChange(constraints.filter(c => c.id !== existing.id));
-        } catch (err) { toast("error", err instanceof Error ? err.message : "Failed to remove constraint"); }
-      }
-    } else {
-      /* Add constraint — make unavailable */
-      try {
-        const created = await api.createConstraint(pid, {
-          entity_type: entityType,
-          entity_id: entityId,
-          day_index: day,
-          period_index: period,
-          is_hard: true,
-        });
-        onChange([...constraints, created]);
-      } catch (err) { toast("error", err instanceof Error ? err.message : "Failed to add constraint"); }
-    }
+    setLocalUnavailable(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+    setDirty(true);
   }
 
-  /* ── Toggle whole day ── */
-  async function toggleWholeDay(day: number) {
-    if (entityId == null) return;
-    const allUnavailable = isWholeDayUnavailable(day);
-    if (allUnavailable) {
-      /* Remove all constraints for this day — make whole day available */
-      const toRemove = constraints.filter(
-        c => c.entity_type === entityType && c.entity_id === entityId && c.day_index === day
-      );
-      try {
-        await Promise.all(toRemove.map(c => api.deleteConstraint(pid, c.id)));
-        const removedIds = new Set(toRemove.map(c => c.id));
-        onChange(constraints.filter(c => !removedIds.has(c.id)));
-      } catch (err) { toast("error", err instanceof Error ? err.message : "Failed"); }
-    } else {
-      /* Mark whole day unavailable — add missing constraints */
-      const newConstraints: Constraint[] = [];
+  /* ── Toggle whole day (local only — instant) ── */
+  function toggleWholeDay(day: number) {
+    setLocalUnavailable(prev => {
+      const next = new Set(prev);
+      const allUnavail = Array.from({ length: numPeriods }, (_, p) => `${day}-${p}`).every(k => next.has(k));
       for (let p = 0; p < numPeriods; p++) {
-        if (isAvailable(day, p)) {
-          try {
-            const created = await api.createConstraint(pid, {
-              entity_type: entityType,
-              entity_id: entityId,
-              day_index: day,
-              period_index: p,
-              is_hard: true,
-            });
-            newConstraints.push(created);
-          } catch { /* skip */ }
-        }
+        const k = `${day}-${p}`;
+        if (allUnavail) next.delete(k); else next.add(k);
       }
-      onChange([...constraints, ...newConstraints]);
-    }
+      return next;
+    });
+    setDirty(true);
   }
 
-  /* ── Save all (re-fetch to confirm sync) ── */
-  async function saveAll() {
+  /* ── Check helpers ── */
+  function isAvailable(day: number, period: number): boolean {
+    return !localUnavailable.has(`${day}-${period}`);
+  }
+
+  function isWholeDayUnavailable(day: number): boolean {
+    return Array.from({ length: numPeriods }, (_, p) => `${day}-${p}`).every(k => localUnavailable.has(k));
+  }
+
+  /* ── SAVE: batch sync to backend ── */
+  async function saveConstraints() {
+    if (entityId == null) return;
     setSaving(true);
     try {
+      /* 1. Get current server constraints for this entity */
+      const existing = constraints.filter(
+        c => c.entity_type === entityType && c.entity_id === entityId
+      );
+      const existingKeys = new Set(existing.map(c => `${c.day_index}-${c.period_index}`));
+
+      /* 2. Find what to ADD (in local but not on server) */
+      const toAdd: { day: number; period: number }[] = [];
+      localUnavailable.forEach(key => {
+        if (!existingKeys.has(key)) {
+          const [d, p] = key.split("-").map(Number);
+          toAdd.push({ day: d, period: p });
+        }
+      });
+
+      /* 3. Find what to REMOVE (on server but not in local) */
+      const toRemove = existing.filter(c => !localUnavailable.has(`${c.day_index}-${c.period_index}`));
+
+      /* 4. Execute batch */
+      const deletePromises = toRemove.map(c => api.deleteConstraint(pid, c.id));
+      const createPromises = toAdd.map(a =>
+        api.createConstraint(pid, {
+          entity_type: entityType,
+          entity_id: entityId,
+          day_index: a.day,
+          period_index: a.period,
+          is_hard: true,
+        })
+      );
+
+      await Promise.all([...deletePromises, ...createPromises]);
+
+      /* 5. Refresh from server to get clean state */
       const fresh = await api.listConstraints(pid);
       onChange(fresh);
-      toast("success", "Constraints saved successfully.");
-    } catch (err) { toast("error", err instanceof Error ? err.message : "Save failed"); }
-    finally { setSaving(false); }
+      setDirty(false);
+      toast("success", `Constraints saved (${toAdd.length} added, ${toRemove.length} removed).`);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -153,7 +156,7 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
         <label style={{ fontWeight: 600, color: "#475569", fontSize: "0.9rem" }}>Entity Type:</label>
         <select
           value={entityType}
-          onChange={e => { setEntityType(e.target.value as "teacher" | "class" | "room"); setEntityId(null); }}
+          onChange={e => { setEntityType(e.target.value as "teacher" | "class" | "room"); }}
           style={{ minWidth: 120 }}
         >
           <option value="teacher">Teacher</option>
@@ -235,10 +238,13 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
 
       {/* ── Actions ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem" }}>
-        <button type="button" className="btn btn-primary" onClick={saveAll} disabled={saving}>
-          {saving ? "Saving…" : "Save Constraints"}
-        </button>
-        <div className="nav-footer" style={{ margin: 0, borderTop: "none", paddingTop: 0 }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <button type="button" className="btn btn-primary" onClick={saveConstraints} disabled={saving || !dirty}>
+            {saving ? "Saving…" : "Save Constraints"}
+          </button>
+          {dirty && <span style={{ color: "#e67e22", fontSize: "0.85rem", fontWeight: 500 }}>● Unsaved changes</span>}
+        </div>
+        <div>
           <button type="button" className="btn" onClick={onNext}>Next: Generate →</button>
         </div>
       </div>

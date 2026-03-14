@@ -30,7 +30,7 @@ def validate_project(
     return validate_project_data(provider)
 
 
-@router.post("/generate")
+@router.post("")
 def generate_timetable_endpoint(
     project: Project = Depends(get_project_or_404),
     db: Session = Depends(get_db),
