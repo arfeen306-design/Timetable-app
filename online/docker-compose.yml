@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  timetable-web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://agora_user:change_me@postgres:5432/timetable_saas
+      - SECRET_KEY=development_secret_key
+      - DEBUG=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: agora_user
+      POSTGRES_PASSWORD: change_me
+      POSTGRES_DB: timetable_saas
+    ports:
+      - "5432:5432"
+    volumes:
+      - timetable_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agora_user -d timetable_saas"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  timetable_postgres_data:
