@@ -102,16 +102,18 @@ export function deleteSubject(projectId: number, id: number) {
 }
 
 // Classes
+export type SchoolClass = { id: number; name: string; grade: string; section: string; stream: string; code: string; color: string; strength: number; class_teacher_id: number | null; home_room_id: number | null };
+
 export function listClasses(projectId: number) {
-  return api<{ id: number; name: string; grade: string; section: string; stream: string; code: string; color: string; strength: number }[]>(`/api/projects/${projectId}/classes`);
+  return api<SchoolClass[]>(`/api/projects/${projectId}/classes`);
 }
 
-export function createClass(projectId: number, data: { grade: string; section?: string; stream?: string; name?: string; code?: string; color?: string; strength?: number }) {
-  return api<{ id: number }>(`/api/projects/${projectId}/classes`, { method: "POST", body: JSON.stringify(data) });
+export function createClass(projectId: number, data: { grade: string; section?: string; stream?: string; name?: string; code?: string; color?: string; strength?: number; class_teacher_id?: number | null; home_room_id?: number | null }) {
+  return api<SchoolClass>(`/api/projects/${projectId}/classes`, { method: "POST", body: JSON.stringify(data) });
 }
 
-export function updateClass(projectId: number, id: number, data: Partial<{ grade: string; section: string; stream: string; name: string; code: string; color: string; strength: number }>) {
-  return api(`/api/projects/${projectId}/classes/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+export function updateClass(projectId: number, id: number, data: Partial<{ grade: string; section: string; stream: string; name: string; code: string; color: string; strength: number; class_teacher_id: number | null; home_room_id: number | null }>) {
+  return api<SchoolClass>(`/api/projects/${projectId}/classes/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
 export function deleteClass(projectId: number, id: number) {

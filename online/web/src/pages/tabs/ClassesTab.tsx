@@ -1,19 +1,20 @@
 import React, { useState } from "react";
 import * as api from "../../api";
+import type { SchoolClass, Room } from "../../api";
 import { useToast } from "../../context/ToastContext";
 
-type SchoolClass = Awaited<ReturnType<typeof api.listClasses>>[0];
+type Teacher = Awaited<ReturnType<typeof api.listTeachers>>[0];
 
 interface Props {
   pid: number;
   classes: SchoolClass[];
-  teachers: Awaited<ReturnType<typeof api.listTeachers>>;
-  rooms: Awaited<ReturnType<typeof api.listRooms>>;
+  teachers: Teacher[];
+  rooms: Room[];
   onChange: (c: SchoolClass[]) => void;
   onNext: () => void;
 }
 
-export default function ClassesTab({ pid, classes, onChange, onNext }: Props) {
+export default function ClassesTab({ pid, classes, teachers, rooms, onChange, onNext }: Props) {
   const toast = useToast();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -30,10 +31,25 @@ export default function ClassesTab({ pid, classes, onChange, onNext }: Props) {
   const [fCode, setFCode] = useState("");
   const [fColor, setFColor] = useState("#50C878");
   const [fStrength, setFStrength] = useState(30);
+  const [fTeacherId, setFTeacherId] = useState<number | null>(null);
+  const [fRoomId, setFRoomId] = useState<number | null>(null);
+
+  /* ── Auto-generate display name and code from grade/section/stream ── */
+  function autoName(grade: string, section: string, stream: string): string {
+    const parts = [`Grade ${grade.trim()}`];
+    if (section.trim()) parts.push(section.trim());
+    if (stream.trim()) parts.push(stream.trim());
+    return parts.join(" ");
+  }
+
+  function autoCode(grade: string, section: string): string {
+    return `${grade.trim()}-${section.trim() || "X"}`.toUpperCase();
+  }
 
   function openAdd() {
     setEditClass(null);
-    setFGrade(""); setFSection(""); setFStream(""); setFName(""); setFCode(""); setFColor("#50C878"); setFStrength(30);
+    setFGrade(""); setFSection(""); setFStream(""); setFName(""); setFCode("");
+    setFColor("#50C878"); setFStrength(30); setFTeacherId(null); setFRoomId(null);
     setModalOpen(true);
   }
 
@@ -42,25 +58,48 @@ export default function ClassesTab({ pid, classes, onChange, onNext }: Props) {
     if (!cls) return;
     setEditClass(cls);
     setFGrade(cls.grade); setFSection(cls.section); setFStream(cls.stream);
-    setFName(cls.name); setFCode(cls.code); setFColor(cls.color || "#50C878"); setFStrength(cls.strength);
+    setFName(cls.name); setFCode(cls.code); setFColor(cls.color || "#50C878");
+    setFStrength(cls.strength);
+    setFTeacherId(cls.class_teacher_id ?? null);
+    setFRoomId(cls.home_room_id ?? null);
     setModalOpen(true);
   }
 
   async function saveClass() {
-    if (!fGrade.trim()) return;
-    const data = { grade: fGrade.trim(), section: fSection.trim(), stream: fStream.trim(), name: fName.trim() || `Grade ${fGrade.trim()} ${fSection.trim()}`.trim(), code: fCode.trim(), color: fColor, strength: fStrength };
+    if (!fGrade.trim()) {
+      toast("error", "Grade is required.");
+      return;
+    }
+
+    const displayName = fName.trim() || autoName(fGrade, fSection, fStream);
+    const code = fCode.trim() || autoCode(fGrade, fSection);
+
+    const data = {
+      grade: fGrade.trim(),
+      section: fSection.trim(),
+      stream: fStream.trim(),
+      name: displayName,
+      code,
+      color: fColor,
+      strength: fStrength,
+      class_teacher_id: fTeacherId || null,
+      home_room_id: fRoomId || null,
+    };
+
     try {
       if (editClass) {
-        await api.updateClass(pid, editClass.id, data);
-        onChange(classes.map(c => c.id === editClass.id ? { ...c, ...data } : c));
+        const updated = await api.updateClass(pid, editClass.id, data);
+        onChange(classes.map(c => c.id === editClass.id ? updated : c));
         toast("success", "Class updated.");
       } else {
         const created = await api.createClass(pid, data);
-        onChange([...classes, { ...created, ...data } as SchoolClass]);
+        onChange([...classes, created]);
         toast("success", "Class added.");
       }
       setModalOpen(false);
-    } catch (err) { toast("error", err instanceof Error ? err.message : "Save failed"); }
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Save failed");
+    }
   }
 
   async function deleteSelected() {
@@ -72,7 +111,9 @@ export default function ClassesTab({ pid, classes, onChange, onNext }: Props) {
       onChange(classes.filter(c => c.id !== selectedId));
       setSelectedId(null);
       toast("success", "Class deleted.");
-    } catch (err) { toast("error", err instanceof Error ? err.message : "Delete failed"); }
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Delete failed");
+    }
   }
 
   async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -86,11 +127,13 @@ export default function ClassesTab({ pid, classes, onChange, onNext }: Props) {
     finally { setImporting(false); e.target.value = ""; }
   }
 
+
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Classes &amp; Sections</h2>
       <p className="subheading">Add and manage classes, sections, and streams.</p>
 
+      {/* ── Toolbar ── */}
       <div className="toolbar" style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
         <button type="button" className="btn btn-primary" onClick={openAdd}>+ Add Class</button>
         <input type="file" ref={importRef} accept=".xlsx,.xls" style={{ display: "none" }} onChange={onImportFile} />
@@ -100,19 +143,38 @@ export default function ClassesTab({ pid, classes, onChange, onNext }: Props) {
         <button type="button" className="btn btn-danger" onClick={deleteSelected} disabled={selectedId == null}>Delete</button>
       </div>
 
+      {/* ── Import Result ── */}
       {importResult && (
         <div className="alert alert-success" style={{ marginBottom: "1rem" }}>
-          Imported {importResult.success_count} class(es).{importResult.errors.length > 0 && ` Errors: ${importResult.errors.map(e => `Row ${e.row}: ${e.message}`).join("; ")}`}
+          Imported {importResult.success_count} class(es).
+          {importResult.errors.length > 0 && ` Errors: ${importResult.errors.map(e => `Row ${e.row}: ${e.message}`).join("; ")}`}
         </div>
       )}
 
+      {/* ── Data Table ── */}
       {classes.length === 0 && <p className="subheading" style={{ textAlign: "center" }}>No classes added yet. Import from Excel or add manually.</p>}
       <table className="data-table">
-        <thead><tr><th style={{ width: 40 }}>#</th><th>Name</th><th>Grade</th><th>Section</th><th>Stream</th><th>Code</th><th style={{ width: 60 }}>Color</th><th>Strength</th></tr></thead>
+        <thead>
+          <tr>
+            <th style={{ width: 40 }}>#</th>
+            <th>Name</th><th>Grade</th><th>Section</th><th>Stream</th><th>Code</th>
+            <th style={{ width: 60 }}>Color</th><th>Strength</th>
+          </tr>
+        </thead>
         <tbody>
           {classes.map((c, i) => (
-            <tr key={c.id} className={selectedId === c.id ? "selected" : ""} onClick={() => setSelectedId(c.id)} onDoubleClick={() => openEdit(c)}>
-              <td>{i + 1}</td><td>{c.name}</td><td>{c.grade}</td><td>{c.section}</td><td>{c.stream}</td><td>{c.code}</td>
+            <tr
+              key={c.id}
+              className={selectedId === c.id ? "selected" : ""}
+              onClick={() => setSelectedId(c.id)}
+              onDoubleClick={() => openEdit(c)}
+            >
+              <td>{i + 1}</td>
+              <td>{c.name}</td>
+              <td>{c.grade}</td>
+              <td>{c.section}</td>
+              <td>{c.stream}</td>
+              <td>{c.code}</td>
               <td><span className="color-swatch" style={{ backgroundColor: c.color || "#50C878" }} /></td>
               <td>{c.strength}</td>
             </tr>
@@ -120,22 +182,59 @@ export default function ClassesTab({ pid, classes, onChange, onNext }: Props) {
         </tbody>
       </table>
 
+      {/* ── Footer nav ── */}
       <div className="nav-footer">
         <button type="button" className="btn" onClick={onNext}>Next: Classrooms →</button>
       </div>
 
+      {/* ── Add/Edit Modal ── */}
       {modalOpen && (
         <div className="modal-overlay" onClick={() => setModalOpen(false)}>
           <div className="modal-dialog" onClick={e => e.stopPropagation()}>
             <h3 style={{ marginTop: 0 }}>{editClass ? "Edit Class" : "New Class"}</h3>
             <div className="modal-form">
-              <div className="modal-field"><label className="modal-label required">Grade:</label><input value={fGrade} onChange={e => setFGrade(e.target.value)} placeholder="e.g., 10" autoFocus /></div>
-              <div className="modal-field"><label className="modal-label">Section:</label><input value={fSection} onChange={e => setFSection(e.target.value)} placeholder="e.g., A" /></div>
-              <div className="modal-field"><label className="modal-label">Stream:</label><input value={fStream} onChange={e => setFStream(e.target.value)} placeholder="e.g., Science" /></div>
-              <div className="modal-field"><label className="modal-label">Display Name:</label><input value={fName} onChange={e => setFName(e.target.value)} placeholder="Auto: Grade + Section" /></div>
-              <div className="modal-field"><label className="modal-label">Code:</label><input value={fCode} onChange={e => setFCode(e.target.value)} placeholder="e.g., 10A" /></div>
-              <div className="modal-field"><label className="modal-label">Color:</label><input type="color" value={fColor} onChange={e => setFColor(e.target.value)} style={{ width: 48, height: 32, padding: 0 }} /></div>
-              <div className="modal-field"><label className="modal-label">Strength:</label><input type="number" min={1} value={fStrength} onChange={e => setFStrength(Number(e.target.value))} style={{ width: 80 }} /></div>
+              <div className="modal-field">
+                <label className="modal-label required">Grade:</label>
+                <input value={fGrade} onChange={e => setFGrade(e.target.value)} placeholder="e.g. 9, 10, 11" autoFocus />
+              </div>
+              <div className="modal-field">
+                <label className="modal-label">Section:</label>
+                <input value={fSection} onChange={e => setFSection(e.target.value)} placeholder="e.g. A, B, Science" />
+              </div>
+              <div className="modal-field">
+                <label className="modal-label">Stream:</label>
+                <input value={fStream} onChange={e => setFStream(e.target.value)} placeholder="e.g. Science, Co..." />
+              </div>
+              <div className="modal-field">
+                <label className="modal-label">Display Name:</label>
+                <input value={fName} onChange={e => setFName(e.target.value)} placeholder={`e.g. ${autoName(fGrade || "9", fSection || "Scie...", "")}`} />
+              </div>
+              <div className="modal-field">
+                <label className="modal-label">Code:</label>
+                <input value={fCode} onChange={e => setFCode(e.target.value)} placeholder={`e.g. ${autoCode(fGrade || "9", fSection || "SCI")}`} />
+              </div>
+              <div className="modal-field">
+                <label className="modal-label">Color:</label>
+                <input type="color" value={fColor} onChange={e => setFColor(e.target.value)} style={{ width: 48, height: 36, padding: 0, border: "1px solid #e2e8f0", borderRadius: 6, cursor: "pointer" }} />
+              </div>
+              <div className="modal-field">
+                <label className="modal-label">Student Strength:</label>
+                <input type="number" min={1} max={500} value={fStrength} onChange={e => setFStrength(Number(e.target.value))} style={{ width: 80 }} />
+              </div>
+              <div className="modal-field">
+                <label className="modal-label">Class Teacher:</label>
+                <select value={fTeacherId ?? 0} onChange={e => setFTeacherId(Number(e.target.value) || null)}>
+                  <option value={0}>(None)</option>
+                  {teachers.map(t => <option key={t.id} value={t.id}>{t.title} {t.first_name} {t.last_name}</option>)}
+                </select>
+              </div>
+              <div className="modal-field">
+                <label className="modal-label">Home Room:</label>
+                <select value={fRoomId ?? 0} onChange={e => setFRoomId(Number(e.target.value) || null)}>
+                  <option value={0}>(None)</option>
+                  {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
             </div>
             <div className="modal-actions">
               <button type="button" className="btn" onClick={() => setModalOpen(false)}>Cancel</button>
