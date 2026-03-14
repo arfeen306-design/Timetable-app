@@ -1,0 +1,220 @@
+/* ===== Timetable Grid — Visual drag-and-drop timetable ===== */
+
+.tt-container {
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.tt-grid {
+  display: grid;
+  gap: 2px;
+  min-width: 700px;
+  background: #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Header cells */
+.tt-header {
+  background: #1e293b;
+  color: #fff;
+  padding: 10px 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tt-header--corner {
+  background: #0f172a;
+  font-size: 0.75rem;
+}
+
+/* Period (row) label */
+.tt-period-label {
+  background: #f8fafc;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-right: 2px solid #e2e8f0;
+}
+
+.tt-period-label small {
+  font-weight: 400;
+  color: #94a3b8;
+  font-size: 0.7rem;
+}
+
+/* Regular cells */
+.tt-cell {
+  background: #fff;
+  min-height: 64px;
+  padding: 3px;
+  transition: background 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+
+.tt-cell:hover {
+  background: #f1f5f9;
+}
+
+/* Drag target highlighting */
+.tt-cell--drag-valid {
+  background: #dcfce7 !important;
+  box-shadow: inset 0 0 0 2px #22c55e;
+}
+
+.tt-cell--drag-conflict {
+  background: #fef2f2 !important;
+  box-shadow: inset 0 0 0 2px #ef4444;
+}
+
+.tt-cell--drag-current {
+  background: #dbeafe !important;
+  box-shadow: inset 0 0 0 2px #3b82f6;
+}
+
+/* Lesson card */
+.tt-card {
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: grab;
+  font-size: 0.78rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  user-select: none;
+  transition: transform 0.1s, box-shadow 0.15s;
+  border-left: 4px solid rgba(0, 0, 0, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.tt-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 2;
+}
+
+.tt-card:active {
+  cursor: grabbing;
+}
+
+.tt-card--dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+.tt-card--locked {
+  cursor: not-allowed;
+}
+
+.tt-card--locked::after {
+  content: "🔒";
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 0.65rem;
+}
+
+.tt-card__subject {
+  font-weight: 700;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tt-card__teacher {
+  font-size: 0.7rem;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tt-card__room {
+  font-size: 0.65rem;
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Empty cell indicator */
+.tt-cell--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #cbd5e1;
+  font-size: 0.75rem;
+}
+
+/* Conflict toast */
+.tt-conflict-toast {
+  position: fixed;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ef4444;
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+  font-size: 0.875rem;
+  z-index: 10000;
+  max-width: 500px;
+  text-align: center;
+  animation: tt-toast-in 0.3s ease;
+}
+
+@keyframes tt-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* View selector */
+.tt-view-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.tt-view-bar select {
+  max-width: 220px;
+}
+
+.tt-legend {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-left: auto;
+}
+
+.tt-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tt-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
