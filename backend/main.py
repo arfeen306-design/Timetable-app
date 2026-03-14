@@ -81,6 +81,31 @@ def debug_db():
         "connected_to_postgres": "postgres" in settings_url or "supabase" in settings_url,
     }
 
+@app.post("/admin/reset-db")
+def admin_reset_db(secret: str = ""):
+    """ONE-TIME: Drop all tables and recreate from SQLAlchemy models. Remove after use."""
+    if secret != "timetable-reset-2024":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Invalid secret")
+    # Import ALL models so Base.metadata knows about them
+    import backend.models.user  # noqa
+    import backend.models.school  # noqa
+    import backend.models.project  # noqa
+    import backend.models.school_settings  # noqa
+    import backend.models.teacher_model  # noqa
+    import backend.models.class_model  # noqa
+    import backend.models.room_model  # noqa
+    import backend.models.lesson_model  # noqa
+    import backend.models.constraint_model  # noqa
+    import backend.models.timetable_model  # noqa
+    from backend.models.base import Base, engine
+    try:
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+        return {"status": "ok", "message": "All tables dropped and recreated from SQLAlchemy models."}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
 # Serve built frontend so you only need backend + http://localhost:8000
 if os.path.isdir(_static_dir):
     app.mount("/assets", StaticFiles(directory=os.path.join(_static_dir, "assets")), name="assets")
