@@ -311,189 +311,197 @@ function SettingsTab({
     }
   }
 
-  const sectionStyle: React.CSSProperties = { borderTop: "2px solid #e2e8f0", paddingTop: "1.25rem", marginTop: "1.5rem" };
-  const fieldRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" };
-  const labelStyle: React.CSSProperties = { minWidth: 180, fontWeight: 500, fontSize: "0.875rem", textAlign: "right" };
   const inputNarrow: React.CSSProperties = { width: 100, maxWidth: 100 };
 
   return (
-    <div className="card">
+    <div className="settings-card">
       {/* ── School Information ── */}
-      <h2 style={{ marginTop: 0 }}>School Settings</h2>
+      <h2>School Settings</h2>
       <p className="subheading">Configure your school's basic information and schedule structure.</p>
 
-      <h3>School Information</h3>
-      <div style={fieldRow}>
-        <label style={labelStyle}>School Name *</label>
+      <h3 className="settings-section-title">School Information</h3>
+      <div className="settings-field">
+        <label className="settings-label required">School Name</label>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Islamabad Model School" />
       </div>
-      <div style={fieldRow}>
-        <label style={labelStyle}>Academic Year</label>
+      <div className="settings-field">
+        <label className="settings-label">Academic Year</label>
         <input value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} placeholder="2025-2026" />
       </div>
 
       {/* ── Schedule Structure ── */}
-      <h3 style={sectionStyle}>Schedule Structure</h3>
-      <div style={fieldRow}>
-        <label style={labelStyle}>Working Days per Week</label>
-        <select value={daysPerWeek} onChange={(e) => setDaysPerWeek(Number(e.target.value))} style={inputNarrow}>
-          {[1, 2, 3, 4, 5, 6, 7].map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
-      </div>
-      <div style={fieldRow}>
-        <label style={labelStyle}>Lessons per Day</label>
-        <select value={periodsPerDay} onChange={(e) => setPeriodsPerDay(Number(e.target.value))} style={inputNarrow}>
-          {Array.from({ length: 16 }, (_, i) => <option key={i} value={i}>{i}</option>)}
-        </select>
+      <div className="settings-section">
+        <h3 className="settings-section-title">Schedule Structure</h3>
+        <div className="settings-field">
+          <label className="settings-label">Working Days per Week</label>
+          <select value={daysPerWeek} onChange={(e) => setDaysPerWeek(Number(e.target.value))} style={inputNarrow}>
+            {[1, 2, 3, 4, 5, 6, 7].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">Lessons per Day</label>
+          <select value={periodsPerDay} onChange={(e) => setPeriodsPerDay(Number(e.target.value))} style={inputNarrow}>
+            {Array.from({ length: 16 }, (_, i) => <option key={i} value={i}>{i}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* ── Bell Schedule — Period Timing ── */}
-      <h3 style={sectionStyle}>Bell Schedule — Period Timing</h3>
-      <div style={fieldRow}>
-        <label style={labelStyle}>Period duration (minutes)</label>
-        <select value={periodDuration} onChange={(e) => setPeriodDuration(Number(e.target.value))} style={inputNarrow}>
-          {[25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90].map((m) => <option key={m} value={m}>{m} minutes</option>)}
-        </select>
-      </div>
-      <div style={fieldRow}>
-        <label style={labelStyle}>School start time</label>
-        <select value={schoolStartTime} onChange={(e) => setSchoolStartTime(e.target.value)} style={{ width: 120 }}>
-          {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </div>
-      <div style={fieldRow}>
-        <label style={labelStyle}>First period start time</label>
-        <select value={firstPeriodStart} onChange={(e) => setFirstPeriodStart(e.target.value)} style={{ width: 120 }}>
-          {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </div>
-      <div style={{ ...fieldRow, marginLeft: 180 }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.85rem", color: "#64748b" }}>
-          <input type="checkbox" checked={zeroPeroid} onChange={(e) => setZeroPeriod(e.target.checked)} />
-          Include zero period (class teacher time only: from school start to first period start)
-        </label>
+      <div className="settings-section">
+        <h3 className="settings-section-title">Bell Schedule — Period Timing</h3>
+        <div className="settings-field">
+          <label className="settings-label">Period duration (minutes)</label>
+          <select value={periodDuration} onChange={(e) => setPeriodDuration(Number(e.target.value))} style={inputNarrow}>
+            {[25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90].map((m) => <option key={m} value={m}>{m} minutes</option>)}
+          </select>
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">School start time</label>
+          <select value={schoolStartTime} onChange={(e) => setSchoolStartTime(e.target.value)} style={{ width: 120 }}>
+            {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">First period start time</label>
+          <select value={firstPeriodStart} onChange={(e) => setFirstPeriodStart(e.target.value)} style={{ width: 120 }}>
+            {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="settings-hint">
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={zeroPeroid} onChange={(e) => setZeroPeriod(e.target.checked)} style={{ width: "auto", accentColor: "#3b82f6" }} />
+            Include zero period (class teacher time: school start → first period)
+          </label>
+        </div>
       </div>
 
       {/* ── Breaks ── */}
-      <div style={fieldRow}>
-        <label style={labelStyle}>Number of breaks (0–9)</label>
-        <select value={numBreaks} onChange={(e) => setNumBreaks(Number(e.target.value))} style={inputNarrow}>
-          {Array.from({ length: 10 }, (_, i) => <option key={i} value={i}>{i}</option>)}
-        </select>
+      <div className="settings-section">
+        <h3 className="settings-section-title">Breaks</h3>
+        <div className="settings-field">
+          <label className="settings-label">Number of breaks (0–9)</label>
+          <select value={numBreaks} onChange={(e) => setNumBreaks(Number(e.target.value))} style={inputNarrow}>
+            {Array.from({ length: 10 }, (_, i) => <option key={i} value={i}>{i}</option>)}
+          </select>
+        </div>
+
+        {breaks.map((b, i) => (
+          <div key={i} className="break-card">
+            <div className="break-card-title">Break {i + 1}</div>
+            <div className="settings-field">
+              <label className="settings-label" style={{ minWidth: 140 }}>Name</label>
+              <input value={b.name} onChange={(e) => updateBreak(i, "name", e.target.value)} placeholder="e.g. Short Break" style={{ width: 200 }} />
+            </div>
+            <div className="settings-field">
+              <label className="settings-label" style={{ minWidth: 140 }}>Start time</label>
+              <select value={b.start} onChange={(e) => updateBreak(i, "start", e.target.value)} style={{ width: 110 }}>
+                {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="settings-field">
+              <label className="settings-label" style={{ minWidth: 140 }}>End time</label>
+              <select value={b.end} onChange={(e) => updateBreak(i, "end", e.target.value)} style={{ width: 110 }}>
+                {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="settings-field">
+              <label className="settings-label" style={{ minWidth: 140 }}>After period</label>
+              <select value={b.after_period} onChange={(e) => updateBreak(i, "after_period", Number(e.target.value))} style={inputNarrow}>
+                {Array.from({ length: periodsPerDay }, (_, p) => <option key={p + 1} value={p + 1}>{p + 1} (after period)</option>)}
+              </select>
+            </div>
+          </div>
+        ))}
+
+        <p className="settings-hint">
+          Lesson length in periods (single, double, etc.) is set per lesson in the Lessons tab.
+        </p>
       </div>
 
-      {breaks.map((b, i) => (
-        <div key={i} style={{ marginLeft: 40, marginBottom: "1rem", padding: "0.75rem", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
-          <div style={fieldRow}>
-            <label style={{ ...labelStyle, minWidth: 140 }}>Break {i + 1} name</label>
-            <input value={b.name} onChange={(e) => updateBreak(i, "name", e.target.value)} placeholder="e.g. Short Break" style={{ width: 180 }} />
-          </div>
-          <div style={fieldRow}>
-            <label style={{ ...labelStyle, minWidth: 140 }}>Break {i + 1} start</label>
-            <select value={b.start} onChange={(e) => updateBreak(i, "start", e.target.value)} style={{ width: 100 }}>
-              {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div style={fieldRow}>
-            <label style={{ ...labelStyle, minWidth: 140 }}>Break {i + 1} end</label>
-            <select value={b.end} onChange={(e) => updateBreak(i, "end", e.target.value)} style={{ width: 100 }}>
-              {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div style={fieldRow}>
-            <label style={{ ...labelStyle, minWidth: 140 }}>Break {i + 1} after period</label>
-            <select value={b.after_period} onChange={(e) => updateBreak(i, "after_period", Number(e.target.value))} style={inputNarrow}>
-              {Array.from({ length: periodsPerDay }, (_, p) => <option key={p + 1} value={p + 1}>{p + 1} (after period)</option>)}
-            </select>
-          </div>
-        </div>
-      ))}
-
-      <p style={{ fontSize: "0.8rem", color: "#94a3b8", marginLeft: 40 }}>
-        Lesson length in periods (single, double, etc.) is set per lesson in the Lessons tab.
-      </p>
-
       {/* ── Friday / Different Schedule ── */}
-      <h3 style={sectionStyle}>
-        <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+      <div className="settings-section">
+        <h3 className="friday-section-title">
           <select value={fridayDayIndex} onChange={(e) => setFridayDayIndex(Number(e.target.value))} style={{ width: 120, fontWeight: 600 }}>
             {DAY_LABELS.map((d, i) => <option key={i} value={i}>{d}</option>)}
           </select>
-          — Different Schedule (Optional)
-        </span>
-      </h3>
-      <div style={{ ...fieldRow, marginLeft: 40 }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <input type="checkbox" checked={fridayDifferent} onChange={(e) => setFridayDifferent(e.target.checked)} />
-          {DAY_LABELS[fridayDayIndex]} has different timing
-        </label>
+          <span>— Different Schedule (Optional)</span>
+        </h3>
+        <div className="settings-field" style={{ marginLeft: 20 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 500, fontSize: "0.875rem" }}>
+            <input type="checkbox" checked={fridayDifferent} onChange={(e) => setFridayDifferent(e.target.checked)} style={{ width: "auto", accentColor: "#f59e0b" }} />
+            {DAY_LABELS[fridayDayIndex]} has different timing
+          </label>
+        </div>
+
+        {fridayDifferent && (
+          <div style={{ marginLeft: 20, marginTop: "0.75rem" }}>
+            <div className="settings-field">
+              <label className="settings-label">{DAY_LABELS[fridayDayIndex]} first period start</label>
+              <select value={fridayFirstPeriodStart} onChange={(e) => setFridayFirstPeriodStart(e.target.value)} style={{ width: 120 }}>
+                {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="settings-field">
+              <label className="settings-label">{DAY_LABELS[fridayDayIndex]} period duration</label>
+              <select value={fridayPeriodDuration} onChange={(e) => setFridayPeriodDuration(Number(e.target.value))} style={inputNarrow}>
+                {[25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90].map((m) => <option key={m} value={m}>{m} minutes</option>)}
+              </select>
+            </div>
+            <div className="settings-field">
+              <label className="settings-label">{DAY_LABELS[fridayDayIndex]} breaks (0–9)</label>
+              <select value={fridayNumBreaks} onChange={(e) => setFridayNumBreaks(Number(e.target.value))} style={inputNarrow}>
+                {Array.from({ length: 10 }, (_, i) => <option key={i} value={i}>{i}</option>)}
+              </select>
+            </div>
+
+            {fridayBreaks.map((b, i) => (
+              <div key={i} className="break-card-friday">
+                <div className="break-card-title">{DAY_LABELS[fridayDayIndex]} Break {i + 1}</div>
+                <div className="settings-field">
+                  <label className="settings-label" style={{ minWidth: 140 }}>Name</label>
+                  <input value={b.name} onChange={(e) => updateFridayBreak(i, "name", e.target.value)} placeholder="e.g. Break" style={{ width: 200 }} />
+                </div>
+                <div className="settings-field">
+                  <label className="settings-label" style={{ minWidth: 140 }}>Start time</label>
+                  <select value={b.start} onChange={(e) => updateFridayBreak(i, "start", e.target.value)} style={{ width: 110 }}>
+                    {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-label" style={{ minWidth: 140 }}>End time</label>
+                  <select value={b.end} onChange={(e) => updateFridayBreak(i, "end", e.target.value)} style={{ width: 110 }}>
+                    {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-label" style={{ minWidth: 140 }}>After period</label>
+                  <select value={b.after_period} onChange={(e) => updateFridayBreak(i, "after_period", Number(e.target.value))} style={inputNarrow}>
+                    {Array.from({ length: periodsPerDay }, (_, p) => <option key={p + 1} value={p + 1}>{p + 1}</option>)}
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {fridayDifferent && (
-        <div style={{ marginLeft: 40 }}>
-          <div style={fieldRow}>
-            <label style={labelStyle}>{DAY_LABELS[fridayDayIndex]} first period start</label>
-            <select value={fridayFirstPeriodStart} onChange={(e) => setFridayFirstPeriodStart(e.target.value)} style={{ width: 120 }}>
-              {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div style={fieldRow}>
-            <label style={labelStyle}>{DAY_LABELS[fridayDayIndex]} period duration</label>
-            <select value={fridayPeriodDuration} onChange={(e) => setFridayPeriodDuration(Number(e.target.value))} style={inputNarrow}>
-              {[25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90].map((m) => <option key={m} value={m}>{m} minutes</option>)}
-            </select>
-          </div>
-          <div style={fieldRow}>
-            <label style={labelStyle}>{DAY_LABELS[fridayDayIndex]} breaks (0–9)</label>
-            <select value={fridayNumBreaks} onChange={(e) => setFridayNumBreaks(Number(e.target.value))} style={inputNarrow}>
-              {Array.from({ length: 10 }, (_, i) => <option key={i} value={i}>{i}</option>)}
-            </select>
-          </div>
-
-          {fridayBreaks.map((b, i) => (
-            <div key={i} style={{ marginLeft: 20, marginBottom: "1rem", padding: "0.75rem", background: "#fffbeb", borderRadius: 8, border: "1px solid #fde68a" }}>
-              <div style={fieldRow}>
-                <label style={{ ...labelStyle, minWidth: 160 }}>{DAY_LABELS[fridayDayIndex]} break {i + 1} name</label>
-                <input value={b.name} onChange={(e) => updateFridayBreak(i, "name", e.target.value)} placeholder="e.g. Break" style={{ width: 180 }} />
-              </div>
-              <div style={fieldRow}>
-                <label style={{ ...labelStyle, minWidth: 160 }}>{DAY_LABELS[fridayDayIndex]} break {i + 1} start</label>
-                <select value={b.start} onChange={(e) => updateFridayBreak(i, "start", e.target.value)} style={{ width: 100 }}>
-                  {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div style={fieldRow}>
-                <label style={{ ...labelStyle, minWidth: 160 }}>{DAY_LABELS[fridayDayIndex]} break {i + 1} end</label>
-                <select value={b.end} onChange={(e) => updateFridayBreak(i, "end", e.target.value)} style={{ width: 100 }}>
-                  {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div style={fieldRow}>
-                <label style={{ ...labelStyle, minWidth: 160 }}>{DAY_LABELS[fridayDayIndex]} break {i + 1} after period</label>
-                <select value={b.after_period} onChange={(e) => updateFridayBreak(i, "after_period", Number(e.target.value))} style={inputNarrow}>
-                  {Array.from({ length: periodsPerDay }, (_, p) => <option key={p + 1} value={p + 1}>{p + 1}</option>)}
-                </select>
-              </div>
-            </div>
+      {/* ── Weekend Days ── */}
+      <div className="settings-section">
+        <h3 className="settings-section-title">Weekend Days</h3>
+        <div className="weekend-row">
+          {DAY_LABELS.map((day, i) => (
+            <label key={i} className={`weekend-checkbox${weekendDays.has(i) ? " checked" : ""}`}>
+              <input type="checkbox" checked={weekendDays.has(i)} onChange={() => toggleWeekend(i)} style={{ width: "auto" }} />
+              {day}
+            </label>
           ))}
         </div>
-      )}
-
-      {/* ── Weekend Days ── */}
-      <h3 style={sectionStyle}>Weekend Days</h3>
-      <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
-        {DAY_LABELS.map((day, i) => (
-          <label key={i} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: "0.9rem" }}>
-            <input type="checkbox" checked={weekendDays.has(i)} onChange={() => toggleWeekend(i)} />
-            {day}
-          </label>
-        ))}
       </div>
 
       {/* ── Save buttons ── */}
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", borderTop: "2px solid #e2e8f0", paddingTop: "1rem", marginTop: "1rem" }}>
-        <button type="button" className="btn btn-primary" onClick={() => save()} disabled={saving}>{saving ? "Saving…" : "Save Settings"}</button>
-        <button type="button" className="btn" onClick={() => save(true)} disabled={saving}>Next: Subjects</button>
+      <div className="settings-footer">
+        <button type="button" className="btn btn-primary" onClick={() => save()} disabled={saving}>{saving ? "Saving…" : "💾 Save Settings"}</button>
+        <button type="button" className="btn" onClick={() => save(true)} disabled={saving}>Next: Subjects →</button>
       </div>
     </div>
   );
