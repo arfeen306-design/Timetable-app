@@ -48,7 +48,21 @@ export default function SubjectsTab({ pid, subjects, rooms, onChange, onNext }: 
   }
 
   async function saveSubject() {
-    if (!fName.trim()) return;
+    if (!fName.trim()) {
+      toast("error", "Subject name is required.");
+      return;
+    }
+
+    /* ── Case-insensitive duplicate check ── */
+    const nameLower = fName.trim().toLowerCase();
+    const duplicate = subjects.find(
+      s => s.name.trim().toLowerCase() === nameLower && (!editSubject || s.id !== editSubject.id)
+    );
+    if (duplicate) {
+      toast("error", `Subject "${duplicate.name}" already exists. Please use a different name.`);
+      return;
+    }
+
     const data = {
       name: fName.trim(),
       code: fCode.trim() || fName.trim().slice(0, 3).toUpperCase(),
