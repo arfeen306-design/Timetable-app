@@ -239,12 +239,14 @@ export function copyLessonsFromClass(projectId: number, sourceClassId: number, t
 }
 
 // Constraints
+export type Constraint = { id: number; entity_type: string; entity_id: number; day_index: number; period_index: number; constraint_type: string; weight: number; is_hard: boolean };
+
 export function listConstraints(projectId: number) {
-  return api<{ id: number; entity_type: string; entity_id: number; day_index: number; period_index: number }[]>(`/api/projects/${projectId}/constraints`);
+  return api<Constraint[]>(`/api/projects/${projectId}/constraints`);
 }
 
 export function createConstraint(projectId: number, data: { entity_type: string; entity_id: number; day_index: number; period_index: number; is_hard?: boolean }) {
-  return api<{ id: number }>(`/api/projects/${projectId}/constraints`, { method: "POST", body: JSON.stringify(data) });
+  return api<Constraint>(`/api/projects/${projectId}/constraints`, { method: "POST", body: JSON.stringify(data) });
 }
 
 export function deleteConstraint(projectId: number, id: number) {
