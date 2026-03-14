@@ -70,7 +70,6 @@ def debug_db():
     import os
     raw_url = os.environ.get("DATABASE_URL", "NOT_SET")
     settings_url = settings.database_url
-    # Show only type, not credentials
     def classify(url):
         if "sqlite" in url: return "sqlite"
         if "postgres" in url or "supabase" in url: return "postgresql"
@@ -80,6 +79,17 @@ def debug_db():
         "pydantic_settings_url": classify(settings_url),
         "connected_to_postgres": "postgres" in settings_url or "supabase" in settings_url,
     }
+
+@app.get("/debug/solver")
+def debug_solver():
+    """Check if original CP-SAT solver engine imports correctly."""
+    try:
+        from solver.engine import TimetableSolver
+        from core.validators import validate_for_generation
+        return {"solver_available": True, "engine": "OR-Tools CP-SAT (original solver/engine.py)"}
+    except ImportError as e:
+        return {"solver_available": False, "error": str(e)}
+
 
 
 # Serve built frontend so you only need backend + http://localhost:8000

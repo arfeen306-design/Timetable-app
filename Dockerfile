@@ -17,12 +17,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-# First copy the requirements files
-COPY requirements.txt ./root-requirements.txt
+# requirements-server.txt: ortools + exports (no PySide6/Qt desktop libs)
+# backend/requirements.txt: fastapi, sqlalchemy, psycopg2, etc.
+COPY requirements-server.txt ./server-requirements.txt
 COPY backend/requirements.txt ./backend-requirements.txt
 
 # Install dependencies
-RUN pip install --no-cache-dir -r root-requirements.txt \
+RUN pip install --no-cache-dir -r server-requirements.txt \
     && pip install --no-cache-dir -r backend-requirements.txt
 
 # Copy shared engine folders
