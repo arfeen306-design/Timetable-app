@@ -35,7 +35,7 @@ export default function ProjectEditor() {
       api.listTeachers(pid).then(setTeachers),
       api.listLessons(pid).then(setLessons),
       api.listConstraints(pid).then(setConstraints),
-    ]).catch(setError).finally(() => setLoading(false));
+    ]).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoading(false));
   }
 
   useEffect(() => { load(); }, [pid]);

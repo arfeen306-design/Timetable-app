@@ -32,31 +32,31 @@ export default function Review() {
   useEffect(() => {
     if (view === "class" && classId) {
       setLoading(true);
-      api.getClassTimetable(pid!, classId).then(setClassData).catch(setError).finally(() => setLoading(false));
+      api.getClassTimetable(pid!, classId).then(setClassData).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoading(false));
     } else setClassData(null);
   }, [view, classId, pid]);
   useEffect(() => {
     if (view === "teacher" && teacherId) {
       setLoading(true);
-      api.getTeacherTimetable(pid!, teacherId).then(setTeacherData).catch(setError).finally(() => setLoading(false));
+      api.getTeacherTimetable(pid!, teacherId).then(setTeacherData).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoading(false));
     } else setTeacherData(null);
   }, [view, teacherId, pid]);
   useEffect(() => {
     if (view === "room" && roomId) {
       setLoading(true);
-      api.getRoomTimetable(pid!, roomId).then(setRoomData).catch(setError).finally(() => setLoading(false));
+      api.getRoomTimetable(pid!, roomId).then(setRoomData).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoading(false));
     } else setRoomData(null);
   }, [view, roomId, pid]);
   useEffect(() => {
     if (view === "master") {
       setLoading(true);
-      api.getMasterTimetable(pid!).then(setMasterData).catch(setError).finally(() => setLoading(false));
+      api.getMasterTimetable(pid!).then(setMasterData).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoading(false));
     } else setMasterData(null);
   }, [view, pid]);
   useEffect(() => {
     if (view === "workload") {
       setLoading(true);
-      api.getWorkload(pid!).then(setWorkloadData).catch(setError).finally(() => setLoading(false));
+      api.getWorkload(pid!).then(setWorkloadData).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoading(false));
     } else setWorkloadData(null);
   }, [view, pid]);
 
