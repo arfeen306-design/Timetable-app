@@ -16,7 +16,10 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.listProjects().then(setProjects).catch(setError).finally(() => setLoading(false));
+    api.listProjects()
+      .then(setProjects)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleLoadDemo() {
