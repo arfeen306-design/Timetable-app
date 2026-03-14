@@ -64,6 +64,18 @@ app.include_router(api_router, prefix="/api")
 def health():
     return {"status": "ok"}
 
+@app.get("/debug/db")
+def debug_db():
+    """Safe debug endpoint: shows DB type without exposing credentials."""
+    url = settings.database_url
+    if url.startswith("sqlite"):
+        db_type = "sqlite"
+    elif "supabase" in url or "postgresql" in url or "postgres" in url:
+        db_type = "postgresql"
+    else:
+        db_type = "unknown"
+    return {"db_type": db_type, "connected_to_postgres": db_type == "postgresql"}
+
 # Serve built frontend so you only need backend + http://localhost:8000
 if os.path.isdir(_static_dir):
     app.mount("/assets", StaticFiles(directory=os.path.join(_static_dir, "assets")), name="assets")
