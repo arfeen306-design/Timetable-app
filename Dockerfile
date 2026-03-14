@@ -45,5 +45,5 @@ ENV PYTHONPATH=/app
 # Expose the API and Web port
 EXPOSE 8000
 
-# Start command
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start command — uses $PORT env var (set by Railway/Render), falls back to 8000 locally
+CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}
