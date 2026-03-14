@@ -67,14 +67,19 @@ def health():
 @app.get("/debug/db")
 def debug_db():
     """Safe debug endpoint: shows DB type without exposing credentials."""
-    url = settings.database_url
-    if url.startswith("sqlite"):
-        db_type = "sqlite"
-    elif "supabase" in url or "postgresql" in url or "postgres" in url:
-        db_type = "postgresql"
-    else:
-        db_type = "unknown"
-    return {"db_type": db_type, "connected_to_postgres": db_type == "postgresql"}
+    import os
+    raw_url = os.environ.get("DATABASE_URL", "NOT_SET")
+    settings_url = settings.database_url
+    # Show only type, not credentials
+    def classify(url):
+        if "sqlite" in url: return "sqlite"
+        if "postgres" in url or "supabase" in url: return "postgresql"
+        return url[:30] if url != "NOT_SET" else "NOT_SET"
+    return {
+        "os_environ_DATABASE_URL": classify(raw_url),
+        "pydantic_settings_url": classify(settings_url),
+        "connected_to_postgres": "postgres" in settings_url or "supabase" in settings_url,
+    }
 
 # Serve built frontend so you only need backend + http://localhost:8000
 if os.path.isdir(_static_dir):
