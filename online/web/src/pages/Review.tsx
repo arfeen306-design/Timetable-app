@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import * as api from "../api";
+import type { DaySlots, PeriodSlot } from "../api";
 import { useToast } from "../context/ToastContext";
 
 interface Entry {
@@ -33,7 +34,7 @@ export default function Review() {
   const [classes, setClasses] = useState<Awaited<ReturnType<typeof api.listClasses>>>([]);
   const [teachers, setTeachers] = useState<Awaited<ReturnType<typeof api.listTeachers>>>([]);
   const [rooms, setRooms] = useState<Awaited<ReturnType<typeof api.listRooms>>>([]);
-  const [settings, setSettings] = useState<Awaited<ReturnType<typeof api.getSchoolSettings>> | null>(null);
+  const [periodSlots, setPeriodSlots] = useState<DaySlots[]>([]);
 
   const [view, setView] = useState<ViewType>("class");
   const [classId, setClassId] = useState(0);
@@ -53,7 +54,7 @@ export default function Review() {
     api.listClasses(pid).then(c => { setClasses(c); if (c.length > 0) setClassId(c[0].id); });
     api.listTeachers(pid).then(t => { setTeachers(t); if (t.length > 0) setTeacherId(t[0].id); });
     api.listRooms(pid).then(r => { setRooms(r); if (r.length > 0) setRoomId(r[0].id); });
-    api.getSchoolSettings(pid).then(setSettings).catch(() => setSettings(null));
+    api.getPeriodSlots(pid).then(d => setPeriodSlots(d.days)).catch(() => setPeriodSlots([]));
   }, [pid]);
 
   /* ── Load timetable ── */
@@ -69,13 +70,38 @@ export default function Review() {
       .finally(() => setLoading(false));
   }, [view, classId, teacherId, roomId, pid]);
 
-  /* ── Bell schedule labels ── */
-  const bellSchedule = settings?.bell_schedule_json ? (() => { try { return JSON.parse(settings.bell_schedule_json); } catch { return null; } })() : null;
-  function periodHeader(idx: number): { num: string; time: string } {
-    if (bellSchedule && Array.isArray(bellSchedule) && bellSchedule[idx]) {
-      return { num: String(idx + 1), time: `${bellSchedule[idx].start || ""} to ${bellSchedule[idx].end || ""}` };
+  /* ── Compute period time labels per day ── */
+  const slotsByDay = useMemo(() => {
+    const m: Record<number, PeriodSlot[]> = {};
+    for (const d of periodSlots) {
+      m[d.day_index] = d.slots.filter(s => !s.is_break);
     }
-    return { num: String(idx + 1), time: "" };
+    return m;
+  }, [periodSlots]);
+
+  /* Check if Friday (day_index=4) has different times than Monday (day_index=0) */
+  const fridayDayIndex = 4;
+  const fridayDifferent = useMemo(() => {
+    const mon = slotsByDay[0];
+    const fri = slotsByDay[fridayDayIndex];
+    if (!mon || !fri || mon.length === 0 || fri.length === 0) return false;
+    return mon[0]?.start_time !== fri[0]?.start_time || mon[0]?.end_time !== fri[0]?.end_time;
+  }, [slotsByDay]);
+
+  /* Get period time for a specific day & period index */
+  function getSlot(dayIdx: number, periodIdx: number): PeriodSlot | undefined {
+    const dayPeriods = slotsByDay[dayIdx];
+    if (dayPeriods) return dayPeriods.find(s => s.period_index === periodIdx);
+    // Fallback: use first available day's slots
+    const firstDay = periodSlots[0];
+    if (firstDay) return firstDay.slots.filter(s => !s.is_break).find(s => s.period_index === periodIdx);
+    return undefined;
+  }
+
+  /* Get break info between periods for a day */
+  function getBreaksForDay(dayIdx: number): PeriodSlot[] {
+    const d = periodSlots.find(ds => ds.day_index === dayIdx);
+    return d ? d.slots.filter(s => s.is_break) : [];
   }
 
   /* ── Export ── */
@@ -97,8 +123,11 @@ export default function Review() {
   const noRun = !run || run.status !== "completed";
   const selectedId = view === "class" ? classId : view === "teacher" ? teacherId : roomId;
 
+  /* Default period headers from day 0 (Monday) */
+  const defaultSlots = slotsByDay[0] || [];
+
   return (
-    <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+    <div style={{ maxWidth: 1020, margin: "0 auto" }}>
       <p style={{ marginBottom: "0.5rem" }}>
         <Link to={`/project/${pid}`} style={{ color: "#3b82f6", textDecoration: "none", fontSize: "0.9rem" }}>← Editor</Link>
       </p>
@@ -163,53 +192,95 @@ export default function Review() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
-                <th style={{ padding: "0.6rem 0.75rem", textAlign: "left", borderBottom: "1px solid #e2e8f0", width: 60, color: "#94a3b8", fontSize: "0.8rem" }}></th>
+                <th style={{ padding: "0.6rem 0.75rem", textAlign: "left", borderBottom: "2px solid #e2e8f0", width: 64, color: "#94a3b8", fontSize: "0.75rem" }}></th>
                 {Array.from({ length: gridPeriods }, (_, i) => {
-                  const h = periodHeader(i);
+                  const slot = defaultSlots.find(s => s.period_index === i);
                   return (
-                    <th key={i} style={{ padding: "0.5rem 0.4rem", textAlign: "center", borderBottom: "1px solid #e2e8f0", borderLeft: "1px solid #f1f5f9", fontSize: "0.75rem", color: "#475569", lineHeight: 1.4 }}>
-                      <div style={{ fontWeight: 700 }}>{h.num}</div>
-                      {h.time && <div style={{ fontWeight: 400, color: "#94a3b8", fontSize: "0.68rem" }}>{h.time}</div>}
+                    <th key={i} style={{ padding: "0.5rem 0.3rem", textAlign: "center", borderBottom: "2px solid #e2e8f0", borderLeft: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#475569", lineHeight: 1.3 }}>
+                      <div style={{ fontWeight: 700, fontSize: "0.8rem" }}>{i + 1}</div>
+                      {slot && (
+                        <div style={{ fontWeight: 400, color: "#64748b", fontSize: "0.65rem", marginTop: 1 }}>
+                          {slot.start_time} to {slot.end_time}
+                        </div>
+                      )}
                     </th>
                   );
                 })}
               </tr>
             </thead>
             <tbody>
-              {Array.from({ length: gridDays }, (_, dayIdx) => (
-                <tr key={dayIdx} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "0.75rem", fontWeight: 600, color: "#334155", fontSize: "0.85rem", background: "#fafbfc", borderRight: "1px solid #f1f5f9" }}>
-                    {DAY_NAMES[dayIdx] || `Day ${dayIdx + 1}`}
-                  </td>
-                  {Array.from({ length: gridPeriods }, (_, pIdx) => {
-                    const entry = entries.find(e => e.day_index === dayIdx && e.period_index === pIdx);
-                    return (
-                      <td key={pIdx} style={{
-                        padding: "0.35rem 0.25rem", textAlign: "center", verticalAlign: "middle",
-                        borderLeft: "1px solid #f1f5f9", minWidth: 80, height: 60,
-                        background: entry ? `${entry.subject_color || "#3b82f6"}10` : "transparent",
-                        borderBottom: entry ? `2px solid ${entry.subject_color || "#3b82f6"}` : undefined,
+              {Array.from({ length: gridDays }, (_, dayIdx) => {
+                const isFriday = dayIdx === fridayDayIndex;
+                const dayBreaks = getBreaksForDay(dayIdx);
+                const fridaySlots = isFriday && fridayDifferent ? slotsByDay[fridayDayIndex] : null;
+
+                return (
+                  <>
+                    {/* ── Friday different timing row ── */}
+                    {isFriday && fridayDifferent && fridaySlots && (
+                      <tr key={`fri-header-${dayIdx}`} style={{ background: "linear-gradient(135deg, #fef3c7, #fde68a)" }}>
+                        <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600, color: "#92400e", fontSize: "0.72rem" }}>
+                          ⏰ Fri timing
+                        </td>
+                        {Array.from({ length: gridPeriods }, (_, pIdx) => {
+                          const fSlot = fridaySlots.find(s => s.period_index === pIdx);
+                          return (
+                            <td key={pIdx} style={{ textAlign: "center", borderLeft: "1px solid #fde68a", padding: "0.25rem 0.2rem", fontSize: "0.62rem", color: "#92400e", fontWeight: 500 }}>
+                              {fSlot ? `${fSlot.start_time}–${fSlot.end_time}` : ""}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    )}
+
+                    {/* ── Day row ── */}
+                    <tr key={dayIdx} style={{ borderBottom: dayIdx < gridDays - 1 ? "1px solid #f1f5f9" : undefined }}>
+                      <td style={{
+                        padding: "0.6rem 0.6rem", fontWeight: 600, color: "#334155", fontSize: "0.85rem",
+                        background: isFriday && fridayDifferent ? "#fffbeb" : "#fafbfc", borderRight: "1px solid #f1f5f9",
                       }}>
-                        {entry && (
-                          <div style={{ lineHeight: 1.25 }}>
-                            <div style={{ fontWeight: 700, fontSize: "0.78rem", color: entry.subject_color || "#1e293b" }}>
-                              {entry.subject_code || entry.subject_name}
-                            </div>
-                            <div style={{ fontSize: "0.68rem", color: "#64748b", marginTop: 1 }}>
-                              {view === "class" ? entry.teacher_name : entry.class_name}
-                            </div>
-                            {entry.room_name && (
-                              <div style={{ fontSize: "0.62rem", color: "#94a3b8", fontStyle: "italic" }}>
-                                {entry.room_name}
+                        {DAY_NAMES[dayIdx] || `Day ${dayIdx + 1}`}
+                      </td>
+                      {Array.from({ length: gridPeriods }, (_, pIdx) => {
+                        const entry = entries.find(e => e.day_index === dayIdx && e.period_index === pIdx);
+                        // Check if there's a break after this period on this day
+                        const breakAfter = dayBreaks.find(b => {
+                          const prevPeriod = pIdx; // break is after a period
+                          // We check if the break start_time matches end of this period
+                          const slot = getSlot(dayIdx, prevPeriod);
+                          return slot && b.start_time === slot.end_time;
+                        });
+
+                        return (
+                          <td key={pIdx} style={{
+                            padding: "0.3rem 0.2rem", textAlign: "center", verticalAlign: "middle",
+                            borderLeft: "1px solid #f1f5f9", minWidth: 80, height: 56,
+                            background: entry ? `${entry.subject_color || "#3b82f6"}08` : "transparent",
+                            borderBottom: entry ? `2px solid ${entry.subject_color || "#3b82f6"}` : undefined,
+                            borderRight: breakAfter ? "3px dashed #f59e0b" : undefined,
+                          }}>
+                            {entry && (
+                              <div style={{ lineHeight: 1.2 }}>
+                                <div style={{ fontWeight: 700, fontSize: "0.78rem", color: entry.subject_color || "#1e293b" }}>
+                                  {entry.subject_code || entry.subject_name}
+                                </div>
+                                <div style={{ fontSize: "0.66rem", color: "#64748b", marginTop: 1 }}>
+                                  {view === "class" ? entry.teacher_name : entry.class_name}
+                                </div>
+                                {entry.room_name && (
+                                  <div style={{ fontSize: "0.6rem", color: "#94a3b8", fontStyle: "italic" }}>
+                                    {entry.room_name}
+                                  </div>
+                                )}
                               </div>
                             )}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </>
+                );
+              })}
             </tbody>
           </table>
         </div>

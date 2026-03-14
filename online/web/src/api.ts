@@ -84,6 +84,13 @@ export function updateSchoolSettings(projectId: number, data: Partial<{ name: st
   return api(`/api/projects/${projectId}/school-settings`, { method: "PUT", body: JSON.stringify(data) });
 }
 
+export type PeriodSlot = { period_index: number; start_time: string; end_time: string; is_break: boolean; break_name: string | null };
+export type DaySlots = { day_index: number; day_name: string; slots: PeriodSlot[] };
+
+export function getPeriodSlots(projectId: number) {
+  return api<{ days: DaySlots[] }>(`/api/projects/${projectId}/school-settings/period-slots`);
+}
+
 // Subjects
 export type Subject = { id: number; name: string; code: string; color: string; category: string; max_per_day: number; double_allowed: boolean; preferred_room_type: string };
 
