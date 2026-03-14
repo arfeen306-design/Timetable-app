@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: timetable-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false         # You will paste your Supabase/Neon Postgres URL here
+      - key: SECRET_KEY
+        generateValue: true  # Render auto-generates a secure random value
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_ORIGINS
+        sync: false         # e.g. https://your-app.vercel.app
+    healthCheckPath: /health

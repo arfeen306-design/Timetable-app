@@ -1,0 +1,3 @@
+# Install these in addition to requirements.txt when building the distributable app.
+-r requirements.txt
+pyinstaller>=6.0.0

@@ -1,0 +1,24 @@
+OPEN THE TIMETABLE APP
+======================
+
+1. First time only (in Terminal):
+
+   cd "/Users/admin/Desktop/Timetable app"
+   ./backend/venv/bin/pip install -r backend/requirements.txt
+   cd web && npm install && cd ..
+   ./backend/venv/bin/python -m backend.scripts.seed_dev
+   cd web && npm run build && cd ..
+
+2. Start the app:
+
+   ./run_app.sh
+
+3. In your browser, open:
+
+   http://localhost:8000
+
+4. Log in with:
+
+   admin@school.demo / demo123
+
+That's it. No second terminal, no port 5173 or 3987 — everything runs on port 8000.
