@@ -202,8 +202,8 @@ def export_pdf(
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib import colors
         from reportlab.lib.units import mm
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     except ImportError:
         raise HTTPException(501, "reportlab not installed on server.")
 
@@ -216,17 +216,21 @@ def export_pdf(
         by_class.setdefault(e.get("class_name", "?"), []).append(e)
 
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), topMargin=15*mm, bottomMargin=15*mm)
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), topMargin=12*mm, bottomMargin=12*mm, leftMargin=10*mm, rightMargin=10*mm)
     styles = getSampleStyleSheet()
     elements = []
-    title_style = styles["Title"]
-    normal = styles["Normal"]
 
-    elements.append(Paragraph(f"{school_name} — Timetable", title_style))
-    elements.append(Spacer(1, 10))
+    # Custom styles
+    title_style = ParagraphStyle("CustomTitle", parent=styles["Title"], fontSize=16, spaceAfter=4)
+    class_title = ParagraphStyle("ClassTitle", parent=styles["Heading2"], fontSize=14, spaceAfter=6, textColor=colors.HexColor("#1e293b"))
 
-    for cn in sorted(by_class.keys()):
-        elements.append(Paragraph(f"Class: {cn}", styles["Heading2"]))
+    sorted_classes = sorted(by_class.keys())
+    for idx, cn in enumerate(sorted_classes):
+        # School name + class title on each page
+        elements.append(Paragraph(f"{school_name}", title_style))
+        elements.append(Paragraph(f"Class: {cn}", class_title))
+        elements.append(Spacer(1, 4))
+
         lookup = {(e["day_index"], e["period_index"]): e for e in by_class[cn]}
         header = ["Day"] + [f"P{p+1}" for p in range(periods)]
         data = [header]
@@ -237,24 +241,42 @@ def export_pdf(
                 if e:
                     code = e.get("subject_code") or e.get("subject_name", "")
                     teacher = e.get("teacher_name", "")
-                    row.append(f"{code}\n{teacher}")
+                    room = e.get("room_name", "")
+                    cell_text = code
+                    if teacher:
+                        cell_text += f"\n{teacher}"
+                    if room:
+                        cell_text += f"\n{room}"
+                    row.append(cell_text)
                 else:
                     row.append("")
             data.append(row)
 
-        col_w = [30*mm] + [22*mm] * periods
+        # Calculate column widths to fill the page
+        page_w = landscape(A4)[0] - 20*mm  # minus margins
+        day_col_w = 25*mm
+        period_col_w = (page_w - day_col_w) / periods
+        col_w = [day_col_w] + [period_col_w] * periods
+
         tbl = Table(data, colWidths=col_w, repeatRows=1)
         tbl.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2C3E50")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 8),
+            ("FONTSIZE", (0, 1), (-1, -1), 7),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+            ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+            ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#F1F5F9")),
         ]))
         elements.append(tbl)
-        elements.append(Spacer(1, 12))
+
+        # Page break after each class (except last)
+        if idx < len(sorted_classes) - 1:
+            elements.append(PageBreak())
 
     doc.build(elements)
     buf.seek(0)
@@ -262,6 +284,7 @@ def export_pdf(
     return StreamingResponse(buf,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
 
 
 @router.get("")
