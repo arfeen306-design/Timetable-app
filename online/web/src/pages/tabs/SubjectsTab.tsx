@@ -14,12 +14,20 @@ interface Props {
 
 export default function SubjectsTab({ pid, subjects, rooms, onChange, onNext }: Props) {
   const toast = useToast();
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
   const [editSubject, setEditSubject] = useState<Subject | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [importFileRef] = useState(() => React.createRef<HTMLInputElement>());
   const [importing, setImporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  function toggleSelect(id: number) {
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function selectAll(checked: boolean) {
+    setSelectedIds(checked ? new Set(subjects.map(s => s.id)) : new Set());
+  }
 
   /* ── Modal form state ── */
   const [fName, setFName] = useState("");
@@ -38,7 +46,7 @@ export default function SubjectsTab({ pid, subjects, rooms, onChange, onNext }: 
   }
 
   function openEdit(s?: Subject) {
-    const sub = s || subjects.find(x => x.id === selectedId);
+    const sub = s || (selectedIds.size === 1 ? subjects.find(x => x.id === [...selectedIds][0]) : undefined);
     if (!sub) return;
     setEditSubject(sub);
     setFName(sub.name); setFCode(sub.code); setFCategory(sub.category);
@@ -89,17 +97,20 @@ export default function SubjectsTab({ pid, subjects, rooms, onChange, onNext }: 
   }
 
   async function deleteSelected() {
-    if (selectedId == null) return;
-    const name = subjects.find(s => s.id === selectedId)?.name ?? "";
-    if (!confirm(`Delete subject "${name}"? This will also remove related lessons.`)) return;
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const names = subjects.filter(s => selectedIds.has(s.id)).map(s => s.name).join(", ");
+    if (!confirm(`Delete ${count} subject(s): ${names}? This will also remove related lessons.`)) return;
+    setDeleting(true);
     try {
-      await api.deleteSubject(pid, selectedId);
-      onChange(subjects.filter(s => s.id !== selectedId));
-      setSelectedId(null);
-      toast("success", "Subject deleted.");
+      await Promise.all([...selectedIds].map(id => api.deleteSubject(pid, id)));
+      onChange(subjects.filter(s => !selectedIds.has(s.id)));
+      setSelectedIds(new Set());
+      toast("success", `${count} subject(s) deleted.`);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Delete failed");
-    }
+      const list = await api.listSubjects(pid); onChange(list);
+    } finally { setDeleting(false); }
   }
 
   /* ── Import from Excel ── */
@@ -191,8 +202,10 @@ export default function SubjectsTab({ pid, subjects, rooms, onChange, onNext }: 
         <input type="file" ref={importFileRef} accept=".xlsx,.xls" style={{ display: "none" }} onChange={onImportFile} />
         <button type="button" className="btn" onClick={() => importFileRef.current?.click()} disabled={importing}>{importing ? "Importing…" : "Import from Excel"}</button>
         <button type="button" className="btn" onClick={downloadTemplate}>Download Template</button>
-        <button type="button" className="btn" onClick={() => openEdit()} disabled={selectedId == null}>Edit</button>
-        <button type="button" className="btn btn-danger" onClick={deleteSelected} disabled={selectedId == null}>Delete</button>
+        <button type="button" className="btn" onClick={() => openEdit()} disabled={selectedIds.size !== 1}>Edit</button>
+        <button type="button" className="btn btn-danger" onClick={deleteSelected} disabled={selectedIds.size === 0 || deleting}>
+          {deleting ? "Deleting…" : selectedIds.size > 0 ? `Delete (${selectedIds.size})` : "Delete"}
+        </button>
       </div>
 
       {/* Data Table */}
@@ -200,14 +213,18 @@ export default function SubjectsTab({ pid, subjects, rooms, onChange, onNext }: 
       <table className="data-table">
         <thead>
           <tr>
-            <th style={{ width: 40 }}>#</th>
+            <th style={{ width: 36, textAlign: "center" }}>
+              <input type="checkbox" checked={selectedIds.size === subjects.length && subjects.length > 0} onChange={e => selectAll(e.target.checked)} style={{ width: "auto" }} />
+            </th>
+            <th style={{ width: 36 }}>#</th>
             <th>Name</th><th>Code</th><th>Category</th><th style={{ width: 60 }}>Color</th>
             <th>Max/Day</th><th>Double?</th><th>Pref. Room Type</th>
           </tr>
         </thead>
         <tbody>
           {subjects.map((s, i) => (
-            <tr key={s.id} className={selectedId === s.id ? "selected" : ""} onClick={() => setSelectedId(s.id)} onDoubleClick={() => openEdit(s)}>
+            <tr key={s.id} className={selectedIds.has(s.id) ? "selected" : ""} onClick={() => toggleSelect(s.id)} onDoubleClick={() => openEdit(s)}>
+              <td style={{ textAlign: "center" }}><input type="checkbox" checked={selectedIds.has(s.id)} onChange={() => toggleSelect(s.id)} onClick={e => e.stopPropagation()} style={{ width: "auto" }} /></td>
               <td>{i + 1}</td>
               <td>{s.name}</td><td>{s.code}</td><td>{s.category}</td>
               <td><span className="color-swatch" style={{ backgroundColor: s.color }} /></td>

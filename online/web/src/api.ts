@@ -28,14 +28,16 @@ export async function api<T>(
   return res.json();
 }
 
-export function apiBlob(path: string): Promise<Blob> {
+export async function apiBlob(path: string): Promise<Blob> {
   const token = getToken();
   const headers: HeadersInit = {};
   if (token) (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
-  return fetch(`${API_BASE}${path}`, { headers }).then((res) => {
-    if (!res.ok) throw new Error(res.statusText);
-    return res.blob();
-  });
+  const res = await fetch(`${API_BASE}${path}`, { headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail));
+  }
+  return res.blob();
 }
 
 // Auth
