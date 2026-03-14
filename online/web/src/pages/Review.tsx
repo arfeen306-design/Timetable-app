@@ -1,29 +1,78 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import * as api from "../api";
-import type { DaySlots, PeriodSlot } from "../api";
 import { useToast } from "../context/ToastContext";
 
 interface Entry {
-  id: number;
-  lesson_id: number;
-  day_index: number;
-  period_index: number;
-  room_id: number | null;
-  locked: boolean;
-  teacher_id: number;
-  subject_id: number;
-  class_id: number;
-  teacher_name: string;
-  subject_name: string;
-  subject_code: string;
-  subject_color: string;
-  class_name: string;
-  room_name: string;
+  id: number; lesson_id: number; day_index: number; period_index: number;
+  room_id: number | null; locked: boolean; teacher_id: number; subject_id: number;
+  class_id: number; teacher_name: string; subject_name: string; subject_code: string;
+  subject_color: string; class_name: string; room_name: string;
 }
 
 type ViewType = "class" | "teacher" | "room";
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/* ── Client-side slot computation (matches desktop time engine) ── */
+interface SlotDef {
+  type: "period" | "break";
+  periodIndex: number; // -1 for breaks
+  start: string;
+  end: string;
+  breakName?: string;
+}
+
+function parseTime(t: string): number {
+  if (!t || !t.includes(":")) return 8 * 60;
+  const [h, m] = t.split(":").map(Number);
+  return (isNaN(h) ? 8 : h) * 60 + (isNaN(m) ? 0 : m);
+}
+function fmtTime(mins: number): string {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+interface BreakDef { name?: string; start?: string; end?: string; after_period?: number; duration_minutes?: number; is_friday?: boolean }
+
+function computeSlots(
+  startTime: string, periodDuration: number, numPeriods: number,
+  breaks: BreakDef[], isFriday: boolean,
+  fridayStartTime?: string, fridayDuration?: number,
+): SlotDef[] {
+  const isFri = isFriday;
+  const startMin = parseTime(isFri && fridayStartTime ? fridayStartTime : startTime);
+  const dur = isFri && fridayDuration ? fridayDuration : periodDuration;
+
+  // Filter breaks for this context
+  const dayBreaks = breaks.filter(b => isFri ? !!b.is_friday : !b.is_friday);
+  // Build after_period map
+  const breakByPeriod: Record<number, BreakDef> = {};
+  for (const b of dayBreaks) {
+    if (b.after_period !== undefined && b.after_period !== null) {
+      breakByPeriod[b.after_period] = b;
+    }
+  }
+
+  const slots: SlotDef[] = [];
+  let current = startMin;
+  for (let p = 0; p < numPeriods; p++) {
+    const end = current + dur;
+    slots.push({ type: "period", periodIndex: p, start: fmtTime(current), end: fmtTime(end) });
+    current = end;
+    // Insert break after this period if configured
+    const brk = breakByPeriod[p];
+    if (brk) {
+      const bStart = brk.start ? parseTime(brk.start) : current;
+      const bEnd = brk.end ? parseTime(brk.end) : bStart + (brk.duration_minutes || 20);
+      // Use actual break start/end if provided, otherwise compute
+      const breakStart = brk.start ? bStart : current;
+      const breakEnd = brk.end ? bEnd : current + (brk.duration_minutes || 20);
+      slots.push({ type: "break", periodIndex: -1, start: fmtTime(breakStart), end: fmtTime(breakEnd), breakName: brk.name || "Break" });
+      current = breakEnd;
+    }
+  }
+  return slots;
+}
 
 export default function Review() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -34,7 +83,7 @@ export default function Review() {
   const [classes, setClasses] = useState<Awaited<ReturnType<typeof api.listClasses>>>([]);
   const [teachers, setTeachers] = useState<Awaited<ReturnType<typeof api.listTeachers>>>([]);
   const [rooms, setRooms] = useState<Awaited<ReturnType<typeof api.listRooms>>>([]);
-  const [periodSlots, setPeriodSlots] = useState<DaySlots[]>([]);
+  const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
 
   const [view, setView] = useState<ViewType>("class");
   const [classId, setClassId] = useState(0);
@@ -46,8 +95,6 @@ export default function Review() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
-
-  // Drag-and-drop state
   const [dragEntry, setDragEntry] = useState<Entry | null>(null);
   const [dragOver, setDragOver] = useState<{ day: number; period: number } | null>(null);
   const [moving, setMoving] = useState(false);
@@ -59,7 +106,10 @@ export default function Review() {
     api.listClasses(pid).then(c => { setClasses(c); if (c.length > 0) setClassId(c[0].id); });
     api.listTeachers(pid).then(t => { setTeachers(t); if (t.length > 0) setTeacherId(t[0].id); });
     api.listRooms(pid).then(r => { setRooms(r); if (r.length > 0) setRoomId(r[0].id); });
-    api.getPeriodSlots(pid).then(d => setPeriodSlots(d.days)).catch(() => setPeriodSlots([]));
+    // Fetch FULL school settings (including breaks_json, bell_schedule_json, school_start_time, etc.)
+    fetch(`/api/projects/${pid}/school-settings`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("timetable_token")}` }
+    }).then(r => r.json()).then(s => setSettings(s)).catch(() => setSettings(null));
   }, [pid]);
 
   /* ── Load timetable ── */
@@ -77,83 +127,65 @@ export default function Review() {
 
   useEffect(() => { loadTimetable(); }, [loadTimetable]);
 
-  /* ── Period slots lookup ── */
-  const slotsByDay = useMemo(() => {
-    const m: Record<number, PeriodSlot[]> = {};
-    for (const d of periodSlots) m[d.day_index] = d.slots.filter(s => !s.is_break);
-    return m;
-  }, [periodSlots]);
+  /* ── Compute slot sequences ── */
+  const { regularSlots, fridaySlots, hasFridayDiff, fridayDayIndex } = useMemo(() => {
+    if (!settings) return { regularSlots: [] as SlotDef[], fridaySlots: [] as SlotDef[], hasFridayDiff: false, fridayDayIndex: 4 };
 
-  const fridayDayIndex = 4;
-  const fridayDifferent = useMemo(() => {
-    const mon = slotsByDay[0]; const fri = slotsByDay[fridayDayIndex];
-    if (!mon || !fri || !mon.length || !fri.length) return false;
-    return mon[0]?.start_time !== fri[0]?.start_time || mon[0]?.end_time !== fri[0]?.end_time;
-  }, [slotsByDay]);
+    const startTime = (settings.school_start_time as string) || "08:00";
+    const periodDuration = (settings.period_duration_minutes as number) || 45;
+    const numPeriods = (settings.periods_per_day as number) || 7;
 
-  const defaultSlots = slotsByDay[0] || [];
+    // Parse breaks
+    let breaks: BreakDef[] = [];
+    try {
+      const raw = settings.breaks_json as string;
+      if (raw) breaks = JSON.parse(raw);
+    } catch { /* ignore */ }
 
-  /* ── Drag & Drop handlers ── */
+    // Parse bell schedule for Friday settings
+    let bell: Record<string, unknown> = {};
+    try {
+      const raw = settings.bell_schedule_json as string;
+      if (raw) bell = JSON.parse(raw);
+    } catch { /* ignore */ }
+
+    const fridayDiff = !!(bell.friday_different);
+    const friDayIdx = (bell.friday_day_index as number) ?? 4;
+    const friStartTime = (bell.friday_first_period_start as string) || undefined;
+    const friDuration = (bell.friday_period_duration as number) || undefined;
+
+    const regular = computeSlots(startTime, periodDuration, numPeriods, breaks, false);
+    const friday = fridayDiff ? computeSlots(startTime, periodDuration, numPeriods, breaks, true, friStartTime, friDuration) : regular;
+
+    return { regularSlots: regular, fridaySlots: friday, hasFridayDiff: fridayDiff, fridayDayIndex: friDayIdx };
+  }, [settings]);
+
+  /* ── Drag & Drop ── */
   function onDragStart(e: React.DragEvent, entry: Entry) {
-    setDragEntry(entry);
-    e.dataTransfer.effectAllowed = "move";
+    setDragEntry(entry); e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", String(entry.id));
   }
-
-  function onDragOver(e: React.DragEvent, day: number, period: number) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    setDragOver({ day, period });
-  }
-
-  function onDragLeave() {
-    setDragOver(null);
-  }
-
   async function onDrop(e: React.DragEvent, newDay: number, newPeriod: number) {
-    e.preventDefault();
-    setDragOver(null);
+    e.preventDefault(); setDragOver(null);
     if (!dragEntry || moving) return;
     if (dragEntry.day_index === newDay && dragEntry.period_index === newPeriod) { setDragEntry(null); return; }
-
-    // Optimistic update
-    const oldDay = dragEntry.day_index;
-    const oldPeriod = dragEntry.period_index;
-    setEntries(prev => prev.map(en =>
-      en.id === dragEntry.id ? { ...en, day_index: newDay, period_index: newPeriod } : en
-    ));
-
+    const oldDay = dragEntry.day_index, oldPeriod = dragEntry.period_index;
+    setEntries(prev => prev.map(en => en.id === dragEntry.id ? { ...en, day_index: newDay, period_index: newPeriod } : en));
     setMoving(true);
     try {
       const result = await api.moveEntry(pid, dragEntry.id, newDay, newPeriod, false);
       if (!result.success) {
-        // Revert optimistic update
-        setEntries(prev => prev.map(en =>
-          en.id === dragEntry.id ? { ...en, day_index: oldDay, period_index: oldPeriod } : en
-        ));
-        const msgs = result.conflicts.map(c => c.message).join("; ");
+        setEntries(prev => prev.map(en => en.id === dragEntry.id ? { ...en, day_index: oldDay, period_index: oldPeriod } : en));
+        const msgs = result.conflicts.map(c => c.message).join("\n");
         if (confirm(`⚠️ Conflicts:\n${msgs}\n\nMove anyway (force)?`)) {
           const forced = await api.moveEntry(pid, dragEntry.id, newDay, newPeriod, true);
-          if (forced.success) {
-            setEntries(prev => prev.map(en =>
-              en.id === dragEntry.id ? { ...en, day_index: newDay, period_index: newPeriod } : en
-            ));
-            toast("success", `Moved (forced). ${forced.message || ""}`);
-          }
+          if (forced.success) setEntries(prev => prev.map(en => en.id === dragEntry.id ? { ...en, day_index: newDay, period_index: newPeriod } : en));
         }
-      } else {
-        toast("success", result.message || "Moved successfully.");
-      }
+      } else { toast("success", result.message || "Moved."); }
     } catch (err) {
-      // Revert
-      setEntries(prev => prev.map(en =>
-        en.id === dragEntry.id ? { ...en, day_index: oldDay, period_index: oldPeriod } : en
-      ));
+      setEntries(prev => prev.map(en => en.id === dragEntry.id ? { ...en, day_index: oldDay, period_index: oldPeriod } : en));
       toast("error", err instanceof Error ? err.message : "Move failed");
-    } finally {
-      setMoving(false);
-      setDragEntry(null);
-    }
+    } finally { setMoving(false); setDragEntry(null); }
   }
 
   /* ── Export ── */
@@ -163,11 +195,8 @@ export default function Review() {
       const ext = format === "excel" ? "xlsx" : format;
       await api.downloadExport(pid, format, `timetable.${ext}`);
       toast("success", `${format.charAt(0).toUpperCase() + format.slice(1)} downloaded.`);
-    } catch (err) {
-      toast("error", err instanceof Error ? err.message : `${format} export failed`);
-    } finally {
-      setExporting(null);
-    }
+    } catch (err) { toast("error", err instanceof Error ? err.message : `${format} export failed`); }
+    finally { setExporting(null); }
   }
 
   if (isNaN(pid)) return <div>Invalid project</div>;
@@ -175,8 +204,11 @@ export default function Review() {
   const noRun = !run || run.status !== "completed";
   const selectedId = view === "class" ? classId : view === "teacher" ? teacherId : roomId;
 
+  // Column count = number of slots in regular schedule
+  const colSlots = regularSlots.length > 0 ? regularSlots : Array.from({ length: gridPeriods }, (_, i) => ({ type: "period" as const, periodIndex: i, start: "", end: "" }));
+
   return (
-    <div style={{ maxWidth: 1020, margin: "0 auto" }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto" }}>
       <p style={{ marginBottom: "0.5rem" }}>
         <Link to={`/project/${pid}`} style={{ color: "#3b82f6", textDecoration: "none", fontSize: "0.9rem" }}>← Editor</Link>
       </p>
@@ -204,7 +236,7 @@ export default function Review() {
       </div>
 
       {/* ═══ Entity Selector ═══ */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.25rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
         <label style={{ fontWeight: 600, color: "#475569", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
           Select {view === "class" ? "Class" : view === "teacher" ? "Teacher" : "Room"}:
         </label>
@@ -225,95 +257,127 @@ export default function Review() {
         )}
       </div>
 
-      {/* ═══ Drag hint ═══ */}
       {!noRun && selectedId > 0 && (
-        <p style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.5rem" }}>
-          💡 Drag any subject cell to another slot to move it. Conflicts are checked automatically.
-        </p>
+        <p style={{ fontSize: "0.72rem", color: "#94a3b8", marginBottom: "0.5rem" }}>💡 Drag any cell to move it. Conflicts checked automatically.</p>
       )}
 
       {/* ═══ Timetable Grid ═══ */}
       {loading && <p style={{ color: "#64748b", padding: "2rem", textAlign: "center" }}>Loading…</p>}
 
       {!loading && selectedId > 0 && (
-        <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden", marginBottom: "1.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "auto", marginBottom: "1.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+            {/* ── Header row: period numbers + times, with break columns ── */}
             <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                <th style={{ padding: "0.6rem 0.75rem", textAlign: "left", borderBottom: "2px solid #e2e8f0", width: 64, color: "#94a3b8", fontSize: "0.75rem" }}></th>
-                {Array.from({ length: gridPeriods }, (_, i) => {
-                  const slot = defaultSlots.find(s => s.period_index === i);
-                  return (
-                    <th key={i} style={{ padding: "0.5rem 0.3rem", textAlign: "center", borderBottom: "2px solid #e2e8f0", borderLeft: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#475569", lineHeight: 1.3 }}>
-                      <div style={{ fontWeight: 700, fontSize: "0.8rem" }}>{i + 1}</div>
-                      {slot && <div style={{ fontWeight: 400, color: "#64748b", fontSize: "0.65rem", marginTop: 1 }}>{slot.start_time} to {slot.end_time}</div>}
-                    </th>
-                  );
-                })}
+              <tr style={{ background: "#2d3748" }}>
+                <th style={{ padding: "0.5rem 0.6rem", textAlign: "left", borderBottom: "2px solid #1a202c", width: 64, color: "#e2e8f0", fontSize: "0.75rem" }}></th>
+                {colSlots.map((slot, i) => (
+                  <th key={i} style={{
+                    padding: "0.4rem 0.25rem", textAlign: "center", borderBottom: "2px solid #1a202c",
+                    borderLeft: "1px solid #4a5568", fontSize: "0.68rem", color: "#fff", lineHeight: 1.3,
+                    background: slot.type === "break" ? "#4a5568" : "#2d3748",
+                    minWidth: slot.type === "break" ? 70 : 90,
+                  }}>
+                    {slot.type === "period" ? (
+                      <>
+                        <div style={{ fontWeight: 700, fontSize: "0.8rem" }}>{slot.periodIndex + 1}</div>
+                        {slot.start && <div style={{ fontWeight: 400, color: "#cbd5e0", fontSize: "0.6rem" }}>{slot.start} to {slot.end}</div>}
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 600, fontSize: "0.7rem" }}>{slot.breakName || "Break"}</div>
+                        {slot.start && <div style={{ fontWeight: 400, color: "#a0aec0", fontSize: "0.58rem" }}>{slot.start} to {slot.end}</div>}
+                      </>
+                    )}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {Array.from({ length: gridDays }, (_, dayIdx) => {
-                const isFriday = dayIdx === fridayDayIndex;
-                const fridaySlots = isFriday && fridayDifferent ? slotsByDay[fridayDayIndex] : null;
+                const isFridayRow = dayIdx === fridayDayIndex;
+                const daySlots = isFridayRow && hasFridayDiff ? fridaySlots : colSlots;
 
                 return (
                   <>
-                    {/* Friday different timing row */}
-                    {isFriday && fridayDifferent && fridaySlots && (
-                      <tr key={`fri-h-${dayIdx}`} style={{ background: "linear-gradient(135deg, #fef3c7, #fde68a)" }}>
-                        <td style={{ padding: "0.25rem 0.5rem", fontWeight: 600, color: "#92400e", fontSize: "0.7rem" }}>⏰ Fri</td>
-                        {Array.from({ length: gridPeriods }, (_, pIdx) => {
-                          const fSlot = fridaySlots.find(s => s.period_index === pIdx);
-                          return <td key={pIdx} style={{ textAlign: "center", borderLeft: "1px solid #fde68a", padding: "0.2rem", fontSize: "0.6rem", color: "#92400e", fontWeight: 500 }}>
-                            {fSlot ? `${fSlot.start_time}–${fSlot.end_time}` : ""}
-                          </td>;
-                        })}
+                    {/* ── Friday times row ── */}
+                    {isFridayRow && hasFridayDiff && (
+                      <tr key={`fri-times-${dayIdx}`} style={{ background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)" }}>
+                        <td style={{ padding: "0.25rem 0.5rem", fontWeight: 700, color: "#92400e", fontSize: "0.72rem", whiteSpace: "nowrap" }}>
+                          Fri times
+                        </td>
+                        {fridaySlots.map((slot, i) => (
+                          <td key={i} style={{
+                            textAlign: "center", padding: "0.2rem 0.15rem", fontSize: "0.58rem", color: "#92400e",
+                            fontWeight: 500, borderLeft: "1px solid #fde68a",
+                            background: slot.type === "break" ? "#fcd34d50" : undefined,
+                          }}>
+                            {slot.start} to {slot.end}
+                          </td>
+                        ))}
+                        {/* Fill remaining columns if Friday has fewer slots */}
+                        {fridaySlots.length < colSlots.length && Array.from({ length: colSlots.length - fridaySlots.length }, (_, i) => (
+                          <td key={`fill-${i}`} style={{ borderLeft: "1px solid #fde68a" }}></td>
+                        ))}
                       </tr>
                     )}
 
-                    {/* Day row */}
-                    <tr key={dayIdx} style={{ borderBottom: dayIdx < gridDays - 1 ? "1px solid #f1f5f9" : undefined }}>
-                      <td style={{ padding: "0.6rem", fontWeight: 600, color: "#334155", fontSize: "0.85rem", background: isFriday && fridayDifferent ? "#fffbeb" : "#fafbfc", borderRight: "1px solid #f1f5f9" }}>
+                    {/* ── Day row ── */}
+                    <tr key={dayIdx} style={{ borderBottom: dayIdx < gridDays - 1 ? "1px solid #e2e8f0" : undefined }}>
+                      <td style={{
+                        padding: "0.5rem 0.5rem", fontWeight: 700, color: "#1e293b", fontSize: "0.85rem",
+                        background: isFridayRow && hasFridayDiff ? "#fffbeb" : "#f8fafc",
+                        borderRight: "1px solid #e2e8f0",
+                      }}>
                         {DAY_NAMES[dayIdx] || `Day ${dayIdx + 1}`}
                       </td>
-                      {Array.from({ length: gridPeriods }, (_, pIdx) => {
-                        const entry = entries.find(e => e.day_index === dayIdx && e.period_index === pIdx);
-                        const isDragTarget = dragOver?.day === dayIdx && dragOver?.period === pIdx;
-                        const isDragSource = dragEntry?.day_index === dayIdx && dragEntry?.period_index === pIdx;
+                      {colSlots.map((slot, colIdx) => {
+                        if (slot.type === "break") {
+                          // Break column — grey
+                          const friBreak = isFridayRow && hasFridayDiff && daySlots[colIdx]?.type === "break" ? daySlots[colIdx] : null;
+                          return (
+                            <td key={colIdx} style={{
+                              background: "#e2e8f0", textAlign: "center", borderLeft: "1px solid #cbd5e0",
+                              verticalAlign: "middle", color: "#64748b", fontSize: "0.65rem", fontStyle: "italic", padding: "0.3rem",
+                            }}>
+                              {slot.breakName || "Break"}
+                              {friBreak ? ` ${friBreak.start}–${friBreak.end}` : slot.start ? ` ${slot.start} to ${slot.end}` : ""}
+                            </td>
+                          );
+                        }
+
+                        // Period column — look for entry
+                        const entry = entries.find(e => e.day_index === dayIdx && e.period_index === slot.periodIndex);
+                        const isDragTarget = dragOver?.day === dayIdx && dragOver?.period === slot.periodIndex;
+                        const isDragSource = dragEntry?.day_index === dayIdx && dragEntry?.period_index === slot.periodIndex;
 
                         return (
-                          <td
-                            key={pIdx}
-                            onDragOver={e => onDragOver(e, dayIdx, pIdx)}
-                            onDragLeave={onDragLeave}
-                            onDrop={e => onDrop(e, dayIdx, pIdx)}
+                          <td key={colIdx}
+                            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOver({ day: dayIdx, period: slot.periodIndex }); }}
+                            onDragLeave={() => setDragOver(null)}
+                            onDrop={e => onDrop(e, dayIdx, slot.periodIndex)}
                             style={{
-                              padding: "0.3rem 0.2rem", textAlign: "center", verticalAlign: "middle",
-                              borderLeft: "1px solid #f1f5f9", minWidth: 80, height: 56,
+                              padding: "0.25rem 0.15rem", textAlign: "center", verticalAlign: "middle",
+                              borderLeft: "1px solid #e2e8f0", minWidth: 80, height: 56,
                               background: isDragTarget ? "#dbeafe"
                                 : isDragSource ? "#fef3c7"
-                                : entry ? `${entry.subject_color || "#3b82f6"}08` : "transparent",
-                              borderBottom: entry ? `2px solid ${entry.subject_color || "#3b82f6"}` : undefined,
+                                : entry ? `${entry.subject_color || "#3b82f6"}15` : "transparent",
+                              borderBottom: entry ? `3px solid ${entry.subject_color || "#3b82f6"}` : undefined,
                               outline: isDragTarget ? "2px dashed #3b82f6" : undefined,
-                              transition: "background 0.1s ease",
-                              cursor: entry ? "grab" : "default",
+                              transition: "background 0.1s", cursor: entry ? "grab" : "default",
                             }}
                           >
                             {entry && (
-                              <div
-                                draggable
-                                onDragStart={e => onDragStart(e, entry)}
+                              <div draggable onDragStart={e => onDragStart(e, entry)}
                                 onDragEnd={() => { setDragEntry(null); setDragOver(null); }}
-                                style={{ lineHeight: 1.2, cursor: "grab", userSelect: "none" }}
-                              >
-                                <div style={{ fontWeight: 700, fontSize: "0.78rem", color: entry.subject_color || "#1e293b" }}>
+                                style={{ lineHeight: 1.15, cursor: "grab", userSelect: "none" }}>
+                                <div style={{ fontWeight: 700, fontSize: "0.76rem", color: entry.subject_color || "#1e293b" }}>
                                   {entry.subject_code || entry.subject_name}
                                 </div>
-                                <div style={{ fontSize: "0.66rem", color: "#64748b", marginTop: 1 }}>
+                                <div style={{ fontSize: "0.63rem", color: "#64748b", marginTop: 1 }}>
                                   {view === "class" ? entry.teacher_name : entry.class_name}
                                 </div>
-                                {entry.room_name && <div style={{ fontSize: "0.6rem", color: "#94a3b8", fontStyle: "italic" }}>{entry.room_name}</div>}
+                                {entry.room_name && <div style={{ fontSize: "0.58rem", color: "#94a3b8", fontStyle: "italic" }}>{entry.room_name}</div>}
                               </div>
                             )}
                           </td>
@@ -334,12 +398,11 @@ export default function Review() {
         </div>
       )}
 
-      {/* ═══ Export Section ═══ */}
+      {/* ═══ Export ═══ */}
       <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "1.25rem 1.5rem", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
         <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Export</h3>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <button type="button" className="btn btn-primary" disabled={noRun || exporting === "excel"} onClick={() => handleExport("excel")}
-            style={{ background: "#22c55e", borderColor: "#22c55e" }}>
+          <button type="button" className="btn btn-primary" disabled={noRun || exporting === "excel"} onClick={() => handleExport("excel")} style={{ background: "#22c55e", borderColor: "#22c55e" }}>
             {exporting === "excel" ? "⏳ Exporting…" : "📊 Export to Excel"}
           </button>
           <button type="button" className="btn" disabled={noRun || exporting === "csv"} onClick={() => handleExport("csv")}>
@@ -351,24 +414,16 @@ export default function Review() {
         </div>
       </div>
 
-      {/* ═══ Communication Section ═══ */}
+      {/* ═══ Communication ═══ */}
       <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "1.25rem 1.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
         <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Communication — email / WhatsApp ready</h3>
         <div style={{ marginBottom: "1rem" }}>
-          <p style={{ fontSize: "0.85rem", color: "#475569", margin: "0 0 0.5rem" }}>
-            <strong>Teacher timetables:</strong> {teachers.length} teachers.
-          </p>
-          <button type="button" className="btn" disabled={noRun || teachers.length === 0} onClick={() => handleExport("excel")}>
-            Export all teacher timetables…
-          </button>
+          <p style={{ fontSize: "0.85rem", color: "#475569", margin: "0 0 0.5rem" }}><strong>Teacher timetables:</strong> {teachers.length} teachers.</p>
+          <button type="button" className="btn" disabled={noRun || teachers.length === 0} onClick={() => handleExport("excel")}>Export all teacher timetables…</button>
         </div>
         <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "1rem" }}>
-          <p style={{ fontSize: "0.85rem", color: "#475569", margin: "0 0 0.5rem" }}>
-            <strong>Class timetables:</strong> {classes.filter(c => c.class_teacher_id).length} classes with assigned teachers.
-          </p>
-          <button type="button" className="btn" disabled={noRun || classes.length === 0} onClick={() => handleExport("excel")}>
-            Export class timetables for class teachers…
-          </button>
+          <p style={{ fontSize: "0.85rem", color: "#475569", margin: "0 0 0.5rem" }}><strong>Class timetables:</strong> {classes.filter(c => c.class_teacher_id).length} classes with assigned teachers.</p>
+          <button type="button" className="btn" disabled={noRun || classes.length === 0} onClick={() => handleExport("excel")}>Export class timetables for class teachers…</button>
         </div>
       </div>
     </div>
