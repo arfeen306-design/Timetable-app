@@ -41,7 +41,9 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def coerce_sqlite_path(cls, v: str) -> str:
-        # SQLite: make path relative to project root (backend/..) when path is ./timetable.db
+        # Strip whitespace/newlines (common when copy-pasting from Supabase)
+        if isinstance(v, str):
+            v = v.strip()
         if isinstance(v, str) and v.startswith("sqlite:///./"):
             return v
         if v == "postgresql://postgres:postgres@localhost:5432/timetable_saas":
