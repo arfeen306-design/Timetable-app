@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import * as api from "../api";
 import type { DaySlots, PeriodSlot } from "../api";
@@ -47,6 +47,11 @@ export default function Review() {
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
 
+  // Drag-and-drop state
+  const [dragEntry, setDragEntry] = useState<Entry | null>(null);
+  const [dragOver, setDragOver] = useState<{ day: number; period: number } | null>(null);
+  const [moving, setMoving] = useState(false);
+
   /* ── Load data ── */
   useEffect(() => {
     if (isNaN(pid)) return;
@@ -58,7 +63,7 @@ export default function Review() {
   }, [pid]);
 
   /* ── Load timetable ── */
-  useEffect(() => {
+  const loadTimetable = useCallback(() => {
     const id = view === "class" ? classId : view === "teacher" ? teacherId : roomId;
     if (!id) { setEntries([]); return; }
     setLoading(true); setError("");
@@ -70,38 +75,85 @@ export default function Review() {
       .finally(() => setLoading(false));
   }, [view, classId, teacherId, roomId, pid]);
 
-  /* ── Compute period time labels per day ── */
+  useEffect(() => { loadTimetable(); }, [loadTimetable]);
+
+  /* ── Period slots lookup ── */
   const slotsByDay = useMemo(() => {
     const m: Record<number, PeriodSlot[]> = {};
-    for (const d of periodSlots) {
-      m[d.day_index] = d.slots.filter(s => !s.is_break);
-    }
+    for (const d of periodSlots) m[d.day_index] = d.slots.filter(s => !s.is_break);
     return m;
   }, [periodSlots]);
 
-  /* Check if Friday (day_index=4) has different times than Monday (day_index=0) */
   const fridayDayIndex = 4;
   const fridayDifferent = useMemo(() => {
-    const mon = slotsByDay[0];
-    const fri = slotsByDay[fridayDayIndex];
-    if (!mon || !fri || mon.length === 0 || fri.length === 0) return false;
+    const mon = slotsByDay[0]; const fri = slotsByDay[fridayDayIndex];
+    if (!mon || !fri || !mon.length || !fri.length) return false;
     return mon[0]?.start_time !== fri[0]?.start_time || mon[0]?.end_time !== fri[0]?.end_time;
   }, [slotsByDay]);
 
-  /* Get period time for a specific day & period index */
-  function getSlot(dayIdx: number, periodIdx: number): PeriodSlot | undefined {
-    const dayPeriods = slotsByDay[dayIdx];
-    if (dayPeriods) return dayPeriods.find(s => s.period_index === periodIdx);
-    // Fallback: use first available day's slots
-    const firstDay = periodSlots[0];
-    if (firstDay) return firstDay.slots.filter(s => !s.is_break).find(s => s.period_index === periodIdx);
-    return undefined;
+  const defaultSlots = slotsByDay[0] || [];
+
+  /* ── Drag & Drop handlers ── */
+  function onDragStart(e: React.DragEvent, entry: Entry) {
+    setDragEntry(entry);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(entry.id));
   }
 
-  /* Get break info between periods for a day */
-  function getBreaksForDay(dayIdx: number): PeriodSlot[] {
-    const d = periodSlots.find(ds => ds.day_index === dayIdx);
-    return d ? d.slots.filter(s => s.is_break) : [];
+  function onDragOver(e: React.DragEvent, day: number, period: number) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOver({ day, period });
+  }
+
+  function onDragLeave() {
+    setDragOver(null);
+  }
+
+  async function onDrop(e: React.DragEvent, newDay: number, newPeriod: number) {
+    e.preventDefault();
+    setDragOver(null);
+    if (!dragEntry || moving) return;
+    if (dragEntry.day_index === newDay && dragEntry.period_index === newPeriod) { setDragEntry(null); return; }
+
+    // Optimistic update
+    const oldDay = dragEntry.day_index;
+    const oldPeriod = dragEntry.period_index;
+    setEntries(prev => prev.map(en =>
+      en.id === dragEntry.id ? { ...en, day_index: newDay, period_index: newPeriod } : en
+    ));
+
+    setMoving(true);
+    try {
+      const result = await api.moveEntry(pid, dragEntry.id, newDay, newPeriod, false);
+      if (!result.success) {
+        // Revert optimistic update
+        setEntries(prev => prev.map(en =>
+          en.id === dragEntry.id ? { ...en, day_index: oldDay, period_index: oldPeriod } : en
+        ));
+        const msgs = result.conflicts.map(c => c.message).join("; ");
+        if (confirm(`⚠️ Conflicts:\n${msgs}\n\nMove anyway (force)?`)) {
+          const forced = await api.moveEntry(pid, dragEntry.id, newDay, newPeriod, true);
+          if (forced.success) {
+            setEntries(prev => prev.map(en =>
+              en.id === dragEntry.id ? { ...en, day_index: newDay, period_index: newPeriod } : en
+            ));
+            toast("success", `Moved (forced). ${forced.message || ""}`);
+          }
+        }
+      } else {
+        toast("success", result.message || "Moved successfully.");
+      }
+    } catch (err) {
+      // Revert
+      setEntries(prev => prev.map(en =>
+        en.id === dragEntry.id ? { ...en, day_index: oldDay, period_index: oldPeriod } : en
+      ));
+      toast("error", err instanceof Error ? err.message : "Move failed");
+    } finally {
+      setMoving(false);
+      setDragEntry(null);
+    }
   }
 
   /* ── Export ── */
@@ -110,7 +162,7 @@ export default function Review() {
     try {
       const ext = format === "excel" ? "xlsx" : format;
       await api.downloadExport(pid, format, `timetable.${ext}`);
-      toast("success", `${format.charAt(0).toUpperCase() + format.slice(1)} downloaded successfully.`);
+      toast("success", `${format.charAt(0).toUpperCase() + format.slice(1)} downloaded.`);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : `${format} export failed`);
     } finally {
@@ -122,9 +174,6 @@ export default function Review() {
   const run = runSummary?.run;
   const noRun = !run || run.status !== "completed";
   const selectedId = view === "class" ? classId : view === "teacher" ? teacherId : roomId;
-
-  /* Default period headers from day 0 (Monday) */
-  const defaultSlots = slotsByDay[0] || [];
 
   return (
     <div style={{ maxWidth: 1020, margin: "0 auto" }}>
@@ -141,18 +190,13 @@ export default function Review() {
       {error && <div className="alert alert-error" style={{ marginBottom: "1rem" }}>{error}</div>}
 
       {/* ═══ View Tabs ═══ */}
-      <div style={{
-        display: "flex", gap: 0, marginBottom: "1rem", borderRadius: 8, overflow: "hidden",
-        border: "1px solid #e2e8f0", width: "fit-content"
-      }}>
+      <div style={{ display: "flex", gap: 0, marginBottom: "1rem", borderRadius: 8, overflow: "hidden", border: "1px solid #e2e8f0", width: "fit-content" }}>
         {(["class", "teacher", "room"] as ViewType[]).map(v => (
           <button key={v} type="button" onClick={() => setView(v)} style={{
             padding: "0.5rem 1.25rem", border: "none", cursor: "pointer",
-            background: view === v ? "#3b82f6" : "#fff",
-            color: view === v ? "#fff" : "#475569",
+            background: view === v ? "#3b82f6" : "#fff", color: view === v ? "#fff" : "#475569",
             fontWeight: view === v ? 600 : 400, fontSize: "0.85rem",
-            borderRight: v !== "room" ? "1px solid #e2e8f0" : undefined,
-            transition: "all 0.15s ease",
+            borderRight: v !== "room" ? "1px solid #e2e8f0" : undefined, transition: "all 0.15s ease",
           }}>
             {v === "class" ? "Class Timetable" : v === "teacher" ? "Teacher Timetable" : "Room Timetable"}
           </button>
@@ -181,14 +225,18 @@ export default function Review() {
         )}
       </div>
 
+      {/* ═══ Drag hint ═══ */}
+      {!noRun && selectedId > 0 && (
+        <p style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.5rem" }}>
+          💡 Drag any subject cell to another slot to move it. Conflicts are checked automatically.
+        </p>
+      )}
+
       {/* ═══ Timetable Grid ═══ */}
       {loading && <p style={{ color: "#64748b", padding: "2rem", textAlign: "center" }}>Loading…</p>}
 
       {!loading && selectedId > 0 && (
-        <div style={{
-          background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0",
-          overflow: "hidden", marginBottom: "1.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-        }}>
+        <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden", marginBottom: "1.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
@@ -198,11 +246,7 @@ export default function Review() {
                   return (
                     <th key={i} style={{ padding: "0.5rem 0.3rem", textAlign: "center", borderBottom: "2px solid #e2e8f0", borderLeft: "1px solid #f1f5f9", fontSize: "0.72rem", color: "#475569", lineHeight: 1.3 }}>
                       <div style={{ fontWeight: 700, fontSize: "0.8rem" }}>{i + 1}</div>
-                      {slot && (
-                        <div style={{ fontWeight: 400, color: "#64748b", fontSize: "0.65rem", marginTop: 1 }}>
-                          {slot.start_time} to {slot.end_time}
-                        </div>
-                      )}
+                      {slot && <div style={{ fontWeight: 400, color: "#64748b", fontSize: "0.65rem", marginTop: 1 }}>{slot.start_time} to {slot.end_time}</div>}
                     </th>
                   );
                 })}
@@ -211,67 +255,65 @@ export default function Review() {
             <tbody>
               {Array.from({ length: gridDays }, (_, dayIdx) => {
                 const isFriday = dayIdx === fridayDayIndex;
-                const dayBreaks = getBreaksForDay(dayIdx);
                 const fridaySlots = isFriday && fridayDifferent ? slotsByDay[fridayDayIndex] : null;
 
                 return (
                   <>
-                    {/* ── Friday different timing row ── */}
+                    {/* Friday different timing row */}
                     {isFriday && fridayDifferent && fridaySlots && (
-                      <tr key={`fri-header-${dayIdx}`} style={{ background: "linear-gradient(135deg, #fef3c7, #fde68a)" }}>
-                        <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600, color: "#92400e", fontSize: "0.72rem" }}>
-                          ⏰ Fri timing
-                        </td>
+                      <tr key={`fri-h-${dayIdx}`} style={{ background: "linear-gradient(135deg, #fef3c7, #fde68a)" }}>
+                        <td style={{ padding: "0.25rem 0.5rem", fontWeight: 600, color: "#92400e", fontSize: "0.7rem" }}>⏰ Fri</td>
                         {Array.from({ length: gridPeriods }, (_, pIdx) => {
                           const fSlot = fridaySlots.find(s => s.period_index === pIdx);
-                          return (
-                            <td key={pIdx} style={{ textAlign: "center", borderLeft: "1px solid #fde68a", padding: "0.25rem 0.2rem", fontSize: "0.62rem", color: "#92400e", fontWeight: 500 }}>
-                              {fSlot ? `${fSlot.start_time}–${fSlot.end_time}` : ""}
-                            </td>
-                          );
+                          return <td key={pIdx} style={{ textAlign: "center", borderLeft: "1px solid #fde68a", padding: "0.2rem", fontSize: "0.6rem", color: "#92400e", fontWeight: 500 }}>
+                            {fSlot ? `${fSlot.start_time}–${fSlot.end_time}` : ""}
+                          </td>;
                         })}
                       </tr>
                     )}
 
-                    {/* ── Day row ── */}
+                    {/* Day row */}
                     <tr key={dayIdx} style={{ borderBottom: dayIdx < gridDays - 1 ? "1px solid #f1f5f9" : undefined }}>
-                      <td style={{
-                        padding: "0.6rem 0.6rem", fontWeight: 600, color: "#334155", fontSize: "0.85rem",
-                        background: isFriday && fridayDifferent ? "#fffbeb" : "#fafbfc", borderRight: "1px solid #f1f5f9",
-                      }}>
+                      <td style={{ padding: "0.6rem", fontWeight: 600, color: "#334155", fontSize: "0.85rem", background: isFriday && fridayDifferent ? "#fffbeb" : "#fafbfc", borderRight: "1px solid #f1f5f9" }}>
                         {DAY_NAMES[dayIdx] || `Day ${dayIdx + 1}`}
                       </td>
                       {Array.from({ length: gridPeriods }, (_, pIdx) => {
                         const entry = entries.find(e => e.day_index === dayIdx && e.period_index === pIdx);
-                        // Check if there's a break after this period on this day
-                        const breakAfter = dayBreaks.find(b => {
-                          const prevPeriod = pIdx; // break is after a period
-                          // We check if the break start_time matches end of this period
-                          const slot = getSlot(dayIdx, prevPeriod);
-                          return slot && b.start_time === slot.end_time;
-                        });
+                        const isDragTarget = dragOver?.day === dayIdx && dragOver?.period === pIdx;
+                        const isDragSource = dragEntry?.day_index === dayIdx && dragEntry?.period_index === pIdx;
 
                         return (
-                          <td key={pIdx} style={{
-                            padding: "0.3rem 0.2rem", textAlign: "center", verticalAlign: "middle",
-                            borderLeft: "1px solid #f1f5f9", minWidth: 80, height: 56,
-                            background: entry ? `${entry.subject_color || "#3b82f6"}08` : "transparent",
-                            borderBottom: entry ? `2px solid ${entry.subject_color || "#3b82f6"}` : undefined,
-                            borderRight: breakAfter ? "3px dashed #f59e0b" : undefined,
-                          }}>
+                          <td
+                            key={pIdx}
+                            onDragOver={e => onDragOver(e, dayIdx, pIdx)}
+                            onDragLeave={onDragLeave}
+                            onDrop={e => onDrop(e, dayIdx, pIdx)}
+                            style={{
+                              padding: "0.3rem 0.2rem", textAlign: "center", verticalAlign: "middle",
+                              borderLeft: "1px solid #f1f5f9", minWidth: 80, height: 56,
+                              background: isDragTarget ? "#dbeafe"
+                                : isDragSource ? "#fef3c7"
+                                : entry ? `${entry.subject_color || "#3b82f6"}08` : "transparent",
+                              borderBottom: entry ? `2px solid ${entry.subject_color || "#3b82f6"}` : undefined,
+                              outline: isDragTarget ? "2px dashed #3b82f6" : undefined,
+                              transition: "background 0.1s ease",
+                              cursor: entry ? "grab" : "default",
+                            }}
+                          >
                             {entry && (
-                              <div style={{ lineHeight: 1.2 }}>
+                              <div
+                                draggable
+                                onDragStart={e => onDragStart(e, entry)}
+                                onDragEnd={() => { setDragEntry(null); setDragOver(null); }}
+                                style={{ lineHeight: 1.2, cursor: "grab", userSelect: "none" }}
+                              >
                                 <div style={{ fontWeight: 700, fontSize: "0.78rem", color: entry.subject_color || "#1e293b" }}>
                                   {entry.subject_code || entry.subject_name}
                                 </div>
                                 <div style={{ fontSize: "0.66rem", color: "#64748b", marginTop: 1 }}>
                                   {view === "class" ? entry.teacher_name : entry.class_name}
                                 </div>
-                                {entry.room_name && (
-                                  <div style={{ fontSize: "0.6rem", color: "#94a3b8", fontStyle: "italic" }}>
-                                    {entry.room_name}
-                                  </div>
-                                )}
+                                {entry.room_name && <div style={{ fontSize: "0.6rem", color: "#94a3b8", fontStyle: "italic" }}>{entry.room_name}</div>}
                               </div>
                             )}
                           </td>
@@ -293,10 +335,7 @@ export default function Review() {
       )}
 
       {/* ═══ Export Section ═══ */}
-      <div style={{
-        background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "1.25rem 1.5rem",
-        marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-      }}>
+      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "1.25rem 1.5rem", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
         <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Export</h3>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <button type="button" className="btn btn-primary" disabled={noRun || exporting === "excel"} onClick={() => handleExport("excel")}
@@ -313,24 +352,19 @@ export default function Review() {
       </div>
 
       {/* ═══ Communication Section ═══ */}
-      <div style={{
-        background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "1.25rem 1.5rem",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-      }}>
+      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "1.25rem 1.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
         <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Communication — email / WhatsApp ready</h3>
-
         <div style={{ marginBottom: "1rem" }}>
           <p style={{ fontSize: "0.85rem", color: "#475569", margin: "0 0 0.5rem" }}>
-            <strong>Teacher timetables:</strong> {teachers.length} teachers. Export one file per teacher for email or WhatsApp.
+            <strong>Teacher timetables:</strong> {teachers.length} teachers.
           </p>
           <button type="button" className="btn" disabled={noRun || teachers.length === 0} onClick={() => handleExport("excel")}>
             Export all teacher timetables…
           </button>
         </div>
-
         <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "1rem" }}>
           <p style={{ fontSize: "0.85rem", color: "#475569", margin: "0 0 0.5rem" }}>
-            <strong>Class timetables for class teachers:</strong> {classes.filter(c => c.class_teacher_id).length} classes with assigned teachers.
+            <strong>Class timetables:</strong> {classes.filter(c => c.class_teacher_id).length} classes with assigned teachers.
           </p>
           <button type="button" className="btn" disabled={noRun || classes.length === 0} onClick={() => handleExport("excel")}>
             Export class timetables for class teachers…

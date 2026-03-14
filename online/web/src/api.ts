@@ -306,6 +306,14 @@ export function getWorkload(projectId: number) {
   return api<{ workload: { teacher_id: number; teacher_name: string; periods_scheduled: number }[] }>(`/api/projects/${projectId}/review/workload`);
 }
 
+// Move entry (drag & drop)
+export function moveEntry(projectId: number, entryId: number, newDayIndex: number, newPeriodIndex: number, force = false) {
+  return api<{ success: boolean; conflicts: { type: string; message: string }[]; message?: string }>(
+    `/api/projects/${projectId}/review/move-entry`,
+    { method: "POST", body: JSON.stringify({ entry_id: entryId, new_day_index: newDayIndex, new_period_index: newPeriodIndex, force }) }
+  );
+}
+
 // Templates — download Excel templates for bulk import (same as desktop)
 export function downloadTemplate(type: "teachers" | "classes") {
   const filename = type === "teachers" ? "teachers_template.xlsx" : "classes_template.xlsx";
