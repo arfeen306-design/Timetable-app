@@ -73,7 +73,7 @@ export default function AcademicYearPage() {
       const p = await createProject({ name: newName.trim(), academic_year: newYear.trim() || new Date().getFullYear().toString() });
       setShowCreate(false); setNewName(""); setNewYear("");
       setActionMsg("✅ Project created! Redirecting…");
-      window.location.href = `/project/${p.id}/settings`;
+      window.location.href = `/project/${p.id}/dashboard`;
     } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Failed"}`); }
     finally { setCreating(false); }
   }
@@ -348,8 +348,8 @@ export default function AcademicYearPage() {
               display: "flex", alignItems: "center", gap: 4,
               marginBottom: 6,
             }}>
-              <a href={`/project/${p.id}/settings`}
-                onClick={(e) => { e.preventDefault(); window.location.href = `/project/${p.id}/settings`; }}
+              <a href={`/project/${p.id}/dashboard`}
+                onClick={(e) => { e.preventDefault(); window.location.href = `/project/${p.id}/dashboard`; }}
                 style={{
                   flex: 1, display: "block", padding: "0.6rem 0.75rem",
                   borderRadius: "var(--radius-md)", textDecoration: "none",
@@ -392,7 +392,7 @@ export default function AcademicYearPage() {
                     const remaining = projects.filter(x => x.id !== p.id);
                     setProjects(remaining);
                     if (p.id === pid && remaining.length > 0) {
-                      window.location.href = `/project/${remaining[0].id}/settings`;
+                      window.location.href = `/project/${remaining[0].id}/dashboard`;
                     } else if (remaining.length === 0) {
                       window.location.href = "/";
                     }

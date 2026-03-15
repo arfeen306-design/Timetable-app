@@ -33,7 +33,7 @@ export default function Dashboard() {
     try {
       const p = await api.createDemoProject();
       setProjects((prev) => [...prev, p]);
-      navigate(`/project/${p.id}/settings`);
+      navigate(`/project/${p.id}/dashboard`);
     } catch (err) { setError(err instanceof Error ? err.message : "Failed to load demo school"); }
     finally { setDemoLoading(false); }
   }
@@ -46,7 +46,7 @@ export default function Dashboard() {
       const p = await api.createProject({ name: name.trim(), academic_year: academicYear.trim() || new Date().getFullYear().toString() });
       setProjects((prev) => [...prev, p]);
       setName(""); setAcademicYear(""); setShowCreateForm(false);
-      navigate(`/project/${p.id}/settings`);
+      navigate(`/project/${p.id}/dashboard`);
     } catch (err) { setError(err instanceof Error ? err.message : "Failed to create project"); }
     finally { setCreating(false); }
   }
