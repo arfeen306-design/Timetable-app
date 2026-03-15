@@ -278,15 +278,45 @@ function SettingsTab({
             <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} first lesson start</label><select value={fridayFirstPeriodStart} onChange={e => setFridayFirstPeriodStart(e.target.value)} style={{width:120}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
             <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} lesson duration</label><select value={fridayPeriodDuration} onChange={e => setFridayPeriodDuration(Number(e.target.value))} style={inputNarrow}>{[25,30,35,40,45,50,55,60,70,80,90].map(m => <option key={m} value={m}>{m} minutes</option>)}</select></div>
             <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} breaks (0–9)</label><select value={fridayNumBreaks} onChange={e => setFridayNumBreaks(Number(e.target.value))} style={inputNarrow}>{Array.from({length:10},(_,i) => <option key={i} value={i}>{i}</option>)}</select></div>
-            {fridayBreaks.map((b, i) => (
-              <div key={i} className="break-card-friday">
-                <div className="break-card-title">{DAY_LABELS[fridayDayIndex]} Break {i + 1}</div>
-                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Name</label><input value={b.name} onChange={e => updateFridayBreak(i,"name",e.target.value)} placeholder="e.g. Break" style={{width:200}} /></div>
-                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Start time</label><select value={b.start} onChange={e => updateFridayBreak(i,"start",e.target.value)} style={{width:110}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>End time</label><select value={b.end} onChange={e => updateFridayBreak(i,"end",e.target.value)} style={{width:110}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>After lesson</label><select value={b.after_period} onChange={e => updateFridayBreak(i,"after_period",Number(e.target.value))} style={inputNarrow}>{Array.from({length:periodsPerDay},(_,p) => <option key={p+1} value={p+1}>{p+1} (after lesson)</option>)}</select></div>
-              </div>
-            ))}
+            {fridayBreaks.map((b, i) => {
+              // Compute expected break start using FRIDAY timing
+              const fpStart = parseTime(fridayFirstPeriodStart);
+              let expectedStart = fpStart;
+              expectedStart += fridayPeriodDuration * b.after_period;
+              for (const prev of fridayBreaks) {
+                if (prev !== b && prev.after_period < b.after_period) {
+                  expectedStart += (parseTime(prev.end) - parseTime(prev.start));
+                }
+              }
+              const expectedStartStr = fmtTimeHelper(expectedStart);
+              const userStart = b.start;
+              const userEnd = b.end;
+              const startMismatch = userStart && expectedStartStr !== userStart;
+              const endBeforeStart = userStart && userEnd && parseTime(userEnd) <= parseTime(userStart);
+
+              return (
+                <div key={i}>
+                  <div className="break-card-friday" style={startMismatch || endBeforeStart ? { border: "2px solid #ef4444", background: "#fef2f2" } : undefined}>
+                    <div className="break-card-title">{DAY_LABELS[fridayDayIndex]} Break {i + 1}</div>
+                    <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Name</label><input value={b.name} onChange={e => updateFridayBreak(i,"name",e.target.value)} placeholder="e.g. Break" style={{width:200}} /></div>
+                    <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Start time</label><select value={b.start} onChange={e => updateFridayBreak(i,"start",e.target.value)} style={{width:110, borderColor: startMismatch ? "#ef4444" : undefined}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                    <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>End time</label><select value={b.end} onChange={e => updateFridayBreak(i,"end",e.target.value)} style={{width:110, borderColor: endBeforeStart ? "#ef4444" : undefined}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                    <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>After lesson</label><select value={b.after_period} onChange={e => updateFridayBreak(i,"after_period",Number(e.target.value))} style={inputNarrow}>{Array.from({length:periodsPerDay},(_,p) => <option key={p+1} value={p+1}>{p+1} (after lesson)</option>)}</select></div>
+                    {startMismatch && (
+                      <div style={{ background: "#fef2f2", border: "1px solid #ef4444", borderRadius: 6, padding: "0.5rem 0.75rem", marginTop: "0.5rem", fontSize: "0.8rem", color: "#dc2626" }}>
+                        ⚠️ <strong>Time conflict!</strong> Lesson {b.after_period} ends at <strong>{expectedStartStr}</strong>, but break starts at <strong>{userStart}</strong>.
+                        Please set break start time to <strong>{expectedStartStr}</strong>.
+                      </div>
+                    )}
+                    {endBeforeStart && (
+                      <div style={{ background: "#fef2f2", border: "1px solid #ef4444", borderRadius: 6, padding: "0.5rem 0.75rem", marginTop: "0.5rem", fontSize: "0.8rem", color: "#dc2626" }}>
+                        ⚠️ <strong>Invalid!</strong> Break end time ({userEnd}) is before or equal to start time ({userStart}).
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -302,10 +332,40 @@ function SettingsTab({
         </div>
       </div>
 
-      <div className="settings-footer">
-        <button type="button" className="btn btn-primary" onClick={() => save()} disabled={saving}>{saving ? "Saving…" : "💾 Save Settings"}</button>
-        <button type="button" className="btn" onClick={() => save(true)} disabled={saving}>Next: Subjects →</button>
-      </div>
+      {(() => {
+        // Compute whether any time conflicts exist
+        const hasConflict = (() => {
+          for (const b of breaks) {
+            const fp = parseTime(firstPeriodStart);
+            let exp = fp + periodDuration * b.after_period;
+            for (const prev of breaks) { if (prev !== b && prev.after_period < b.after_period) exp += (parseTime(prev.end) - parseTime(prev.start)); }
+            if (b.start && fmtTimeHelper(exp) !== b.start) return true;
+            if (b.start && b.end && parseTime(b.end) <= parseTime(b.start)) return true;
+          }
+          if (fridayDifferent) {
+            for (const b of fridayBreaks) {
+              const fp = parseTime(fridayFirstPeriodStart);
+              let exp = fp + fridayPeriodDuration * b.after_period;
+              for (const prev of fridayBreaks) { if (prev !== b && prev.after_period < b.after_period) exp += (parseTime(prev.end) - parseTime(prev.start)); }
+              if (b.start && fmtTimeHelper(exp) !== b.start) return true;
+              if (b.start && b.end && parseTime(b.end) <= parseTime(b.start)) return true;
+            }
+          }
+          return false;
+        })();
+
+        return (
+          <div className="settings-footer">
+            {hasConflict && (
+              <div style={{ background: "#fef2f2", border: "1px solid #ef4444", borderRadius: 8, padding: "0.5rem 1rem", fontSize: "0.82rem", color: "#dc2626", fontWeight: 600, marginBottom: "0.5rem" }}>
+                🚫 Fix all time conflicts above before saving.
+              </div>
+            )}
+            <button type="button" className="btn btn-primary" onClick={() => save()} disabled={saving || hasConflict}>{saving ? "Saving…" : "💾 Save Settings"}</button>
+            <button type="button" className="btn" onClick={() => save(true)} disabled={saving || hasConflict}>Next: Subjects →</button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
