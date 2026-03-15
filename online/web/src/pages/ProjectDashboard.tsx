@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
-import { api } from "../api";
+import { useState, useEffect, useRef } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { api, createProject, createDemoProject, importProject, exportProject } from "../api";
 
 /* ── Types ── */
 interface DashboardData {
@@ -61,8 +61,20 @@ function avatarColor(i: number) { return AVATAR_COLORS[i % AVATAR_COLORS.length]
 export default function ProjectDashboard() {
   const { projectId } = useParams();
   const pid = Number(projectId);
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Quick action state
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newYear, setNewYear] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [actionMsg, setActionMsg] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!pid) return;
@@ -72,6 +84,51 @@ export default function ProjectDashboard() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [pid]);
+
+  // ── Action handlers ──
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setCreating(true); setActionMsg("");
+    try {
+      const p = await createProject({ name: newName.trim(), academic_year: newYear.trim() || new Date().getFullYear().toString() });
+      setShowCreate(false); setNewName(""); setNewYear("");
+      navigate(`/project/${p.id}/dashboard`);
+    } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Failed"}`); }
+    finally { setCreating(false); }
+  }
+
+  async function handleDemo() {
+    setDemoLoading(true); setActionMsg("");
+    try {
+      const p = await createDemoProject();
+      setActionMsg("✅ Demo project created!");
+      setTimeout(() => navigate(`/project/${p.id}/dashboard`), 600);
+    } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Failed"}`); }
+    finally { setDemoLoading(false); }
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true); setActionMsg("");
+    try {
+      const p = await importProject(file);
+      setActionMsg(`✅ Imported "${p.name}"!`);
+      setTimeout(() => navigate(`/project/${p.id}/dashboard`), 600);
+    } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Import failed"}`); }
+    finally { setImporting(false); if (fileRef.current) fileRef.current.value = ""; }
+  }
+
+  async function handleExport() {
+    setExporting(true); setActionMsg("");
+    try {
+      const name = data?.school_name?.replace(/\s/g, "_") || "project";
+      await exportProject(pid, `${name}_${data?.academic_year || "export"}.timetable.json`);
+      setActionMsg("✅ Project file downloaded!");
+    } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Export failed"}`); }
+    finally { setExporting(false); }
+  }
 
   if (loading) return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -88,8 +145,6 @@ export default function ProjectDashboard() {
   const d = data;
   const s = d.stats;
   const uncoveredCount = d.unassigned.length;
-
-  // Workload chart — max bar height
   const chartMax = Math.max(...d.workload_chart.map(w => w.total), 1);
 
   return (
@@ -113,6 +168,55 @@ export default function ProjectDashboard() {
         </div>
       </div>
 
+      {/* ═══ Quick Actions Bar ═══ */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <button className="btn btn-primary" onClick={() => setShowCreate(!showCreate)}
+          style={{ fontSize: "0.78rem", padding: "0.4rem 0.85rem" }}>
+          + New Timetable
+        </button>
+        <button className="btn" onClick={handleDemo} disabled={demoLoading}
+          style={{ fontSize: "0.78rem", padding: "0.4rem 0.85rem" }}>
+          {demoLoading ? "⏳ Loading…" : "🧪 Load Demo Data"}
+        </button>
+        <button className="btn" onClick={() => fileRef.current?.click()} disabled={importing}
+          style={{ fontSize: "0.78rem", padding: "0.4rem 0.85rem" }}>
+          {importing ? "⏳ Uploading…" : "📂 Upload Project"}
+        </button>
+        <button className="btn" onClick={handleExport} disabled={exporting}
+          style={{ fontSize: "0.78rem", padding: "0.4rem 0.85rem" }}>
+          {exporting ? "⏳…" : "💾 Save Project"}
+        </button>
+        <input ref={fileRef} type="file" accept=".json,.timetable.json" style={{ display: "none" }} onChange={handleImportFile} />
+        {actionMsg && (
+          <span style={{
+            fontSize: "0.72rem", fontWeight: 600, marginLeft: 4,
+            color: actionMsg.startsWith("✅") ? "var(--color-success)" : "var(--color-danger)",
+          }}>{actionMsg}</span>
+        )}
+      </div>
+
+      {/* ═══ Create Project Form (collapsible) ═══ */}
+      {showCreate && (
+        <div className="card" style={{ marginBottom: 12, padding: "0.85rem 1rem" }}>
+          <form onSubmit={handleCreate} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", display: "block", marginBottom: 4 }}>School / Project Name</label>
+              <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. The City School" required
+                style={{ width: "100%", padding: "0.45rem 0.7rem", borderRadius: "var(--r-md, var(--radius-md))", border: "1px solid var(--border-default, var(--slate-300))", fontSize: "0.82rem", fontFamily: "inherit" }} />
+            </div>
+            <div style={{ minWidth: 120 }}>
+              <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", display: "block", marginBottom: 4 }}>Academic Year</label>
+              <input value={newYear} onChange={e => setNewYear(e.target.value)} placeholder="e.g. 2025-26"
+                style={{ width: "100%", padding: "0.45rem 0.7rem", borderRadius: "var(--r-md, var(--radius-md))", border: "1px solid var(--border-default, var(--slate-300))", fontSize: "0.82rem", fontFamily: "inherit" }} />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={creating} style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>
+              {creating ? "Creating…" : "Create & Open"}
+            </button>
+            <button type="button" className="btn" onClick={() => setShowCreate(false)} style={{ fontSize: "0.78rem" }}>Cancel</button>
+          </form>
+        </div>
+      )}
+
       {/* ═══ Unassigned alert ═══ */}
       {uncoveredCount > 0 && (
         <div style={{
@@ -135,68 +239,48 @@ export default function ProjectDashboard() {
 
       {/* ═══ Stat Cards (5 across) ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 16 }}>
-        {/* Present Today */}
         <div className="card anim-card" style={{ padding: "0.85rem 1rem", position: "relative", overflow: "hidden", animationDelay: "0ms" }}>
           <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(34,197,94,0.08)" }} />
           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--color-success, var(--success-600))", textTransform: "uppercase", letterSpacing: "0.06em" }}>PRESENT TODAY</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>{s.present_today}</div>
           <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>of {s.total_teachers} teachers</div>
-          <div style={{
-            display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)",
-            background: "var(--color-success-bg, var(--success-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-success, var(--success-600))",
-          }}>{s.attendance_pct}% attendance</div>
+          <div style={{ display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)", background: "var(--color-success-bg, var(--success-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-success, var(--success-600))" }}>{s.attendance_pct}% attendance</div>
         </div>
 
-        {/* Absent Today */}
         <div className="card anim-card" style={{ padding: "0.85rem 1rem", position: "relative", overflow: "hidden", animationDelay: "50ms" }}>
           <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(239,68,68,0.08)" }} />
           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--color-danger, var(--danger-600))", textTransform: "uppercase", letterSpacing: "0.06em" }}>ABSENT TODAY</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>{s.absent_today}</div>
           <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>marked this morning</div>
           {uncoveredCount > 0 && (
-            <div style={{
-              display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)",
-              background: "var(--color-warning-bg, var(--warning-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-warning, var(--warning-600))",
-            }}>{uncoveredCount} periods uncovered</div>
+            <div style={{ display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)", background: "var(--color-warning-bg, var(--warning-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-warning, var(--warning-600))" }}>{uncoveredCount} periods uncovered</div>
           )}
         </div>
 
-        {/* Busy Right Now */}
         <div className="card anim-card" style={{ padding: "0.85rem 1rem", position: "relative", overflow: "hidden", animationDelay: "100ms" }}>
           <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(99,102,241,0.08)" }} />
           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--color-brand, var(--primary-600))", textTransform: "uppercase", letterSpacing: "0.06em" }}>BUSY RIGHT NOW</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>{s.busy_now}</div>
           <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>in Period {d.current_period + 1}</div>
-          <div style={{
-            display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)",
-            background: "var(--color-brand-light, var(--primary-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-brand, var(--primary-600))",
-          }}>{s.free_now} teachers free</div>
+          <div style={{ display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)", background: "var(--color-brand-light, var(--primary-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-brand, var(--primary-600))" }}>{s.free_now} teachers free</div>
         </div>
 
-        {/* Avg Workload */}
         <div className="card anim-card" style={{ padding: "0.85rem 1rem", position: "relative", overflow: "hidden", animationDelay: "150ms" }}>
           <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(245,158,11,0.08)" }} />
           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--color-warning, var(--warning-600))", textTransform: "uppercase", letterSpacing: "0.06em" }}>AVG. WORKLOAD</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>{s.avg_workload}</div>
           <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>periods this week</div>
           {s.over_max > 0 && (
-            <div style={{
-              display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)",
-              background: "var(--color-danger-bg, var(--danger-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-danger, var(--danger-600))",
-            }}>{s.over_max} over max</div>
+            <div style={{ display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)", background: "var(--color-danger-bg, var(--danger-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-danger, var(--danger-600))" }}>{s.over_max} over max</div>
           )}
         </div>
 
-        {/* Total Classes */}
         <div className="card anim-card" style={{ padding: "0.85rem 1rem", position: "relative", overflow: "hidden", animationDelay: "200ms" }}>
           <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(6,182,212,0.08)" }} />
           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#0891B2", textTransform: "uppercase", letterSpacing: "0.06em" }}>TOTAL CLASSES</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>{s.total_classes}</div>
           <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>Grades</div>
-          <div style={{
-            display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)",
-            background: "#ecfeff", fontSize: "0.6rem", fontWeight: 700, color: "#0891B2",
-          }}>{s.total_lessons} lessons / week</div>
+          <div style={{ display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)", background: "#ecfeff", fontSize: "0.6rem", fontWeight: 700, color: "#0891B2" }}>{s.total_lessons} lessons / week</div>
         </div>
       </div>
 
@@ -213,7 +297,6 @@ export default function ProjectDashboard() {
             {s.busy_now} busy · {s.free_now} free · {s.on_sub_now} on sub
           </span>
         </div>
-        {/* Period progress bar */}
         <div style={{ display: "flex", gap: 3, height: 8, borderRadius: 4, overflow: "hidden" }}>
           {Array.from({ length: d.num_periods }, (_, i) => (
             <div key={i} style={{
@@ -267,33 +350,37 @@ export default function ProjectDashboard() {
             </span>
           </div>
 
-          {/* Bar chart */}
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 140, marginBottom: 8 }}>
-            {d.workload_chart.map((w, i) => {
-              const schedH = (w.scheduled / chartMax) * 130;
-              const subH = (w.substitutions / chartMax) * 130;
-              const isOver = w.utilization_pct > 100;
-              return (
-                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                  <span style={{ fontSize: "0.55rem", fontWeight: 700, fontFamily: "var(--font-mono)", color: isOver ? "var(--color-danger)" : "var(--text-muted)" }}>
-                    {w.total}
-                  </span>
-                  <div style={{ width: "100%", display: "flex", flexDirection: "column-reverse", borderRadius: "3px 3px 0 0", overflow: "hidden" }}>
-                    <div className="wl-bar" style={{ height: schedH, background: isOver ? "var(--color-danger, var(--danger-500))" : "var(--color-brand, var(--primary-500))" }} />
-                    {w.substitutions > 0 && (
-                      <div className="wl-bar" style={{ height: subH, background: "var(--color-sub, #F97316)", animationDelay: `${i * 50}ms` }} />
-                    )}
+          {d.workload_chart.length > 0 ? (
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 140, marginBottom: 8 }}>
+              {d.workload_chart.map((w, i) => {
+                const schedH = (w.scheduled / chartMax) * 130;
+                const subH = (w.substitutions / chartMax) * 130;
+                const isOver = w.utilization_pct > 100;
+                return (
+                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                    <span style={{ fontSize: "0.55rem", fontWeight: 700, fontFamily: "var(--font-mono)", color: isOver ? "var(--color-danger)" : "var(--text-muted)" }}>
+                      {w.total}
+                    </span>
+                    <div style={{ width: "100%", display: "flex", flexDirection: "column-reverse", borderRadius: "3px 3px 0 0", overflow: "hidden" }}>
+                      <div className="wl-bar" style={{ height: schedH, background: isOver ? "var(--color-danger, var(--danger-500))" : "var(--color-brand, var(--primary-500))" }} />
+                      {w.substitutions > 0 && (
+                        <div className="wl-bar" style={{ height: subH, background: "var(--color-sub, #F97316)", animationDelay: `${i * 50}ms` }} />
+                      )}
+                    </div>
+                    <span style={{ fontSize: "0.55rem", fontWeight: 600, color: "var(--text-muted)" }}>{w.initials}</span>
                   </div>
-                  <span style={{ fontSize: "0.55rem", fontWeight: 600, color: "var(--text-muted)" }}>{w.initials}</span>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "0.78rem" }}>
+              Generate a timetable to see workload data
+            </div>
+          )}
 
           {/* Teacher status summary */}
           <div style={{ borderTop: "1px solid var(--border-default, var(--slate-200))", paddingTop: 12, marginTop: 4 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              {/* Mini donut (CSS) */}
               <div style={{
                 width: 56, height: 56, borderRadius: "50%",
                 background: `conic-gradient(var(--color-success) 0% ${s.attendance_pct}%, var(--color-danger-bg, var(--danger-100)) ${s.attendance_pct}% 100%)`,
@@ -388,7 +475,6 @@ export default function ProjectDashboard() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {/* Build activity from substitutions + absences */}
             {d.substitutions_today.map((sub) => (
               <div key={`sub-${sub.id}`} style={{ display: "flex", gap: 10, fontSize: "0.72rem" }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--color-success)", flexShrink: 0, marginTop: 5 }} />
