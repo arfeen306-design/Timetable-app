@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { api, createProject, createDemoProject, importProject, exportProject } from "../api";
 
 /* ── Types ── */
@@ -84,7 +84,6 @@ function formatTime12(t: string): string {
 export default function ProjectDashboard() {
   const { projectId } = useParams();
   const pid = Number(projectId);
-  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -108,7 +107,6 @@ export default function ProjectDashboard() {
       .finally(() => setLoading(false));
   }, [pid]);
 
-  // ── Action handlers ──
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
@@ -116,7 +114,8 @@ export default function ProjectDashboard() {
     try {
       const p = await createProject({ name: newName.trim(), academic_year: newYear.trim() || new Date().getFullYear().toString() });
       setShowCreate(false); setNewName(""); setNewYear("");
-      navigate(`/project/${p.id}/dashboard`);
+      setActionMsg("✅ Project created! Redirecting…");
+      window.location.href = `/project/${p.id}/settings`;
     } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Failed"}`); }
     finally { setCreating(false); }
   }
@@ -125,8 +124,8 @@ export default function ProjectDashboard() {
     setDemoLoading(true); setActionMsg("");
     try {
       const p = await createDemoProject();
-      setActionMsg("✅ Demo project created!");
-      setTimeout(() => navigate(`/project/${p.id}/dashboard`), 600);
+      setActionMsg("✅ Demo project created! Redirecting…");
+      setTimeout(() => { window.location.href = `/project/${p.id}/dashboard`; }, 500);
     } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Failed"}`); }
     finally { setDemoLoading(false); }
   }
@@ -137,8 +136,8 @@ export default function ProjectDashboard() {
     setImporting(true); setActionMsg("");
     try {
       const p = await importProject(file);
-      setActionMsg(`✅ Imported "${p.name}"!`);
-      setTimeout(() => navigate(`/project/${p.id}/dashboard`), 600);
+      setActionMsg(`✅ Imported "${p.name}"! Redirecting…`);
+      setTimeout(() => { window.location.href = `/project/${p.id}/dashboard`; }, 500);
     } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Import failed"}`); }
     finally { setImporting(false); if (fileRef.current) fileRef.current.value = ""; }
   }

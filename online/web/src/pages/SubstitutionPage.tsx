@@ -442,16 +442,37 @@ export default function SubstitutionPage() {
                     <Initials name={assigned.sub_teacher_name} color={avatarColor(assigned.sub_teacher_id)} size={30} />
                     <div style={{ flex: 1 }}>
                       <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--success-700)" }}>
-                        {assigned.sub_teacher_name} covering Period {assigned.period_index + 1}
+                        {assigned.sub_teacher_name} covering Lesson {assigned.period_index + 1}
                       </span>
                       <div style={{ fontSize: "0.68rem", color: "var(--slate-500)" }}>
                         {slot.class_name} · {slot.room_name || ""} · In place of {teacherName(Number(tId))}
                       </div>
                     </div>
                     <span style={{ color: "var(--success-600)", fontSize: "1.1rem" }}>✓</span>
-                    <button onClick={async () => { await deleteSubstitution(pid, assigned.id); loadDayData(); }}
-                      style={{ background: "none", border: "none", color: "var(--slate-400)", cursor: "pointer", fontSize: "0.75rem", padding: 2 }}
-                      title="Remove assignment">🗑️</button>
+                    <button onClick={async () => {
+                      await deleteSubstitution(pid, assigned.id);
+                      loadDayData();
+                      // Immediately open the free teacher list to reassign
+                      handleFindFree(slot.period_index, Number(tId));
+                    }}
+                      className="btn" style={{
+                        fontSize: "0.68rem", padding: "3px 10px", fontWeight: 700,
+                        background: "var(--primary-50)", color: "var(--primary-600)",
+                        border: "1px solid var(--primary-200)",
+                      }}
+                      title="Remove current substitute and pick a new one">🔄 Reassign</button>
+                    <button onClick={async () => {
+                      if (!confirm || window.confirm(`Unassign ${assigned.sub_teacher_name} from Lesson ${assigned.period_index + 1}?`)) {
+                        await deleteSubstitution(pid, assigned.id);
+                        loadDayData();
+                      }
+                    }}
+                      className="btn" style={{
+                        fontSize: "0.68rem", padding: "3px 10px", fontWeight: 700,
+                        background: "var(--danger-50)", color: "var(--danger-600)",
+                        border: "1px solid var(--danger-200)",
+                      }}
+                      title="Remove this substitute assignment">✕ Unassign</button>
                   </div>
                 )}
               </div>
