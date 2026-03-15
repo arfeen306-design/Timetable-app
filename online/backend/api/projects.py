@@ -108,30 +108,17 @@ def delete_project(
     if not project:
         raise HTTPException(404, "Project not found")
 
-    # Delete in dependency order — use correct table names and savepoints
-    for table in [
-        "timetable_entries",
-        "timetable_runs",
-        "time_constraints",
-        "lesson_allowed_rooms",
-        "lessons",
-        "teacher_subjects",
-        "subjects",
-        "teachers",
-        "school_classes",
-        "rooms",
-        "school_settings",
-    ]:
-        try:
-            sp = db.begin_nested()
-            db.execute(text(f"DELETE FROM {table} WHERE project_id = :pid"), {"pid": project_id})
-            sp.commit()
-        except Exception:
-            sp.rollback()
+    name = project.name
 
-    db.delete(project)
+    # Fast: single CASCADE delete — all child tables have ondelete=CASCADE FKs
+    db.execute(text("DELETE FROM projects WHERE id = :pid AND school_id = :sid"), {"pid": project_id, "sid": school_id})
     db.commit()
-    return {"ok": True, "message": f"Project '{project.name}' deleted."}
+
+    # Free memory
+    db.expire_all()
+    import gc; gc.collect()
+
+    return {"ok": True, "message": f"Project '{name}' deleted."}
 
 
 # ─── EXPORT (download as .timetable.json) ───────────────────────────────────
