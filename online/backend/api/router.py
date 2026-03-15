@@ -1,6 +1,6 @@
 """API router aggregation."""
 from fastapi import APIRouter
-from backend.api import auth, projects, subjects, schools, school_settings, classes, teachers, rooms, lessons, constraints, generation, review, exports, templates, integration, move_entry
+from backend.api import auth, projects, subjects, schools, school_settings, classes, teachers, rooms, lessons, constraints, generation, review, exports, templates, integration, move_entry, workload, substitutions
 
 api_router = APIRouter()
 
@@ -19,4 +19,7 @@ api_router.include_router(generation.router, prefix="/projects/{project_id}/gene
 api_router.include_router(review.router, prefix="/projects/{project_id}/review", tags=["review"])
 api_router.include_router(move_entry.router, prefix="/projects/{project_id}/review", tags=["review"])
 api_router.include_router(exports.router, prefix="/projects/{project_id}/exports", tags=["exports"])
+api_router.include_router(workload.router, prefix="/projects/{project_id}/workload", tags=["workload"])
+api_router.include_router(substitutions.router, prefix="/projects/{project_id}/substitutions", tags=["substitutions"])
 api_router.include_router(integration.router, prefix="/solve", tags=["integration"])
+

@@ -8,6 +8,8 @@ import ProjectEditor from "./pages/ProjectEditor";
 import Generate from "./pages/Generate";
 import Review from "./pages/Review";
 import Export from "./pages/Export";
+import WorkloadPage from "./pages/WorkloadPage";
+import SubstitutionPage from "./pages/SubstitutionPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -46,6 +48,8 @@ export default function App() {
         <Route path="project/:projectId/generate" element={<Generate />} />
         <Route path="project/:projectId/review" element={<Review />} />
         <Route path="project/:projectId/export" element={<Export />} />
+        <Route path="project/:projectId/workload" element={<WorkloadPage />} />
+        <Route path="project/:projectId/substitutions" element={<SubstitutionPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

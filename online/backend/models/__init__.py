@@ -10,6 +10,7 @@ from backend.models.room_model import Room
 from backend.models.lesson_model import Lesson, LessonAllowedRoom
 from backend.models.constraint_model import TimeConstraint
 from backend.models.timetable_model import TimetableRun, TimetableEntry
+from backend.models.substitution_model import TeacherAbsence, Substitution
 
 __all__ = [
     "Base",
@@ -30,4 +31,6 @@ __all__ = [
     "TimeConstraint",
     "TimetableRun",
     "TimetableEntry",
+    "TeacherAbsence",
+    "Substitution",
 ]

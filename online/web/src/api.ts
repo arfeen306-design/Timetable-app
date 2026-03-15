@@ -397,3 +397,77 @@ export function downloadPdfAll(projectId: number, type: "all-classes" | "all-tea
     URL.revokeObjectURL(url);
   });
 }
+
+// ─── Workload ───────────────────────────────────────────────────────────────
+export type WorkloadEntry = {
+  teacher_id: number; teacher_name: string; teacher_code: string;
+  scheduled: number; substitutions: number; total: number; max: number; utilization_pct: number;
+};
+
+export function getWorkloadOverview(projectId: number, week?: string) {
+  const qs = week ? `?week=${week}` : "";
+  return api<WorkloadEntry[]>(`/api/projects/${projectId}/workload/overview${qs}`);
+}
+
+export function getTeacherWorkload(projectId: number, teacherId: number, week?: string) {
+  const qs = week ? `?week=${week}` : "";
+  return api<WorkloadEntry>(`/api/projects/${projectId}/workload/${teacherId}${qs}`);
+}
+
+// ─── Substitutions ──────────────────────────────────────────────────────────
+export type AbsentSlot = {
+  entry_id: number; period_index: number; room_id: number | null;
+  lesson_id: number; teacher_id: number; subject_id: number; class_id: number;
+};
+
+export type FreeTeacher = WorkloadEntry;
+
+export type SubstitutionRecord = {
+  id: number; period_index: number;
+  absent_teacher_id: number; absent_teacher_name: string;
+  sub_teacher_id: number; sub_teacher_name: string;
+  lesson_id: number; room_id: number | null; notes: string;
+};
+
+export type AbsenceRecord = {
+  id: number; teacher_id: number; teacher_name: string; reason: string;
+};
+
+export function markAbsent(projectId: number, data: { date: string; teacher_ids: number[]; reason?: string }) {
+  return api<{ ok: boolean; absences_created: number[]; date: string; day_index: number; slots: AbsentSlot[] }>(
+    `/api/projects/${projectId}/substitutions/absent`,
+    { method: "POST", body: JSON.stringify(data) }
+  );
+}
+
+export function getFreeTeachers(projectId: number, dt: string, period: number, absentIds: number[], week?: string) {
+  const qs = new URLSearchParams({ date: dt, period: String(period), absent_ids: absentIds.join(",") });
+  if (week) qs.set("week", week);
+  return api<FreeTeacher[]>(`/api/projects/${projectId}/substitutions/free-teachers?${qs}`);
+}
+
+export function assignSubstitute(projectId: number, data: {
+  date: string; period_index: number; absent_teacher_id: number;
+  sub_teacher_id: number; lesson_id: number; room_id?: number | null; notes?: string;
+}) {
+  return api<{ ok: boolean; id: number; message: string }>(
+    `/api/projects/${projectId}/substitutions/assign`,
+    { method: "POST", body: JSON.stringify(data) }
+  );
+}
+
+export function listSubstitutions(projectId: number, dt: string) {
+  return api<SubstitutionRecord[]>(`/api/projects/${projectId}/substitutions?date=${dt}`);
+}
+
+export function listAbsences(projectId: number, dt: string) {
+  return api<AbsenceRecord[]>(`/api/projects/${projectId}/substitutions/absences?date=${dt}`);
+}
+
+export function deleteSubstitution(projectId: number, subId: number) {
+  return api<{ ok: boolean }>(`/api/projects/${projectId}/substitutions/${subId}`, { method: "DELETE" });
+}
+
+export function removeAbsence(projectId: number, absenceId: number) {
+  return api<{ ok: boolean }>(`/api/projects/${projectId}/substitutions/absence/${absenceId}`, { method: "DELETE" });
+}

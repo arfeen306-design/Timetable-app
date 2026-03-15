@@ -13,6 +13,8 @@ const STEPS = [
   { num: 8, label: "Constraints", path: "/project/:projectId/constraints", segment: "constraints" },
   { num: 9, label: "Generate", path: "/project/:projectId/generate", segment: "generate" },
   { num: 10, label: "Review & Export", path: "/project/:projectId/review", segment: "review" },
+  { num: 11, label: "Workload", path: "/project/:projectId/workload", segment: "workload" },
+  { num: 12, label: "Substitutions", path: "/project/:projectId/substitutions", segment: "substitutions" },
 ];
 
 export default function Layout() {
@@ -24,25 +26,29 @@ export default function Layout() {
   const activeStep =
     pathname === "/"
       ? 1
-      : pathname.includes("/export") || pathname.includes("/review")
-        ? 10
-        : pathname.includes("/generate")
-          ? 9
-          : pathname.includes("/constraints")
-            ? 8
-            : pathname.includes("/lessons")
-              ? 7
-              : pathname.includes("/teachers")
-                ? 6
-                : pathname.includes("/rooms")
-                  ? 5
-                  : pathname.includes("/classes")
-                    ? 4
-                    : pathname.includes("/subjects")
-                      ? 3
-                      : pathname.includes("/settings")
-                        ? 2
-                        : 2;
+      : pathname.includes("/substitutions")
+        ? 12
+        : pathname.includes("/workload")
+          ? 11
+          : pathname.includes("/export") || pathname.includes("/review")
+            ? 10
+            : pathname.includes("/generate")
+              ? 9
+              : pathname.includes("/constraints")
+                ? 8
+                : pathname.includes("/lessons")
+                  ? 7
+                  : pathname.includes("/teachers")
+                    ? 6
+                    : pathname.includes("/rooms")
+                      ? 5
+                      : pathname.includes("/classes")
+                        ? 4
+                        : pathname.includes("/subjects")
+                          ? 3
+                          : pathname.includes("/settings")
+                            ? 2
+                            : 2;
 
   return (
     <div className="app-layout">
