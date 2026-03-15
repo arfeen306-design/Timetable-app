@@ -66,7 +66,9 @@ def health():
 
 @app.get("/debug/db")
 def debug_db():
-    """Safe debug endpoint: shows DB type without exposing credentials."""
+    """Debug endpoint (disabled in production). Shows DB type without credentials."""
+    if not settings.debug:
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
     import os
     raw_url = os.environ.get("DATABASE_URL", "NOT_SET")
     settings_url = settings.database_url
@@ -82,7 +84,9 @@ def debug_db():
 
 @app.get("/debug/solver")
 def debug_solver():
-    """Check if original CP-SAT solver engine imports correctly."""
+    """Debug endpoint (disabled in production). Checks CP-SAT solver import."""
+    if not settings.debug:
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
     try:
         from solver.engine import TimetableSolver
         from core.validators import validate_for_generation

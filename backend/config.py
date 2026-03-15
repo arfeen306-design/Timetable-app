@@ -38,6 +38,22 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
         extra = "ignore"
 
+    @field_validator("secret_key", mode="after")
+    @classmethod
+    def warn_default_secret(cls, v: str) -> str:
+        import os, warnings
+        if v == "change-me-in-production-use-openssl-rand-hex-32":
+            if os.environ.get("ENVIRONMENT", "").lower() in ("production", "prod"):
+                raise ValueError(
+                    "SECRET_KEY must be changed in production. "
+                    "Generate one with: openssl rand -hex 32"
+                )
+            warnings.warn(
+                "SECRET_KEY is the insecure default. Set SECRET_KEY in .env before deploying.",
+                stacklevel=2,
+            )
+        return v
+
     @field_validator("database_url", mode="before")
     @classmethod
     def coerce_sqlite_path(cls, v: str) -> str:

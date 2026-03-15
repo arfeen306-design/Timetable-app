@@ -92,7 +92,7 @@ export default function Dashboard() {
     </div>
   );
 
-  const actionBtn = (bg: string, fg: string, _hoverBg?: string): React.CSSProperties => ({
+  const actionBtn = (bg: string, fg: string): React.CSSProperties => ({
     display: "inline-flex", alignItems: "center", gap: 4,
     padding: "0.3rem 0.65rem", borderRadius: "var(--radius-sm)",
     background: bg, color: fg, border: "none",
@@ -319,13 +319,13 @@ export default function Dashboard() {
               {/* Actions */}
               <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                 <Link to={`/project/${p.id}/settings`}
-                  style={{ ...actionBtn("var(--primary-50)", "var(--primary-700)", "var(--primary-100)"), textDecoration: "none" }}
+                  style={{ ...actionBtn("var(--primary-50)", "var(--primary-700)"), textDecoration: "none" }}
                   title="Edit project"
                   onMouseEnter={e => { e.currentTarget.style.background = "var(--primary-100)"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = "var(--primary-50)"; }}
                 >✏️ Edit</Link>
                 <button type="button"
-                  style={actionBtn("var(--success-50)", "var(--success-700)", "var(--success-100)")}
+                  style={actionBtn("var(--success-50)", "var(--success-700)")}
                   disabled={exporting === p.id}
                   onClick={() => handleExport(p)}
                   title="Download project file"
@@ -333,7 +333,7 @@ export default function Dashboard() {
                   onMouseLeave={e => { e.currentTarget.style.background = "var(--success-50)"; }}
                 >{exporting === p.id ? "⏳" : "💾"} Save</button>
                 <button type="button"
-                  style={actionBtn("var(--danger-50)", "var(--danger-700)", "var(--danger-100)")}
+                  style={actionBtn("var(--danger-50)", "var(--danger-700)")}
                   disabled={deleting === p.id}
                   onClick={() => handleDelete(p)}
                   title="Delete project permanently"

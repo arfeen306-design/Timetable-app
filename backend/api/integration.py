@@ -39,7 +39,7 @@ class SchoolDataPayload(BaseModel):
     lessons: List[LessonPayload]
     
 class WebhookSolveRequest(BaseModel):
-    webhook_url: str
+    webhook_url: HttpUrl
     data: SchoolDataPayload
 
 @router.post("/webhook", status_code=202)
@@ -52,22 +52,29 @@ async def solve_timetable_webhook(
     Accept timetable data from an LMS and generate the schedule asynchronously.
     Responds immediately with a job ID and triggers solving in the background.
     """
-    if not request.webhook_url:
-        raise HTTPException(status_code=400, detail="webhook_url is required")
-        
+    webhook_url_str = str(request.webhook_url)
+
+    # Block SSRF: reject private/internal addresses
+    _blocked = ("localhost", "127.", "10.", "172.16.", "172.17.", "172.18.",
+                "172.19.", "172.2", "172.3", "192.168.", "169.254.", "::1",
+                "0.0.0.0")
+    from urllib.parse import urlparse
+    _host = urlparse(webhook_url_str).hostname or ""
+    if any(_host == b or _host.startswith(b) for b in _blocked):
+        raise HTTPException(status_code=400, detail="webhook_url must point to a public host")
+
     job_id = str(uuid.uuid4())
-    
-    # Offload the heavy CPU operations (OR-Tools solver) and webhook dispatch to the background
+
     background_tasks.add_task(
         run_solver_background,
         job_id=job_id,
         school_id=school.id,
-        webhook_url=request.webhook_url,
+        webhook_url=webhook_url_str,
         payload_data=request.data.dict()
     )
-    
+
     return {
         "job_id": job_id,
         "status": "accepted",
-        "message": f"Timetable generation job '{job_id}' started. Results will be sent to {request.webhook_url}"
+        "message": f"Timetable generation job '{job_id}' started. Results will be sent to {webhook_url_str}"
     }

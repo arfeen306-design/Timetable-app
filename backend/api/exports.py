@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import tempfile
+import atexit
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -64,7 +65,9 @@ def export_excel(
             except OSError:
                 pass
         raise HTTPException(status_code=501, detail="Excel export not available (PYTHONPATH).")
-    out_path = tempfile.mktemp(suffix=".xlsx")
+    _fd, out_path = tempfile.mkstemp(suffix=".xlsx")
+    os.close(_fd)
+    atexit.register(lambda p=out_path: os.path.exists(p) and os.unlink(p))
     try:
         core_export_excel(sqlite_db, out_path)
         sqlite_db.close()
@@ -117,7 +120,9 @@ def export_pdf(
             except OSError:
                 pass
         raise HTTPException(status_code=501, detail="PDF export not available (PYTHONPATH).")
-    out_path = tempfile.mktemp(suffix=".pdf")
+    _fd, out_path = tempfile.mkstemp(suffix=".pdf")
+    os.close(_fd)
+    atexit.register(lambda p=out_path: os.path.exists(p) and os.unlink(p))
     try:
         core_export_pdf(sqlite_db, out_path)
         sqlite_db.close()
@@ -170,7 +175,9 @@ def export_csv(
             except OSError:
                 pass
         raise HTTPException(status_code=501, detail="CSV export not available (PYTHONPATH).")
-    out_path = tempfile.mktemp(suffix=".csv")
+    _fd, out_path = tempfile.mkstemp(suffix=".csv")
+    os.close(_fd)
+    atexit.register(lambda p=out_path: os.path.exists(p) and os.unlink(p))
     try:
         core_export_csv(sqlite_db, out_path)
         sqlite_db.close()
