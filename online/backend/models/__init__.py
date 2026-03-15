@@ -14,6 +14,7 @@ from backend.models.academic_year_model import AcademicYear
 from backend.models.academic_week_model import AcademicWeek
 from backend.models.substitution_model import TeacherAbsence, Substitution, TeacherWeekSub
 from backend.models.duty_roster_model import DutyRoster, Committee, CommitteeMember
+from backend.models.exam_duties_model import ExamSession, ExamDutyConfig, ExamDutySlot
 
 __all__ = [
     "Base", "get_db", "init_db",
@@ -25,4 +26,5 @@ __all__ = [
     "AcademicYear", "AcademicWeek",
     "TeacherAbsence", "Substitution", "TeacherWeekSub",
     "DutyRoster", "Committee", "CommitteeMember",
+    "ExamSession", "ExamDutyConfig", "ExamDutySlot",
 ]
