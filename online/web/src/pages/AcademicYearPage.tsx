@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { createAcademicYear, getAcademicYear, createProject, createDemoProject, importProject, exportProject, type AcademicYearData, type AcademicWeekInfo } from "../api";
+import { api, createAcademicYear, getAcademicYear, createProject, createDemoProject, importProject, exportProject, type AcademicYearData, type AcademicWeekInfo } from "../api";
 
 function fmtDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
@@ -50,8 +50,8 @@ export default function AcademicYearPage() {
       }
     }).catch(console.error).finally(() => setLoading(false));
 
-    // Load projects list
-    fetch("/api/projects").then(r => r.json()).then(p => setProjects(Array.isArray(p) ? p : (p.projects || p.data || []))).catch(console.error);
+    // Load projects list (authenticated)
+    api<ProjectSummary[]>("/api/projects").then(p => setProjects(Array.isArray(p) ? p : [])).catch(console.error);
   }, [pid]);
 
   async function handleSave() {
