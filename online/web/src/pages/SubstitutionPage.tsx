@@ -16,14 +16,15 @@ type Teacher = { id: number; first_name: string; last_name: string; code: string
 const AVATAR_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#22c55e"];
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 
-function Initials({ name, color }: { name: string; color: string }) {
+function Initials({ name, color, size }: { name: string; color: string; size?: number }) {
+  const s = size || 36;
   const init = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
   return (
     <div style={{
-      width: 36, height: 36, borderRadius: "50%",
+      width: s, height: s, borderRadius: "50%",
       background: color, color: "#fff",
       display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: "0.7rem", fontWeight: 700, flexShrink: 0,
+      fontSize: `${s * 0.38}px`, fontWeight: 700, flexShrink: 0,
     }}>{init}</div>
   );
 }
@@ -32,10 +33,10 @@ function SubBadge({ count, max }: { count: number; max: number }) {
   const isFull = count >= max;
   const isNear = count === max - 1;
   const cfg = isFull
-    ? { bg: "var(--danger-50)", color: "var(--danger-600)", border: "var(--danger-200)", label: `${count}/${max} — FULL` }
+    ? { bg: "var(--danger-50)", color: "var(--danger-600)", border: "var(--danger-200)", label: `${count} / ${max} FULL` }
     : isNear
-      ? { bg: "var(--warning-50)", color: "var(--warning-600)", border: "var(--warning-100)", label: `${count}/${max} subs` }
-      : { bg: "var(--success-50)", color: "var(--success-600)", border: "var(--success-100)", label: `${count}/${max} subs` };
+      ? { bg: "var(--warning-50)", color: "var(--warning-600)", border: "var(--warning-100)", label: `${count} / ${max} subs` }
+      : { bg: "var(--success-50)", color: "var(--success-600)", border: "var(--success-100)", label: `${count} / ${max} subs` };
   return (
     <span style={{
       padding: "2px 10px", borderRadius: "var(--radius-full)",
@@ -44,6 +45,13 @@ function SubBadge({ count, max }: { count: number; max: number }) {
     }}>{cfg.label}</span>
   );
 }
+
+// Confirmation state
+type ConfirmState = {
+  period: number; absentTeacherId: number; absentTeacherName: string;
+  subTeacher: FreeTeacher; lessonId: number; roomId: number | null;
+  subjectName: string; className: string; roomName: string;
+};
 
 export default function SubstitutionPage() {
   const { projectId } = useParams();
@@ -58,11 +66,14 @@ export default function SubstitutionPage() {
   const [absences, setAbsences] = useState<AbsenceRecord[]>([]);
   const [subs, setSubs] = useState<SubstitutionRecord[]>([]);
   const [freeMap, setFreeMap] = useState<Record<string, FreeTeacher[]>>({});
+  const [freeCount, setFreeCount] = useState<Record<string, number>>({});
   const [expandedSlot, setExpandedSlot] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
-  // Override warning state
+  // Confirmation step
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  // Override warning
   const [overrideWarning, setOverrideWarning] = useState<{
     teacherName: string; subCount: number;
     period: number; absentTeacherId: number; subTeacherId: number; lessonId: number; roomId: number | null;
@@ -97,7 +108,7 @@ export default function SubstitutionPage() {
     try {
       const res = await markAbsent(pid, { date, teacher_ids: selectedAbsent, reason });
       setAbsentSlots(res.slots);
-      setMsg(`✅ ${res.absences_created.length} teacher(s) marked absent. ${res.slots.length} lesson(s) need coverage.`);
+      setMsg(`✅ ${res.absences_created.length} teacher(s) marked absent. ${res.slots.length} period(s) need coverage.`);
       setSelectedAbsent([]); setReason("");
       loadDayData();
     } catch (e) { setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`); }
@@ -111,29 +122,46 @@ export default function SubstitutionPage() {
     try {
       const free = await getFreeTeachers(pid, date, period, absentIds);
       setFreeMap(prev => ({ ...prev, [key]: free }));
+      setFreeCount(prev => ({ ...prev, [key]: free.length }));
       setExpandedSlot(key);
+      setConfirm(null);
     } catch (e) { setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`); }
   }
 
-  async function handleAssign(period: number, absentTeacherId: number, subTeacherId: number, lessonId: number, roomId: number | null, forceOverride = false) {
+  function handleSelectTeacher(slot: AbsentSlot, ft: FreeTeacher) {
+    setConfirm({
+      period: slot.period_index,
+      absentTeacherId: slot.teacher_id,
+      absentTeacherName: teacherName(slot.teacher_id),
+      subTeacher: ft,
+      lessonId: slot.lesson_id,
+      roomId: slot.room_id,
+      subjectName: slot.subject_name || "",
+      className: slot.class_name || "",
+      roomName: slot.room_name || "",
+    });
+    setOverrideWarning(null);
+  }
+
+  async function handleConfirmAssign(forceOverride = false) {
+    if (!confirm) return;
     try {
       const res = await assignSubstitute(pid, {
-        date, period_index: period, absent_teacher_id: absentTeacherId,
-        sub_teacher_id: subTeacherId, lesson_id: lessonId, room_id: roomId,
+        date, period_index: confirm.period, absent_teacher_id: confirm.absentTeacherId,
+        sub_teacher_id: confirm.subTeacher.teacher_id, lesson_id: confirm.lessonId, room_id: confirm.roomId,
         force_override: forceOverride,
       });
       setMsg(`✅ ${res.message}`);
-      setExpandedSlot(null);
-      setOverrideWarning(null);
+      setExpandedSlot(null); setConfirm(null); setOverrideWarning(null);
       loadDayData();
     } catch (e: unknown) {
-      // Handle 409 LIMIT_EXCEEDED
       const err = e as { status?: number; detail?: { code?: string; teacher_name?: string; sub_count?: number } };
       if (err.status === 409 && err.detail?.code === "LIMIT_EXCEEDED") {
         setOverrideWarning({
           teacherName: err.detail.teacher_name || "Teacher",
           subCount: err.detail.sub_count || 2,
-          period, absentTeacherId, subTeacherId: subTeacherId, lessonId, roomId,
+          period: confirm.period, absentTeacherId: confirm.absentTeacherId,
+          subTeacherId: confirm.subTeacher.teacher_id, lessonId: confirm.lessonId, roomId: confirm.roomId,
         });
       } else {
         setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`);
@@ -142,8 +170,7 @@ export default function SubstitutionPage() {
   }
 
   async function handleExportPDF() {
-    const url = `/api/projects/${pid}/substitutions/export-pdf?date=${date}`;
-    window.open(url, "_blank");
+    window.open(`/api/projects/${pid}/substitutions/export-pdf?date=${date}`, "_blank");
   }
 
   // Group absent slots by teacher
@@ -163,34 +190,19 @@ export default function SubstitutionPage() {
           )}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {/* Week dropdown */}
           {weeks.length > 0 && (
-            <select
-              value={selectedWeek?.id || ""}
-              onChange={e => {
-                const w = weeks.find(wk => wk.id === Number(e.target.value));
-                if (w) setSelectedWeek(w);
-              }}
-              style={{
-                padding: "0.4rem 0.75rem", borderRadius: "var(--radius-md)",
-                border: "1px solid var(--slate-300)", fontSize: "0.78rem",
-                background: "#fff", fontWeight: 600, maxWidth: 260,
-              }}
-            >
+            <select value={selectedWeek?.id || ""} onChange={e => { const w = weeks.find(wk => wk.id === Number(e.target.value)); if (w) setSelectedWeek(w); }}
+              style={{ padding: "0.4rem 0.75rem", borderRadius: "var(--radius-md)", border: "1px solid var(--slate-300)", fontSize: "0.78rem", background: "#fff", fontWeight: 600, maxWidth: 260 }}>
               {weeks.map(w => (
-                <option key={w.id} value={w.id}>
-                  Week {w.week_number} · {fmtShort(w.start_date)}–{fmtShort(w.end_date)}{w.is_current ? " (current)" : ""}
-                </option>
+                <option key={w.id} value={w.id}>Week {w.week_number} · {fmtShort(w.start_date)}–{fmtShort(w.end_date)}{w.is_current ? " (current)" : ""}</option>
               ))}
             </select>
           )}
-          <button onClick={handleExportPDF} className="btn btn-secondary" style={{ fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap" }}>
-            Export PDF
-          </button>
+          <button onClick={handleExportPDF} className="btn btn-secondary" style={{ fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap" }}>Export PDF</button>
         </div>
       </div>
 
-      {msg && <div className={msg.startsWith("✅") ? "alert alert-success" : "alert alert-error"}>{msg}</div>}
+      {msg && <div className={msg.startsWith("✅") ? "alert alert-success" : "alert alert-error"} style={{ marginBottom: 12 }}>{msg}</div>}
 
       {/* ── Absent Today ── */}
       <div style={{ marginBottom: "1rem" }}>
@@ -222,14 +234,13 @@ export default function SubstitutionPage() {
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", marginBottom: "0.75rem" }}>
           <div>
             <label style={{ fontSize: "0.72rem", fontWeight: 600 }}>Date</label>
-            <input type="date" value={date} onChange={e => { setDate(e.target.value); setAbsentSlots([]); }} style={{ maxWidth: 160 }} />
+            <input type="date" value={date} onChange={e => { setDate(e.target.value); setAbsentSlots([]); setConfirm(null); }} style={{ maxWidth: 160 }} />
           </div>
           <div style={{ flex: 1, minWidth: 160 }}>
             <label style={{ fontSize: "0.72rem", fontWeight: 600 }}>Reason</label>
             <input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Sick leave" />
           </div>
         </div>
-
         <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid var(--slate-200)", borderRadius: "var(--radius-md)", padding: 4, marginBottom: 8 }}>
           {teachers.map(t => {
             const checked = selectedAbsent.includes(t.id);
@@ -237,21 +248,17 @@ export default function SubstitutionPage() {
             return (
               <label key={t.id} style={{
                 display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: "var(--radius-sm)", cursor: "pointer",
-                background: alreadyAbsent ? "var(--danger-50)" : checked ? "var(--primary-50)" : "transparent",
-                opacity: alreadyAbsent ? 0.5 : 1,
+                background: alreadyAbsent ? "var(--danger-50)" : checked ? "var(--primary-50)" : "transparent", opacity: alreadyAbsent ? 0.5 : 1,
               }}>
                 <input type="checkbox" checked={checked || alreadyAbsent} disabled={alreadyAbsent}
                   onChange={() => setSelectedAbsent(prev => checked ? prev.filter(x => x !== t.id) : [...prev, t.id])}
-                  style={{ accentColor: "var(--primary-500)", width: 15, height: 15 }}
-                />
+                  style={{ accentColor: "var(--primary-500)", width: 15, height: 15 }} />
                 <span style={{ fontWeight: 600, fontSize: "0.82rem" }}>{t.first_name} {t.last_name}</span>
                 <span style={{ color: "var(--slate-400)", fontSize: "0.68rem", fontFamily: "var(--font-mono)" }}>{t.code}</span>
-                {alreadyAbsent && <span style={{ color: "var(--danger-500)", fontSize: "0.65rem", marginLeft: "auto" }}>Already absent</span>}
               </label>
             );
           })}
         </div>
-
         <button onClick={handleMarkAbsent} disabled={loading || !selectedAbsent.length} className="btn btn-danger" style={{ fontSize: "0.82rem" }}>
           {loading ? "⏳ Processing…" : `Mark ${selectedAbsent.length} Teacher(s) Absent`}
         </button>
@@ -268,15 +275,19 @@ export default function SubstitutionPage() {
             const key = `${tId}-${slot.period_index}`;
             const isExpanded = expandedSlot === key;
             const freeTeachers = freeMap[key] || [];
+            const numFree = freeCount[key] || 0;
             const assigned = subs.find(s => s.absent_teacher_id === Number(tId) && s.period_index === slot.period_index);
+            const isConfirming = confirm?.period === slot.period_index && confirm?.absentTeacherId === Number(tId);
 
             return (
-              <div key={slot.period_index} className="card" style={{ padding: "0.75rem 1rem", marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div key={slot.period_index} className="card" style={{ padding: 0, marginBottom: 8, overflow: "hidden" }}>
+                {/* Period header */}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "0.75rem 1rem", cursor: !assigned ? "pointer" : undefined }}
+                  onClick={() => !assigned && handleFindFree(slot.period_index, Number(tId))}>
                   <div style={{
-                    width: 36, height: 36, borderRadius: "50%",
-                    background: assigned ? "var(--success-50)" : "var(--primary-50)",
-                    color: assigned ? "var(--success-600)" : "var(--primary-600)",
+                    width: 38, height: 38, borderRadius: "50%",
+                    background: assigned ? "var(--success-50)" : isConfirming ? "var(--warning-50)" : "var(--primary-50)",
+                    color: assigned ? "var(--success-600)" : isConfirming ? "var(--warning-600)" : "var(--primary-600)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: "0.75rem", fontWeight: 700, fontFamily: "var(--font-mono)", flexShrink: 0,
                   }}>P{slot.period_index + 1}</div>
@@ -284,126 +295,151 @@ export default function SubstitutionPage() {
                     <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--slate-900)" }}>
                       {slot.subject_name || "Lesson"} · {slot.class_name || "Class"}
                     </div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--slate-400)" }}>
-                      {slot.room_name ? `${slot.room_name} · ` : ""}{teacherName(Number(tId))} is absent
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 2 }}>
+                      {slot.class_name && <span style={{ padding: "1px 8px", borderRadius: "var(--radius-full)", background: "var(--slate-100)", fontSize: "0.65rem", fontWeight: 600, color: "var(--slate-600)" }}>{slot.class_name}</span>}
+                      {slot.room_name && <span style={{ padding: "1px 8px", borderRadius: "var(--radius-full)", background: "var(--slate-100)", fontSize: "0.65rem", fontWeight: 600, color: "var(--slate-600)" }}>{slot.room_name}</span>}
+                      <span style={{ padding: "1px 8px", borderRadius: "var(--radius-full)", background: "var(--danger-50)", border: "1px solid var(--danger-100)", fontSize: "0.62rem", fontWeight: 700, color: "var(--danger-600)" }}>
+                        {teacherName(Number(tId))} absent
+                      </span>
                     </div>
                   </div>
                   {assigned ? (
-                    <span style={{
-                      padding: "3px 10px", borderRadius: "var(--radius-full)",
-                      background: "var(--success-50)", border: "1px solid var(--success-100)",
-                      fontSize: "0.72rem", fontWeight: 700, color: "var(--success-600)",
-                    }}>{assigned.sub_teacher_name} assigned</span>
+                    <span style={{ padding: "3px 10px", borderRadius: "var(--radius-full)", background: "var(--success-50)", border: "1px solid var(--success-100)", fontSize: "0.72rem", fontWeight: 700, color: "var(--success-600)" }}>Assigned</span>
+                  ) : isConfirming ? (
+                    <span style={{ padding: "3px 10px", borderRadius: "var(--radius-full)", background: "var(--warning-50)", border: "1px solid var(--warning-200)", fontSize: "0.72rem", fontWeight: 700, color: "var(--warning-600)" }}>Confirming…</span>
                   ) : (
-                    <span style={{
-                      padding: "3px 10px", borderRadius: "var(--radius-full)",
-                      background: "var(--warning-50)", border: "1px solid var(--warning-100)",
-                      fontSize: "0.72rem", fontWeight: 700, color: "var(--warning-600)",
-                    }}>Unassigned</span>
-                  )}
-                  {!assigned && (
-                    <button onClick={() => handleFindFree(slot.period_index, Number(tId))}
-                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.9rem", color: "var(--slate-400)", padding: 2 }}>
-                      {isExpanded ? "▲" : "▼"}
-                    </button>
+                    <span style={{ padding: "3px 10px", borderRadius: "var(--radius-full)", background: "var(--warning-50)", border: "1px solid var(--warning-100)", fontSize: "0.72rem", fontWeight: 700, color: "var(--warning-600)" }}>Unassigned</span>
                   )}
                 </div>
 
-                {/* Free teacher candidates */}
-                {isExpanded && (
-                  <div style={{ marginTop: 12 }}>
+                {/* ── Confirmation panel ── */}
+                {isConfirming && confirm && !overrideWarning && (
+                  <div style={{ padding: "0.75rem 1rem", borderTop: "1px solid var(--slate-200)", background: "var(--slate-50)" }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--slate-900)", marginBottom: 10 }}>Confirm substitution assignment</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px", fontSize: "0.78rem", marginBottom: 12 }}>
+                      <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Assigned teacher</span><strong>{confirm.subTeacher.teacher_name}</strong></div>
+                      <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Covering for</span><strong>{confirm.absentTeacherName}</strong></div>
+                      <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Class</span><strong>{confirm.className}</strong></div>
+                      <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Period & time</span><strong>Period {confirm.period + 1}</strong></div>
+                      <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Room</span><strong>{confirm.roomName || "—"}</strong></div>
+                      <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Subject</span><strong>{confirm.subjectName || confirm.subTeacher.subject || "—"}</strong></div>
+                    </div>
+                    <div style={{ fontSize: "0.72rem", color: "var(--slate-500)", marginBottom: 12 }}>
+                      After confirming, {confirm.subTeacher.teacher_name}'s week {selectedWeek?.week_number || ""} workload will update to {confirm.subTeacher.scheduled} + {confirm.subTeacher.subs_this_week + 1} subs = {confirm.subTeacher.total + 1} total.
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => handleConfirmAssign(false)} className="btn" style={{ fontWeight: 700, fontSize: "0.82rem" }}>Confirm assignment</button>
+                      <button onClick={() => setConfirm(null)} className="btn btn-secondary" style={{ fontSize: "0.78rem" }}>Change teacher</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Override warning ── */}
+                {isConfirming && overrideWarning && (
+                  <div style={{ padding: "0.75rem 1rem", borderTop: "1px solid var(--warning-200)", background: "var(--warning-50)" }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--warning-700)", marginBottom: 4 }}>
+                      ⚠ {overrideWarning.teacherName} has already taken {overrideWarning.subCount} substitutions this week
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "var(--slate-600)", marginBottom: 10 }}>
+                      Assigning another will exceed the weekly limit of 2. This will be flagged in the workload report as an excess substitution.
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => handleConfirmAssign(true)} className="btn btn-danger" style={{ fontSize: "0.78rem", fontWeight: 700 }}>Yes, assign anyway</button>
+                      <button onClick={() => { setOverrideWarning(null); setConfirm(null); }} className="btn btn-secondary" style={{ fontSize: "0.78rem" }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Free teacher candidates ── */}
+                {isExpanded && !isConfirming && (
+                  <div style={{ padding: "0.65rem 1rem", borderTop: "1px solid var(--slate-200)" }}>
                     <div style={{ fontSize: "0.65rem", color: "var(--slate-400)", marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--primary-500)", display: "inline-block" }} />
-                      Sorted: fewest periods today → fewest subs this week. Max 2 subs per teacher.
+                      Only showing teachers with no class in Period {slot.period_index + 1} on {new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" })}s · <strong>{numFree} teachers free</strong>
                     </div>
 
                     {freeTeachers.length === 0 ? (
-                      <div style={{ color: "var(--slate-400)", fontSize: "0.82rem", padding: "0.5rem 0" }}>No free teachers available.</div>
+                      <div style={{ color: "var(--slate-400)", fontSize: "0.82rem", padding: "0.5rem 0" }}>No free teachers available for this period.</div>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {freeTeachers.map(ft => {
-                          const isFull = ft.subs_this_week >= 2;
-                          const isActiveOverride = overrideWarning && overrideWarning.subTeacherId === ft.teacher_id && overrideWarning.period === slot.period_index;
-                          return (
-                            <div key={ft.teacher_id}>
-                              <div style={{
-                                display: "flex", alignItems: "center", gap: 12,
-                                padding: "0.6rem 0.75rem", borderRadius: "var(--radius-md)",
-                                border: ft.best_fit ? "1.5px solid var(--primary-300)" : isFull ? "1.5px solid var(--danger-200)" : "1px solid var(--slate-200)",
-                                background: ft.best_fit ? "var(--primary-50)" : isFull ? "var(--danger-50)" : "var(--slate-50)",
-                              }}>
-                                <Initials name={ft.teacher_name} color={avatarColor(ft.teacher_id)} />
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                                    <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--slate-900)" }}>{ft.teacher_name}</span>
-                                    {ft.best_fit && (
-                                      <span style={{ padding: "1px 8px", borderRadius: "var(--radius-full)", background: "var(--primary-500)", color: "#fff", fontSize: "0.6rem", fontWeight: 700 }}>Best fit</span>
-                                    )}
-                                    {isFull && (
-                                      <span style={{ padding: "1px 8px", borderRadius: "var(--radius-full)", background: "var(--danger-100)", color: "var(--danger-600)", fontSize: "0.6rem", fontWeight: 700 }}>At limit</span>
-                                    )}
-                                  </div>
-                                  <div style={{ fontSize: "0.68rem", color: "var(--slate-400)" }}>
-                                    {ft.periods_today} periods today
-                                  </div>
-                                </div>
-
-                                {/* Workload bar + sub badge */}
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 160 }}>
-                                  {selectedWeek && <span style={{ fontSize: "0.62rem", color: "var(--slate-400)", whiteSpace: "nowrap" }}>Week {selectedWeek.week_number}</span>}
-                                  <div style={{ width: 80, height: 5, background: "var(--slate-200)", borderRadius: 3, overflow: "hidden" }}>
-                                    <div style={{
-                                      width: `${Math.min(ft.utilization_pct, 100)}%`, height: "100%", borderRadius: 3,
-                                      background: ft.utilization_pct > 100 ? "var(--danger-500)" : ft.utilization_pct > 85 ? "var(--warning-500)" : "var(--primary-500)",
-                                      transition: "width 0.3s",
-                                    }} />
-                                  </div>
-                                  <span style={{ fontSize: "0.62rem", color: "var(--slate-400)", whiteSpace: "nowrap" }}>{ft.scheduled} + {ft.subs_this_week} sub{ft.subs_this_week !== 1 ? "s" : ""}</span>
-                                </div>
-
-                                <SubBadge count={ft.subs_this_week} max={2} />
-
-                                {/* Assign or Override button */}
-                                {isFull ? (
-                                  <button onClick={() => handleAssign(slot.period_index, Number(tId), ft.teacher_id, slot.lesson_id, slot.room_id)}
-                                    className="btn btn-danger" style={{ padding: "0.35rem 1rem", fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap" }}>
-                                    Override
-                                  </button>
-                                ) : (
-                                  <button onClick={() => handleAssign(slot.period_index, Number(tId), ft.teacher_id, slot.lesson_id, slot.room_id)}
-                                    className="btn" style={{ padding: "0.35rem 1rem", fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap" }}>
-                                    Assign
-                                  </button>
-                                )}
+                        {freeTeachers.map(ft => (
+                          <div key={ft.teacher_id} style={{
+                            display: "flex", alignItems: "center", gap: 12,
+                            padding: "0.6rem 0.75rem", borderRadius: "var(--radius-md)",
+                            border: ft.best_fit ? "1.5px solid var(--primary-300)" : ft.sub_limit_reached ? "1.5px solid var(--danger-200)" : "1px solid var(--slate-200)",
+                            background: ft.best_fit ? "var(--primary-50)" : ft.sub_limit_reached ? "var(--danger-50)" : "var(--slate-50)",
+                          }}>
+                            <Initials name={ft.teacher_name} color={avatarColor(ft.teacher_id)} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--slate-900)" }}>{ft.teacher_name}</span>
+                                {ft.best_fit && <span style={{ padding: "1px 8px", borderRadius: "var(--radius-full)", background: "var(--primary-500)", color: "#fff", fontSize: "0.6rem", fontWeight: 700 }}>Best fit</span>}
+                                {ft.sub_limit_reached && <span style={{ padding: "1px 8px", borderRadius: "var(--radius-full)", background: "var(--danger-100)", color: "var(--danger-600)", fontSize: "0.6rem", fontWeight: 700 }}>At limit</span>}
                               </div>
-
-                              {/* Inline override warning */}
-                              {isActiveOverride && (
-                                <div style={{
-                                  marginTop: 8, padding: "0.65rem 1rem", borderRadius: "var(--radius-md)",
-                                  background: "var(--warning-50)", border: "1px solid var(--warning-200)",
+                              <div style={{ fontSize: "0.68rem", color: "var(--slate-500)", display: "flex", gap: 8, alignItems: "center", marginTop: 2 }}>
+                                {ft.subject && <span>{ft.subject}</span>}
+                                {/* Free period badge */}
+                                <span style={{
+                                  display: "inline-flex", alignItems: "center", gap: 3,
+                                  padding: "1px 6px", borderRadius: "var(--radius-full)",
+                                  background: "var(--success-50)", border: "1px solid var(--success-200)",
+                                  fontSize: "0.6rem", fontWeight: 700, color: "var(--success-600)",
                                 }}>
-                                  <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--warning-700)", marginBottom: 4 }}>
-                                    ⚠ {overrideWarning.teacherName} has already taken {overrideWarning.subCount} substitutions this week
-                                  </div>
-                                  <div style={{ fontSize: "0.75rem", color: "var(--slate-600)", marginBottom: 10 }}>
-                                    Assigning another will exceed the weekly limit of 2. This will be flagged in his workload report as an excess substitution.
-                                  </div>
-                                  <div style={{ display: "flex", gap: 8 }}>
-                                    <button onClick={() => handleAssign(overrideWarning.period, overrideWarning.absentTeacherId, overrideWarning.subTeacherId, overrideWarning.lessonId, overrideWarning.roomId, true)}
-                                      className="btn btn-danger" style={{ fontSize: "0.78rem", fontWeight: 700 }}>
-                                      Yes, assign anyway
-                                    </button>
-                                    <button onClick={() => setOverrideWarning(null)}
-                                      className="btn btn-secondary" style={{ fontSize: "0.78rem" }}>Cancel</button>
-                                  </div>
-                                </div>
-                              )}
+                                  🟢 {ft.free_period_label}
+                                </span>
+                                <span style={{ color: "var(--slate-400)" }}>{ft.periods_today} periods today</span>
+                              </div>
                             </div>
-                          );
-                        })}
+
+                            {/* Workload bar */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 160 }}>
+                              {selectedWeek && <span style={{ fontSize: "0.62rem", color: "var(--slate-400)", whiteSpace: "nowrap" }}>Wk {selectedWeek.week_number}</span>}
+                              <div style={{ width: 70, height: 5, background: "var(--slate-200)", borderRadius: 3, overflow: "hidden" }}>
+                                <div style={{
+                                  width: `${Math.min(ft.utilization_pct, 100)}%`, height: "100%", borderRadius: 3,
+                                  background: ft.utilization_pct > 100 ? "var(--danger-500)" : ft.utilization_pct > 85 ? "var(--warning-500)" : "var(--primary-500)",
+                                  transition: "width 0.3s",
+                                }} />
+                              </div>
+                              <span style={{ fontSize: "0.62rem", color: "var(--slate-400)", whiteSpace: "nowrap" }}>{ft.scheduled} + {ft.subs_this_week}</span>
+                            </div>
+
+                            <SubBadge count={ft.subs_this_week} max={2} />
+
+                            {ft.sub_limit_reached ? (
+                              <button onClick={() => handleSelectTeacher(slot, ft)} className="btn btn-danger"
+                                style={{ padding: "0.35rem 1rem", fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap" }}>Override</button>
+                            ) : (
+                              <button onClick={() => handleSelectTeacher(slot, ft)} className="btn"
+                                style={{ padding: "0.35rem 1rem", fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap" }}>Assign</button>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* ── Assigned summary row ── */}
+                {assigned && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "0.55rem 1rem", borderTop: "1px solid var(--success-100)",
+                    background: "var(--success-50)",
+                  }}>
+                    <Initials name={assigned.sub_teacher_name} color={avatarColor(assigned.sub_teacher_id)} size={30} />
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--success-700)" }}>
+                        {assigned.sub_teacher_name} covering Period {assigned.period_index + 1}
+                      </span>
+                      <div style={{ fontSize: "0.68rem", color: "var(--slate-500)" }}>
+                        {slot.class_name} · {slot.room_name || ""} · In place of {teacherName(Number(tId))}
+                      </div>
+                    </div>
+                    <span style={{ color: "var(--success-600)", fontSize: "1.1rem" }}>✓</span>
+                    <button onClick={async () => { await deleteSubstitution(pid, assigned.id); loadDayData(); }}
+                      style={{ background: "none", border: "none", color: "var(--slate-400)", cursor: "pointer", fontSize: "0.75rem", padding: 2 }}
+                      title="Remove assignment">🗑️</button>
                   </div>
                 )}
               </div>
@@ -411,34 +447,6 @@ export default function SubstitutionPage() {
           })}
         </div>
       ))}
-
-      {/* ── Assigned subs summary ── */}
-      {subs.length > 0 && (
-        <div style={{ marginTop: "1rem" }}>
-          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>
-            ASSIGNED SUBSTITUTIONS
-          </div>
-          {subs.map(s => (
-            <div key={s.id} className="card" style={{ padding: "0.6rem 1rem", marginBottom: 6 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{
-                  width: 30, height: 30, borderRadius: "50%",
-                  background: "var(--success-50)", color: "var(--success-600)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "0.65rem", fontWeight: 700, fontFamily: "var(--font-mono)", flexShrink: 0,
-                }}>P{s.period_index + 1}</div>
-                <div style={{ flex: 1 }}>
-                  <span style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--danger-600)" }}>{s.absent_teacher_name}</span>
-                  <span style={{ color: "var(--slate-400)", fontSize: "0.78rem" }}> → </span>
-                  <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--success-600)" }}>{s.sub_teacher_name}</span>
-                </div>
-                <button onClick={async () => { await deleteSubstitution(pid, s.id); loadDayData(); }}
-                  style={{ background: "none", border: "none", color: "var(--danger-400)", cursor: "pointer", fontSize: "0.82rem" }}>🗑️</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

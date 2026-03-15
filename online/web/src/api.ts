@@ -435,9 +435,14 @@ export type WorkloadEntry = {
 };
 
 export type FreeTeacher = WorkloadEntry & {
+  initials: string;
+  subject: string;
   periods_today: number;
   subs_this_week: number;
   best_fit: boolean;
+  free_in_period: boolean;
+  free_period_label: string;
+  sub_limit_reached: boolean;
 };
 
 export type YearlyWeek = {

@@ -140,6 +140,11 @@ def get_free_teachers(
 ) -> List[dict]:
     """Find teachers who are NOT scheduled at a given day+period and not absent.
 
+    Filters:
+      1. NOT scheduled in TimetableEntry for this exact day_index + period_index
+      2. NOT already covering a substitution for this date + period_index
+      3. NOT in the absent list
+
     Ranked by fairness:
       1. periods_today ASC   — lightest day first
       2. subs_this_week ASC  — fewest subs taken first
@@ -148,6 +153,8 @@ def get_free_teachers(
     First result gets best_fit: true.
     """
     day_index = target_date.weekday()  # 0=Mon .. 4=Fri
+    DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    day_name = DAY_NAMES[day_index] if day_index < len(DAY_NAMES) else ""
 
     # Teachers already scheduled at this slot
     busy_sub = (
@@ -181,6 +188,21 @@ def get_free_teachers(
         )
         .all()
     )
+
+    # ── Teacher subject lookup ──
+    from backend.models.teacher_model import TeacherSubject
+    from backend.models.project import Subject
+    subject_q = (
+        db.query(TeacherSubject.teacher_id, Subject.name)
+        .join(Subject, TeacherSubject.subject_id == Subject.id)
+        .filter(TeacherSubject.teacher_id.in_([t.id for t in free]))
+        .all()
+    )
+    # First subject per teacher (primary subject)
+    subject_map: dict[int, str] = {}
+    for tid, sname in subject_q:
+        if tid not in subject_map:
+            subject_map[tid] = sname
 
     # ── Annotation queries ──
 
@@ -222,6 +244,9 @@ def get_free_teachers(
     subs_map = {r.sub_teacher_id: r.cnt for r in subs_q}
 
     # ── Build result with annotations ──
+    period_label = f"P{period_index + 1}"
+    free_label = f"Free {period_label} {day_name}"
+
     result = []
     for t in free:
         s = scheduled_map.get(t.id, 0)
@@ -229,10 +254,17 @@ def get_free_teachers(
         total = s + sub
         max_pw = t.max_periods_week or 30
         pt = periods_today_map.get(t.id, 0)
+        initials = ""
+        name = f"{t.first_name or ''} {t.last_name or ''}".strip()
+        if name:
+            initials = "".join(w[0] for w in name.split() if w).upper()[:2]
+
         result.append({
             "teacher_id": t.id,
-            "teacher_name": f"{t.first_name or ''} {t.last_name or ''}".strip(),
+            "teacher_name": name,
             "teacher_code": t.code or "",
+            "initials": initials,
+            "subject": subject_map.get(t.id, ""),
             "scheduled": s,
             "substitutions": sub,
             "total": total,
@@ -241,6 +273,9 @@ def get_free_teachers(
             "periods_today": pt,
             "subs_this_week": sub,
             "best_fit": False,
+            "free_in_period": True,
+            "free_period_label": free_label,
+            "sub_limit_reached": sub >= 2,
         })
 
     # ── Fairness sort ──
@@ -251,4 +286,5 @@ def get_free_teachers(
         result[0]["best_fit"] = True
 
     return result
+
 
