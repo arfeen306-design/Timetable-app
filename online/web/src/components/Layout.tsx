@@ -34,6 +34,7 @@ const NAV_GROUPS = [
     items: [
       { num: 11, label: "Workload",       icon: "📈", path: "/project/:projectId/workload",       segment: "workload",       badge: "New" },
       { num: 12, label: "Substitution",   icon: "🔄", path: "/project/:projectId/substitutions",  segment: "substitutions",  badge: "New" },
+      { num: 13, label: "Academic Year",  icon: "🗓️", path: "/project/:projectId/academic-year", segment: "academic-year" },
     ],
   },
 ];
@@ -41,7 +42,7 @@ const NAV_GROUPS = [
 function getActiveNum(pathname: string): number {
   if (pathname === "/") return 1;
   const map: [string, number][] = [
-    ["/substitutions", 12], ["/workload", 11],
+    ["/academic-year", 13], ["/substitutions", 12], ["/workload", 11],
     ["/export", 10], ["/review", 10], ["/generate", 9],
     ["/constraints", 8], ["/lessons", 7], ["/teachers", 6],
     ["/rooms", 5], ["/classes", 4], ["/subjects", 3], ["/settings", 2],

@@ -16,7 +16,7 @@ from backend.models.project import Subject
 from backend.models.class_model import SchoolClass
 from backend.models.room_model import Room
 from backend.services.workload_service import get_free_teachers, get_teacher_workload
-from backend.services.week_utils import get_or_create_week, resolve_week_number
+from backend.services.week_utils import get_or_create_week, resolve_week_number, get_or_create_teacher_week_sub
 
 
 router = APIRouter()
@@ -38,6 +38,7 @@ class AssignRequest(BaseModel):
     lesson_id: int
     room_id: Optional[int] = None
     notes: str = ""
+    force_override: bool = False  # if true, bypass the 2-sub limit
 
 
 # ─── Mark Absent ──────────────────────────────────────────────────────────────
@@ -149,7 +150,7 @@ def assign_substitute(
     project=Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
-    """Assign a substitute teacher for a specific period."""
+    """Assign a substitute teacher. Returns 409 if weekly limit exceeded (unless force_override)."""
     target_date = date.fromisoformat(data.date)
     day_index = target_date.weekday()
     wk_number = resolve_week_number(target_date)
@@ -161,41 +162,75 @@ def assign_substitute(
         raise HTTPException(404, "Teacher not found")
 
     # Ensure academic week exists
-    get_or_create_week(db, project_id, target_date)
+    aw = get_or_create_week(db, project_id, target_date)
 
-    # Check if substitution already exists for this slot
+    # ── 2-sub guard ──────────────────────────────────────────────────────────
+    week_sub = get_or_create_teacher_week_sub(db, project_id, data.sub_teacher_id, aw.id)
+
+    if week_sub.sub_count >= 2 and not data.force_override:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "LIMIT_EXCEEDED",
+                "teacher_name": f"{sub.first_name or ''} {sub.last_name or ''}".strip(),
+                "sub_count": week_sub.sub_count,
+                "override_count": week_sub.override_count,
+                "message": f"Teacher has already taken {week_sub.sub_count} substitution(s) this week (limit: 2).",
+            },
+        )
+
+    is_override = week_sub.sub_count >= 2 and data.force_override
+
+    # ── Check existing / create substitution ─────────────────────────────────
     existing = db.query(Substitution).filter(
         Substitution.project_id == project_id,
         Substitution.date == target_date,
         Substitution.period_index == data.period_index,
         Substitution.absent_teacher_id == data.absent_teacher_id,
     ).first()
+
     if existing:
-        # Update existing
         existing.sub_teacher_id = data.sub_teacher_id
         existing.notes = data.notes
         existing.week_number = wk_number
-        db.commit()
-        workload = get_teacher_workload(db, project_id, data.sub_teacher_id)
-        return {"ok": True, "id": existing.id, "message": "Substitution updated", "sub_workload": workload}
+        existing.academic_week_id = aw.id
+        existing.is_override = is_override
+    else:
+        substitution = Substitution(
+            project_id=project_id,
+            date=target_date,
+            week_number=wk_number,
+            academic_week_id=aw.id,
+            day_index=day_index,
+            period_index=data.period_index,
+            absent_teacher_id=data.absent_teacher_id,
+            sub_teacher_id=data.sub_teacher_id,
+            lesson_id=data.lesson_id,
+            room_id=data.room_id,
+            is_override=is_override,
+            notes=data.notes,
+        )
+        db.add(substitution)
 
-    substitution = Substitution(
-        project_id=project_id,
-        date=target_date,
-        week_number=wk_number,
-        day_index=day_index,
-        period_index=data.period_index,
-        absent_teacher_id=data.absent_teacher_id,
-        sub_teacher_id=data.sub_teacher_id,
-        lesson_id=data.lesson_id,
-        room_id=data.room_id,
-        notes=data.notes,
-    )
-    db.add(substitution)
+    # Update TeacherWeekSub counters
+    if is_override:
+        week_sub.override_count += 1
+    else:
+        week_sub.sub_count += 1
+
     db.commit()
-    db.refresh(substitution)
+
+    sub_id = existing.id if existing else substitution.id
     workload = get_teacher_workload(db, project_id, data.sub_teacher_id)
-    return {"ok": True, "id": substitution.id, "message": "Substitution assigned", "sub_workload": workload}
+    return {
+        "ok": True,
+        "id": sub_id,
+        "is_override": is_override,
+        "sub_count": week_sub.sub_count,
+        "override_count": week_sub.override_count,
+        "message": "Override recorded" if is_override else "Substitution assigned",
+        "sub_workload": workload,
+    }
 
 
 # ─── List Substitutions ──────────────────────────────────────────────────────
@@ -297,3 +332,218 @@ def remove_absence(
     db.delete(a)
     db.commit()
     return {"ok": True}
+
+
+# ─── Export PDF ──────────────────────────────────────────────────────────────
+
+@router.get("/export-pdf")
+def export_substitution_pdf(
+    project_id: int = Path(...),
+    dt: str = Query(..., alias="date", description="YYYY-MM-DD"),
+    project=Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    """Generate daily substitution PDF."""
+    from io import BytesIO
+    from datetime import datetime as dt_mod
+    from fastapi.responses import Response
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from backend.models.school import School, SchoolMembership
+    from backend.models.project import Project
+
+    target_date = date.fromisoformat(dt)
+    wk_number = resolve_week_number(target_date)
+    academic_year = f"{target_date.year}-{str(target_date.year + 1)[-2:]}" if target_date.month >= 8 else f"{target_date.year - 1}-{str(target_date.year)[-2:]}"
+
+    # Get school name
+    proj = db.query(Project).filter(Project.id == project_id).first()
+    school_name = "School"
+    if proj:
+        membership = db.query(SchoolMembership).filter(SchoolMembership.user_id == proj.user_id).first()
+        if membership:
+            school = db.query(School).filter(School.id == membership.school_id).first()
+            if school:
+                school_name = school.name or "School"
+
+    # Get absences + substitutions
+    absences = db.query(TeacherAbsence).filter(
+        TeacherAbsence.project_id == project_id,
+        TeacherAbsence.date == target_date,
+    ).all()
+
+    all_subs = db.query(Substitution).filter(
+        Substitution.project_id == project_id,
+        Substitution.date == target_date,
+    ).order_by(Substitution.period_index).all()
+
+    # Group subs by absent teacher
+    subs_by_teacher: dict[int, list] = {}
+    for s in all_subs:
+        subs_by_teacher.setdefault(s.absent_teacher_id, []).append(s)
+
+    # Count subs this week per sub teacher
+    week_start = target_date - __import__("datetime").timedelta(days=target_date.weekday())
+    week_end = week_start + __import__("datetime").timedelta(days=4)
+    from sqlalchemy import func as sqla_func
+    subs_this_week_q = dict(
+        db.query(Substitution.sub_teacher_id, sqla_func.count(Substitution.id))
+        .filter(
+            Substitution.project_id == project_id,
+            Substitution.date >= week_start,
+            Substitution.date <= week_end,
+        )
+        .group_by(Substitution.sub_teacher_id)
+        .all()
+    )
+
+    # Build PDF
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15*mm, rightMargin=15*mm, topMargin=15*mm, bottomMargin=15*mm)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    # Title style
+    title_style = ParagraphStyle("title", parent=styles["Heading1"], fontSize=14, spaceAfter=2*mm)
+    subtitle_style = ParagraphStyle("subtitle", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#6366f1"))
+    small_style = ParagraphStyle("small", parent=styles["Normal"], fontSize=8, textColor=colors.grey)
+    normal_style = ParagraphStyle("normal", parent=styles["Normal"], fontSize=9)
+
+    # Header
+    elements.append(Paragraph(f"<b>{school_name}</b>", title_style))
+    elements.append(Paragraph("Daily Substitution Schedule", subtitle_style))
+    elements.append(Spacer(1, 2*mm))
+    date_str = target_date.strftime("%d/%m/%Y")
+    now_str = dt_mod.now().strftime("%d/%m/%Y %I:%M %p")
+    elements.append(Paragraph(f"Academic Year {academic_year} · Week {wk_number} &nbsp;&nbsp; | &nbsp;&nbsp; Generated: {now_str}", small_style))
+    elements.append(Spacer(1, 5*mm))
+
+    # Absent teachers summary
+    if absences:
+        absent_parts = []
+        for a in absences:
+            tname = f"{a.teacher.first_name} {a.teacher.last_name}".strip() if a.teacher else ""
+            absent_parts.append(f"• {tname} — {a.reason or 'No reason'}")
+        absent_text = "&nbsp;&nbsp;&nbsp;".join(absent_parts)
+        elements.append(Paragraph(f'<font color="#dc2626"><b>TEACHERS ABSENT TODAY</b></font>', normal_style))
+        elements.append(Paragraph(f'<font color="#dc2626">{absent_text}</font>', small_style))
+        elements.append(Spacer(1, 5*mm))
+
+    # Per-teacher tables
+    for absence in absences:
+        teacher = absence.teacher
+        if not teacher:
+            continue
+        tname = f"{teacher.first_name} {teacher.last_name}".strip()
+        teacher_subs = subs_by_teacher.get(teacher.id, [])
+
+        elements.append(Paragraph(f"<b>{tname}</b> &nbsp; <font color='#6366f1'>{absence.reason or ''}</font>", normal_style))
+        elements.append(Spacer(1, 2*mm))
+
+        if not teacher_subs:
+            elements.append(Paragraph("<i>No substitutions assigned</i>", small_style))
+            elements.append(Spacer(1, 5*mm))
+            continue
+
+        # Table header
+        header = ["PERIOD", "CLASS", "ROOM", "SUBSTITUTED BY", "SUB'S SUBJECT", "SUBS THIS WEEK"]
+        rows = [header]
+
+        for s in teacher_subs:
+            sub_name = f"{s.sub_teacher.first_name} {s.sub_teacher.last_name}".strip() if s.sub_teacher else ""
+            sub_subject = ""
+            if s.lesson and s.lesson.subject_id:
+                from backend.models.project import Subject as SubjectModel
+                subj = db.query(SubjectModel).filter(SubjectModel.id == s.lesson.subject_id).first()
+                sub_subject = subj.name if subj else ""
+
+            # Class name
+            class_name = ""
+            if s.lesson and s.lesson.class_id:
+                cls = db.query(SchoolClass).filter(SchoolClass.id == s.lesson.class_id).first()
+                class_name = cls.name if cls else ""
+
+            # Room name
+            room_name = ""
+            if s.room_id:
+                room = db.query(Room).filter(Room.id == s.room_id).first()
+                room_name = room.name if room else ""
+
+            stw = subs_this_week_q.get(s.sub_teacher_id, 0)
+            subs_label = f"{stw} of 2"
+            if s.is_override:
+                subs_label = f"{stw} of 2 ⚠"
+
+            if s.is_override:
+                sub_name = f"{sub_name}\nOVERRIDE"
+
+            rows.append([
+                f"P{s.period_index + 1}",
+                class_name,
+                room_name,
+                sub_name,
+                sub_subject,
+                subs_label,
+            ])
+
+        col_widths = [35, 65, 55, 110, 80, 70]
+        t = Table(rows, colWidths=col_widths)
+
+        style_cmds = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#64748b")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("FONTSIZE", (0, 0), (-1, 0), 7),
+            ("ALIGN", (0, 0), (-1, 0), "LEFT"),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ]
+
+        # Color override rows red
+        for i, s in enumerate(teacher_subs):
+            if s.is_override:
+                style_cmds.append(("TEXTCOLOR", (3, i + 1), (3, i + 1), colors.HexColor("#dc2626")))
+                style_cmds.append(("FONTNAME", (3, i + 1), (3, i + 1), "Helvetica-Bold"))
+                style_cmds.append(("TEXTCOLOR", (5, i + 1), (5, i + 1), colors.HexColor("#dc2626")))
+
+        # Color period column
+        for i in range(1, len(rows)):
+            style_cmds.append(("TEXTCOLOR", (0, i), (0, i), colors.HexColor("#6366f1")))
+            style_cmds.append(("FONTNAME", (0, i), (0, i), "Helvetica-Bold"))
+
+        t.setStyle(TableStyle(style_cmds))
+        elements.append(t)
+        elements.append(Spacer(1, 6*mm))
+
+    # Signature lines
+    elements.append(Spacer(1, 15*mm))
+    sig_data = [["", "", ""], ["_" * 25, "_" * 25, "_" * 25], ["Prepared by", "Vice Principal / HOD", "Principal"]]
+    sig_table = Table(sig_data, colWidths=[140, 140, 140])
+    sig_table.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("TEXTCOLOR", (0, 2), (-1, 2), colors.grey),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    elements.append(sig_table)
+
+    # Footer
+    elements.append(Spacer(1, 8*mm))
+    elements.append(Paragraph(f"Schedulr — School OS · Generated automatically &nbsp;&nbsp;&nbsp;&nbsp; Page 1 of 1", small_style))
+
+    doc.build(elements)
+    pdf_bytes = buf.getvalue()
+
+    filename = f"substitution_{target_date.strftime('%d-%m-%Y')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

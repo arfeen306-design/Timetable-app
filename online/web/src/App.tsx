@@ -10,6 +10,7 @@ import Review from "./pages/Review";
 import Export from "./pages/Export";
 import WorkloadPage from "./pages/WorkloadPage";
 import SubstitutionPage from "./pages/SubstitutionPage";
+import AcademicYearPage from "./pages/AcademicYearPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="project/:projectId/export" element={<Export />} />
         <Route path="project/:projectId/workload" element={<WorkloadPage />} />
         <Route path="project/:projectId/substitutions" element={<SubstitutionPage />} />
+        <Route path="project/:projectId/academic-year" element={<AcademicYearPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

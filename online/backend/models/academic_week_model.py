@@ -1,6 +1,6 @@
 """AcademicWeek model — maps calendar dates to school week numbers."""
 from __future__ import annotations
-from sqlalchemy import Column, Integer, String, Date, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from backend.models.base import Base
@@ -14,9 +14,13 @@ class AcademicWeek(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    academic_year_id = Column(Integer, ForeignKey("academic_years.id", ondelete="CASCADE"), nullable=True, index=True)
     week_number = Column(Integer, nullable=False, index=True)   # 1, 2, 3 … ~40
+    label = Column(String(100), nullable=True)                   # "Week 1 · Orientation"
     start_date = Column(Date, nullable=False)                    # Monday of this week
-    end_date = Column(Date, nullable=False)                      # Friday/Saturday of this week
-    academic_year = Column(String(20), nullable=False, default="2025-26")  # e.g. "2025-26"
+    end_date = Column(Date, nullable=False)                      # Friday of this week
+    academic_year = Column(String(20), nullable=False, default="2025-26")
+    is_current = Column(Boolean, nullable=False, default=False)
 
     project = relationship("Project")
+    academic_year_rel = relationship("AcademicYear", back_populates="weeks")

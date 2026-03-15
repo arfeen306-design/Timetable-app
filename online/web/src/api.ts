@@ -398,6 +398,36 @@ export function downloadPdfAll(projectId: number, type: "all-classes" | "all-tea
   });
 }
 
+// ─── Academic Year ──────────────────────────────────────────────────────────
+export type AcademicWeekInfo = {
+  id: number; week_number: number; label: string;
+  start_date: string; end_date: string; is_current: boolean;
+  status?: string;
+};
+
+export type AcademicYearData = {
+  active: boolean;
+  year: { id: number; name: string; week_1_start_date: string; week_1_label: string; total_weeks: number } | null;
+  weeks: AcademicWeekInfo[];
+};
+
+export function createAcademicYear(projectId: number, data: {
+  name: string; week_1_start_date: string; week_1_label?: string; total_weeks?: number;
+}) {
+  return api<{ ok: boolean; id: number; name: string; weeks_created: number }>(
+    `/api/projects/${projectId}/academic-year`,
+    { method: "POST", body: JSON.stringify(data) }
+  );
+}
+
+export function getAcademicYear(projectId: number) {
+  return api<AcademicYearData>(`/api/projects/${projectId}/academic-year`);
+}
+
+export function listAcademicWeeks(projectId: number) {
+  return api<AcademicWeekInfo[]>(`/api/projects/${projectId}/academic-year/weeks`);
+}
+
 // ─── Workload ───────────────────────────────────────────────────────────────
 export type WorkloadEntry = {
   teacher_id: number; teacher_name: string; teacher_code: string;
@@ -468,8 +498,9 @@ export function getFreeTeachers(projectId: number, dt: string, period: number, a
 export function assignSubstitute(projectId: number, data: {
   date: string; period_index: number; absent_teacher_id: number;
   sub_teacher_id: number; lesson_id: number; room_id?: number | null; notes?: string;
+  force_override?: boolean;
 }) {
-  return api<{ ok: boolean; id: number; message: string; sub_workload: WorkloadEntry }>(
+  return api<{ ok: boolean; id: number; message: string; is_override: boolean; sub_count: number; override_count: number; sub_workload: WorkloadEntry }>(
     `/api/projects/${projectId}/substitutions/assign`,
     { method: "POST", body: JSON.stringify(data) }
   );

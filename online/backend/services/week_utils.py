@@ -1,4 +1,4 @@
-"""Week utilities — resolve dates to academic week numbers.
+"""Week utilities — resolve dates to academic week numbers and manage TeacherWeekSub.
 
 The academic year starts on a configurable date (typically early August/September).
 Week 1 begins on the Monday of that start date's week.
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from backend.models.academic_week_model import AcademicWeek
+from backend.models.substitution_model import TeacherWeekSub
 
 
 def _monday_of(d: date) -> date:
@@ -34,10 +35,7 @@ def _academic_year_start(d: date) -> date:
 
 
 def resolve_week_number(target_date: date) -> int:
-    """Compute the school week number (1-based) from the academic year start.
-
-    Week 1 = the week containing Aug 1 of the academic year.
-    """
+    """Compute the school week number (1-based) from the academic year start."""
     year_start = _academic_year_start(target_date)
     monday_of_start = _monday_of(year_start)
     monday_of_target = _monday_of(target_date)
@@ -87,3 +85,34 @@ def get_week_range(week_number: int, target_date: Optional[date] = None) -> tupl
     monday = monday_of_start + timedelta(weeks=week_number - 1)
     friday = monday + timedelta(days=4)
     return monday, friday
+
+
+def get_or_create_teacher_week_sub(
+    db: Session,
+    project_id: int,
+    teacher_id: int,
+    academic_week_id: int,
+) -> TeacherWeekSub:
+    """Get or create the TeacherWeekSub row for this teacher+week.
+
+    Fresh rows start with sub_count=0, override_count=0.
+    No cron needed — new weeks just get new rows on first use.
+    """
+    existing = db.query(TeacherWeekSub).filter(
+        TeacherWeekSub.teacher_id == teacher_id,
+        TeacherWeekSub.academic_week_id == academic_week_id,
+    ).first()
+
+    if existing:
+        return existing
+
+    tws = TeacherWeekSub(
+        project_id=project_id,
+        teacher_id=teacher_id,
+        academic_week_id=academic_week_id,
+        sub_count=0,
+        override_count=0,
+    )
+    db.add(tws)
+    db.flush()
+    return tws
