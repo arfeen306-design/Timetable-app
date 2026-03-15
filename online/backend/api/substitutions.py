@@ -123,6 +123,63 @@ def mark_absent(
     }
 
 
+# ─── Teacher Slots (for cover-specific-lesson) ────────────────────────────────
+
+@router.get("/teacher-slots")
+def teacher_day_slots(
+    project_id: int = Path(...),
+    dt: str = Query(..., alias="date", description="YYYY-MM-DD"),
+    teacher_id: int = Query(..., description="Teacher ID"),
+    project=Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    """Get a teacher's timetable slots for a specific day (for busy teacher coverage)."""
+    target_date = date.fromisoformat(dt)
+    day_index = target_date.weekday()
+
+    slots = (
+        db.query(
+            TimetableEntry.id.label("entry_id"),
+            TimetableEntry.period_index,
+            TimetableEntry.room_id,
+            Lesson.id.label("lesson_id"),
+            Lesson.teacher_id,
+            Lesson.subject_id,
+            Lesson.class_id,
+            Subject.name.label("subject_name"),
+            SchoolClass.name.label("class_name"),
+            Room.name.label("room_name"),
+        )
+        .join(Lesson, TimetableEntry.lesson_id == Lesson.id)
+        .outerjoin(Subject, Lesson.subject_id == Subject.id)
+        .outerjoin(SchoolClass, Lesson.class_id == SchoolClass.id)
+        .outerjoin(Room, TimetableEntry.room_id == Room.id)
+        .filter(
+            TimetableEntry.project_id == project_id,
+            TimetableEntry.day_index == day_index,
+            Lesson.teacher_id == teacher_id,
+        )
+        .order_by(TimetableEntry.period_index)
+        .all()
+    )
+
+    return [
+        {
+            "entry_id": s.entry_id,
+            "period_index": s.period_index,
+            "room_id": s.room_id,
+            "lesson_id": s.lesson_id,
+            "teacher_id": s.teacher_id,
+            "subject_id": s.subject_id,
+            "class_id": s.class_id,
+            "subject_name": s.subject_name or "",
+            "class_name": s.class_name or "",
+            "room_name": s.room_name or "",
+        }
+        for s in slots
+    ]
+
+
 # ─── Free Teachers ────────────────────────────────────────────────────────────
 
 @router.get("/free-teachers")

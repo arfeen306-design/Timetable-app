@@ -4,6 +4,7 @@ import {
   listTeachers, listAcademicWeeks,
   markAbsent, getFreeTeachers, assignSubstitute,
   listSubstitutions, listAbsences, deleteSubstitution, removeAbsence,
+  getTeacherSlots,
   type AbsentSlot, type FreeTeacher, type SubstitutionRecord, type AbsenceRecord, type AcademicWeekInfo,
 } from "../api";
 
@@ -79,6 +80,11 @@ export default function SubstitutionPage() {
     teacherName: string; subCount: number;
     period: number; absentTeacherId: number; subTeacherId: number; lessonId: number; roomId: number | null;
   } | null>(null);
+  // Cover specific lesson (busy teacher)
+  const [showCoverLesson, setShowCoverLesson] = useState(false);
+  const [coverTeacherId, setCoverTeacherId] = useState<number | null>(null);
+  const [coverSlots, setCoverSlots] = useState<AbsentSlot[]>([]);
+  const [coverLoading, setCoverLoading] = useState(false);
 
   useEffect(() => {
     if (!pid) return;
@@ -274,6 +280,160 @@ export default function SubstitutionPage() {
         <button onClick={handleMarkAbsent} disabled={loading || !selectedAbsent.length} className="btn btn-danger" style={{ fontSize: "0.82rem" }}>
           {loading ? "⏳ Processing…" : `Mark ${selectedAbsent.length} Teacher(s) Absent`}
         </button>
+      </div>
+
+      {/* ── Cover Specific Lesson (busy teacher) ── */}
+      <div className="card" style={{ marginBottom: "1.25rem" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.65rem 1rem", borderBottom: showCoverLesson ? "1px solid var(--slate-200)" : "none" }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--slate-900)" }}>Cover Specific Lesson</div>
+            <div style={{ fontSize: "0.65rem", color: "var(--slate-400)" }}>For teachers who are present but busy or unavailable for a specific lesson</div>
+          </div>
+          <button onClick={() => setShowCoverLesson(!showCoverLesson)} className="btn" style={{ fontSize: "0.72rem", padding: "3px 12px" }}>
+            {showCoverLesson ? "Hide" : "Show"}
+          </button>
+        </div>
+        {showCoverLesson && (
+          <div style={{ padding: "0.65rem 1rem" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginBottom: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: "0.72rem", fontWeight: 600, display: "block", marginBottom: 4 }}>Select Teacher</label>
+                <select value={coverTeacherId || ""}
+                  onChange={e => {
+                    const id = Number(e.target.value);
+                    setCoverTeacherId(id || null);
+                    setCoverSlots([]);
+                  }}
+                  style={{ width: "100%", padding: "0.4rem 0.75rem", borderRadius: "var(--radius-md)", border: "1px solid var(--slate-300)", fontSize: "0.82rem", background: "#fff" }}>
+                  <option value="">— Choose a teacher —</option>
+                  {teachers.filter(t => !absences.some(a => a.teacher_id === t.id)).map(t => (
+                    <option key={t.id} value={t.id}>{t.first_name} {t.last_name} ({t.code})</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                disabled={!coverTeacherId || coverLoading}
+                onClick={async () => {
+                  if (!coverTeacherId) return;
+                  setCoverLoading(true);
+                  try {
+                    const slots = await getTeacherSlots(pid, date, coverTeacherId);
+                    setCoverSlots(slots);
+                    if (slots.length === 0) setMsg("ℹ️ This teacher has no scheduled lessons on this day.");
+                  } catch (e) { setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+                  finally { setCoverLoading(false); }
+                }}
+                className="btn btn-primary" style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>
+                {coverLoading ? "⏳…" : "Load Schedule"}
+              </button>
+            </div>
+
+            {/* Show the teacher's lessons for the day */}
+            {coverSlots.length > 0 && (
+              <div>
+                <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--slate-500)", textTransform: "uppercase", marginBottom: 6 }}>
+                  {teacherName(coverTeacherId!).toUpperCase()} — LESSONS TO COVER
+                </div>
+                {coverSlots.sort((a, b) => a.period_index - b.period_index).map(slot => {
+                  const key = `cover-${coverTeacherId}-${slot.period_index}`;
+                  const isExpanded = expandedSlot === key;
+                  const freeTeachers = freeMap[key] || [];
+                  const assigned = subs.find(s => s.absent_teacher_id === coverTeacherId && s.period_index === slot.period_index);
+                  const isConfirming = confirm?.period === slot.period_index && confirm?.absentTeacherId === coverTeacherId;
+
+                  return (
+                    <div key={slot.period_index} className="card" style={{ padding: 0, marginBottom: 8, overflow: "hidden" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "0.65rem 1rem", cursor: !assigned ? "pointer" : undefined }}
+                        onClick={() => {
+                          if (assigned) return;
+                          const coverKey = `cover-${coverTeacherId}-${slot.period_index}`;
+                          if (expandedSlot === coverKey) { setExpandedSlot(null); return; }
+                          const absentIds = absences.map(a => a.teacher_id).concat([coverTeacherId!]);
+                          getFreeTeachers(pid, date, slot.period_index, absentIds).then(free => {
+                            setFreeMap(prev => ({ ...prev, [coverKey]: free }));
+                            setFreeCount(prev => ({ ...prev, [coverKey]: free.length }));
+                            setExpandedSlot(coverKey);
+                            setConfirm(null);
+                          }).catch(e => setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`));
+                        }}>
+                        <div style={{
+                          width: 38, height: 38, borderRadius: "50%",
+                          background: assigned ? "var(--success-50)" : "var(--primary-50)",
+                          color: assigned ? "var(--success-600)" : "var(--primary-600)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "0.75rem", fontWeight: 700, fontFamily: "var(--font-mono)", flexShrink: 0,
+                        }}>L{slot.period_index + 1}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--slate-900)" }}>
+                            {slot.subject_name || "Lesson"} · {slot.class_name || "Class"}
+                          </div>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 2 }}>
+                            {slot.room_name && <span style={{ padding: "1px 8px", borderRadius: "var(--radius-full)", background: "var(--slate-100)", fontSize: "0.65rem", fontWeight: 600, color: "var(--slate-600)" }}>{slot.room_name}</span>}
+                            <span style={{ padding: "1px 8px", borderRadius: "var(--radius-full)", background: "var(--warning-50)", border: "1px solid var(--warning-100)", fontSize: "0.62rem", fontWeight: 700, color: "var(--warning-600)" }}>
+                              {teacherName(coverTeacherId!)} busy
+                            </span>
+                          </div>
+                        </div>
+                        {assigned ? (
+                          <span style={{ padding: "3px 10px", borderRadius: "var(--radius-full)", background: "var(--success-50)", border: "1px solid var(--success-100)", fontSize: "0.72rem", fontWeight: 700, color: "var(--success-600)" }}>Covered</span>
+                        ) : (
+                          <span style={{ padding: "3px 10px", borderRadius: "var(--radius-full)", background: "var(--warning-50)", border: "1px solid var(--warning-100)", fontSize: "0.72rem", fontWeight: 700, color: "var(--warning-600)" }}>Needs Cover</span>
+                        )}
+                      </div>
+
+                      {/* Free teachers list */}
+                      {isExpanded && !isConfirming && (
+                        <div style={{ padding: "0.5rem 1rem", borderTop: "1px solid var(--slate-200)", background: "var(--slate-50)" }}>
+                          <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--slate-500)", marginBottom: 6 }}>Available teachers ({freeTeachers.length})</div>
+                          {freeTeachers.length === 0 && <div style={{ fontSize: "0.78rem", color: "var(--slate-400)", padding: "4px 0" }}>No free teachers available</div>}
+                          {freeTeachers.map(ft => (
+                            <div key={ft.teacher_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0", cursor: "pointer" }}
+                              onClick={() => handleSelectTeacher(slot, ft)}>
+                              <Initials name={ft.teacher_name} color={avatarColor(ft.teacher_id)} size={28} />
+                              <div style={{ flex: 1 }}>
+                                <span style={{ fontWeight: 600, fontSize: "0.82rem" }}>{ft.teacher_name}</span>
+                                <span style={{ fontSize: "0.65rem", color: "var(--slate-400)", marginLeft: 6 }}>{ft.periods_today} lessons today</span>
+                              </div>
+                              {ft.subs_this_week !== undefined && <SubBadge count={ft.subs_this_week} max={2} />}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Confirmation */}
+                      {isConfirming && confirm && !overrideWarning && (
+                        <div style={{ padding: "0.75rem 1rem", borderTop: "1px solid var(--slate-200)", background: "var(--slate-50)" }}>
+                          <div style={{ fontWeight: 700, fontSize: "0.82rem", marginBottom: 8 }}>Confirm: Assign {confirm.subTeacher.teacher_name}?</div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={() => handleConfirmAssign()} className="btn btn-primary" style={{ fontSize: "0.78rem" }}>✓ Assign</button>
+                            <button onClick={() => { setConfirm(null); setExpandedSlot(null); }} className="btn" style={{ fontSize: "0.78rem" }}>Cancel</button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Assigned row */}
+                      {assigned && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "0.55rem 1rem", borderTop: "1px solid var(--success-100)", background: "var(--success-50)" }}>
+                          <Initials name={assigned.sub_teacher_name} color={avatarColor(assigned.sub_teacher_id)} size={30} />
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--success-700)" }}>
+                              {assigned.sub_teacher_name} covering Lesson {assigned.period_index + 1}
+                            </span>
+                          </div>
+                          <span style={{ color: "var(--success-600)", fontSize: "1.1rem" }}>✓</span>
+                          <button onClick={async () => { await deleteSubstitution(pid, assigned.id); loadDayData(); const coverKey2 = `cover-${coverTeacherId}-${slot.period_index}`; setExpandedSlot(coverKey2); const absentIds2 = absences.map(a => a.teacher_id).concat([coverTeacherId!]); const free = await getFreeTeachers(pid, date, slot.period_index, absentIds2); setFreeMap(prev => ({ ...prev, [coverKey2]: free })); setFreeCount(prev => ({ ...prev, [coverKey2]: free.length })); }}
+                            className="btn" style={{ fontSize: "0.68rem", padding: "3px 10px", background: "var(--primary-50)", color: "var(--primary-600)", border: "1px solid var(--primary-200)" }}>🔄 Reassign</button>
+                          <button onClick={async () => { if (window.confirm(`Unassign ${assigned.sub_teacher_name}?`)) { await deleteSubstitution(pid, assigned.id); loadDayData(); } }}
+                            className="btn" style={{ fontSize: "0.68rem", padding: "3px 10px", background: "var(--danger-50)", color: "var(--danger-600)", border: "1px solid var(--danger-200)" }}>✕ Unassign</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Periods to Cover ── */}
