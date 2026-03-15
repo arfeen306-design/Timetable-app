@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import VerifyEmail from "./pages/VerifyEmail";
 import Dashboard from "./pages/Dashboard";
+import ProjectDashboard from "./pages/ProjectDashboard";
 import ProjectEditor from "./pages/ProjectEditor";
 import Generate from "./pages/Generate";
 import Review from "./pages/Review";
@@ -19,9 +20,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function RedirectToSettings() {
+function RedirectToDashboard() {
   const { projectId } = useParams();
-  return <Navigate to={`/project/${projectId}/settings`} replace />;
+  return <Navigate to={`/project/${projectId}/dashboard`} replace />;
 }
 
 export default function App() {
@@ -38,7 +39,8 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="project/:projectId" element={<RedirectToSettings />} />
+        <Route path="project/:projectId" element={<RedirectToDashboard />} />
+        <Route path="project/:projectId/dashboard" element={<ProjectDashboard />} />
         <Route path="project/:projectId/settings" element={<ProjectEditor />} />
         <Route path="project/:projectId/subjects" element={<ProjectEditor />} />
         <Route path="project/:projectId/classes" element={<ProjectEditor />} />
