@@ -2,103 +2,106 @@
 
 .tt-container {
   overflow-x: auto;
-  padding-bottom: 0.5rem;
+  padding-bottom: var(--sp-2);
 }
 
 .tt-grid {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   min-width: 700px;
-  background: #e5e7eb;
-  border-radius: 8px;
+  background: var(--slate-200);
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
 /* Header cells */
 .tt-header {
-  background: #1e293b;
+  background: var(--slate-900);
   color: #fff;
   padding: 10px 8px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 700;
   text-align: center;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .tt-header--corner {
-  background: #0f172a;
-  font-size: 0.75rem;
+  background: var(--slate-950);
+  font-size: 0.72rem;
 }
 
 /* Period (row) label */
 .tt-period-label {
-  background: #f8fafc;
+  background: var(--slate-50);
   padding: 8px 10px;
-  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--slate-600);
   display: flex;
   flex-direction: column;
   justify-content: center;
-  border-right: 2px solid #e2e8f0;
+  border-right: 2px solid var(--slate-200);
 }
 
 .tt-period-label small {
+  font-family: var(--font-sans);
   font-weight: 400;
-  color: #94a3b8;
-  font-size: 0.7rem;
+  color: var(--slate-400);
+  font-size: 0.65rem;
 }
 
 /* Regular cells */
 .tt-cell {
   background: #fff;
-  min-height: 64px;
-  padding: 3px;
-  transition: background 0.15s, box-shadow 0.15s;
+  min-height: 62px;
+  padding: 2px;
+  transition: background var(--duration-fast), box-shadow var(--duration-fast);
   position: relative;
 }
 
 .tt-cell:hover {
-  background: #f1f5f9;
+  background: var(--slate-50);
 }
 
 /* Drag target highlighting */
 .tt-cell--drag-valid {
-  background: #dcfce7 !important;
-  box-shadow: inset 0 0 0 2px #22c55e;
+  background: var(--success-50) !important;
+  box-shadow: inset 0 0 0 2px var(--success-500);
 }
 
 .tt-cell--drag-conflict {
-  background: #fef2f2 !important;
-  box-shadow: inset 0 0 0 2px #ef4444;
+  background: var(--danger-50) !important;
+  box-shadow: inset 0 0 0 2px var(--danger-500);
 }
 
 .tt-cell--drag-current {
-  background: #dbeafe !important;
-  box-shadow: inset 0 0 0 2px #3b82f6;
+  background: var(--blue-50) !important;
+  box-shadow: inset 0 0 0 2px var(--blue-500);
 }
 
 /* Lesson card */
 .tt-card {
-  border-radius: 6px;
-  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  padding: 5px 7px;
   cursor: grab;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 2px;
+  gap: 1px;
   user-select: none;
-  transition: transform 0.1s, box-shadow 0.15s;
-  border-left: 4px solid rgba(0, 0, 0, 0.15);
+  transition: transform 0.1s, box-shadow var(--duration-fast);
+  border-left: 3px solid rgba(0, 0, 0, 0.12);
   position: relative;
   overflow: hidden;
 }
 
 .tt-card:hover {
   transform: scale(1.02);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   z-index: 2;
 }
 
@@ -118,14 +121,14 @@
 .tt-card--locked::after {
   content: "🔒";
   position: absolute;
-  top: 3px;
-  right: 4px;
-  font-size: 0.65rem;
+  top: 2px;
+  right: 3px;
+  font-size: 0.6rem;
 }
 
 .tt-card__subject {
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
@@ -133,28 +136,39 @@
 }
 
 .tt-card__teacher {
-  font-size: 0.7rem;
-  opacity: 0.8;
+  font-size: 0.64rem;
+  opacity: 0.75;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .tt-card__room {
-  font-size: 0.65rem;
-  opacity: 0.6;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  opacity: 0.5;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── Subject category color classes ── */
+.tt-card--math      { background: var(--subj-math-tint);    border-left-color: var(--subj-math-accent);    color: #312e81; }
+.tt-card--science   { background: var(--subj-science-tint); border-left-color: var(--subj-science-accent); color: #14532d; }
+.tt-card--lang      { background: var(--subj-lang-tint);    border-left-color: var(--subj-lang-accent);    color: #78350f; }
+.tt-card--human     { background: var(--subj-human-tint);   border-left-color: var(--subj-human-accent);   color: #581c87; }
+.tt-card--pe        { background: var(--subj-pe-tint);      border-left-color: var(--subj-pe-accent);      color: #134e4a; }
+.tt-card--arts      { background: var(--subj-arts-tint);    border-left-color: var(--subj-arts-accent);    color: #881337; }
+.tt-card--comp      { background: var(--subj-comp-tint);    border-left-color: var(--subj-comp-accent);    color: #164e63; }
+.tt-card--default   { background: var(--subj-default-tint); border-left-color: var(--subj-default-accent); color: var(--slate-700); }
 
 /* Empty cell indicator */
 .tt-cell--empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #cbd5e1;
-  font-size: 0.75rem;
+  color: var(--slate-300);
+  font-size: 0.72rem;
 }
 
 /* Conflict toast */
@@ -163,27 +177,21 @@
   bottom: 5rem;
   left: 50%;
   transform: translateX(-50%);
-  background: #ef4444;
+  background: linear-gradient(135deg, var(--danger-500), var(--danger-600));
   color: #fff;
   padding: 0.75rem 1.5rem;
-  border-radius: 10px;
-  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
-  font-size: 0.875rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.85rem;
   z-index: 10000;
   max-width: 500px;
   text-align: center;
-  animation: tt-toast-in 0.3s ease;
+  animation: tt-toast-in 0.3s var(--ease-out);
 }
 
 @keyframes tt-toast-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 /* View selector */
@@ -191,7 +199,7 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: var(--sp-4);
   flex-wrap: wrap;
 }
 
@@ -201,9 +209,9 @@
 
 .tt-legend {
   display: flex;
-  gap: 1rem;
-  font-size: 0.75rem;
-  color: #64748b;
+  gap: var(--sp-4);
+  font-size: 0.72rem;
+  color: var(--slate-500);
   margin-left: auto;
 }
 

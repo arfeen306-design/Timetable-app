@@ -8,8 +8,24 @@ import {
 } from "../api";
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
+function fmtDate(d: string) { return new Date(d + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); }
 
 type Teacher = { id: number; first_name: string; last_name: string; code: string };
+
+function Initials({ name, color }: { name: string; color: string }) {
+  const init = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div style={{
+      width: 36, height: 36, borderRadius: "50%",
+      background: color, color: "#fff",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: "0.7rem", fontWeight: 700, flexShrink: 0,
+    }}>{init}</div>
+  );
+}
+
+const AVATAR_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#22c55e"];
+function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 
 export default function SubstitutionPage() {
   const { projectId } = useParams();
@@ -22,12 +38,11 @@ export default function SubstitutionPage() {
   const [absences, setAbsences] = useState<AbsenceRecord[]>([]);
   const [subs, setSubs] = useState<SubstitutionRecord[]>([]);
   const [freeMap, setFreeMap] = useState<Record<string, FreeTeacher[]>>({});
-  const [expandedPeriod, setExpandedPeriod] = useState<string | null>(null);
+  const [expandedSlot, setExpandedSlot] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // Load teachers, subjects, classes
   useEffect(() => {
     if (!pid) return;
     listTeachers(pid).then(t => setTeachers(t as unknown as Teacher[])).catch(console.error);
@@ -46,248 +61,264 @@ export default function SubstitutionPage() {
     return t ? `${t.first_name} ${t.last_name}`.trim() : `#${id}`;
   };
 
-  // Mark absent
   async function handleMarkAbsent() {
     if (!selectedAbsent.length) return;
-    setLoading(true);
-    setMsg("");
+    setLoading(true); setMsg("");
     try {
       const res = await markAbsent(pid, { date, teacher_ids: selectedAbsent, reason });
       setAbsentSlots(res.slots);
       setMsg(`✅ ${res.absences_created.length} teacher(s) marked absent. ${res.slots.length} lesson(s) need coverage.`);
-      setSelectedAbsent([]);
-      setReason("");
+      setSelectedAbsent([]); setReason("");
       loadDayData();
-    } catch (e) {
-      setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+    finally { setLoading(false); }
   }
 
-  // Find free teachers for a period
   async function handleFindFree(period: number, absentTeacherId: number) {
     const key = `${absentTeacherId}-${period}`;
-    if (expandedPeriod === key) { setExpandedPeriod(null); return; }
+    if (expandedSlot === key) { setExpandedSlot(null); return; }
     const absentIds = absences.map(a => a.teacher_id);
     try {
       const free = await getFreeTeachers(pid, date, period, absentIds);
       setFreeMap(prev => ({ ...prev, [key]: free }));
-      setExpandedPeriod(key);
-    } catch (e) {
-      setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`);
-    }
+      setExpandedSlot(key);
+    } catch (e) { setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`); }
   }
 
-  // Assign substitute
   async function handleAssign(period: number, absentTeacherId: number, subTeacherId: number, lessonId: number, roomId: number | null) {
     try {
-      await assignSubstitute(pid, {
-        date, period_index: period,
-        absent_teacher_id: absentTeacherId,
-        sub_teacher_id: subTeacherId,
-        lesson_id: lessonId,
-        room_id: roomId,
-      });
+      await assignSubstitute(pid, { date, period_index: period, absent_teacher_id: absentTeacherId, sub_teacher_id: subTeacherId, lesson_id: lessonId, room_id: roomId });
       setMsg("✅ Substitute assigned!");
-      setExpandedPeriod(null);
+      setExpandedSlot(null);
       loadDayData();
-    } catch (e) {
-      setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`);
-    }
+    } catch (e) { setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`); }
   }
 
   // Group absent slots by teacher
   const slotsByTeacher: Record<number, AbsentSlot[]> = {};
-  for (const s of absentSlots) {
-    (slotsByTeacher[s.teacher_id] ??= []).push(s);
-  }
+  for (const s of absentSlots) { (slotsByTeacher[s.teacher_id] ??= []).push(s); }
 
   return (
-    <div style={{ padding: "1.5rem" }}>
-      <h2 style={{ margin: "0 0 1rem", fontSize: "1.3rem", fontWeight: 800, color: "#0f172a" }}>🔄 Substitution Management</h2>
+    <div style={{ maxWidth: 700, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+        <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800, color: "var(--slate-900)" }}>Substitution Manager</h1>
+        <div style={{
+          padding: "0.35rem 0.85rem", borderRadius: "var(--radius-full)",
+          background: "var(--primary-50)", border: "1px solid var(--primary-200)",
+          fontSize: "0.78rem", fontWeight: 600, color: "var(--primary-600)",
+        }}>{fmtDate(date)}</div>
+      </div>
 
       {msg && (
-        <div style={{
-          padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "1rem", fontSize: "0.82rem",
-          background: msg.startsWith("✅") ? "#f0fdf4" : "#fef2f2",
-          border: msg.startsWith("✅") ? "1px solid #bbf7d0" : "1px solid #fecaca",
-          color: msg.startsWith("✅") ? "#166534" : "#dc2626",
-        }}>{msg}</div>
+        <div className={msg.startsWith("✅") ? "alert alert-success" : "alert alert-error"}>{msg}</div>
       )}
 
-      {/* Step 1: Select date + absent teachers */}
-      <div className="card" style={{ marginBottom: "1rem" }}>
-        <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 700 }}>Step 1: Mark Teachers Absent</h3>
+      {/* ── Absent Today ── */}
+      <div style={{ marginBottom: "1.25rem" }}>
+        <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>ABSENT TODAY</div>
+
+        {/* Absent tags */}
+        <div className="card" style={{ padding: "0.75rem 1rem" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            {absences.map(a => (
+              <span key={a.id} style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "4px 10px 4px 8px", borderRadius: "var(--radius-full)",
+                background: "var(--danger-50)", border: "1px solid var(--danger-100)",
+                fontSize: "0.78rem", fontWeight: 600, color: "var(--danger-600)",
+              }}>
+                {a.teacher_name}
+                <button onClick={async () => { await removeAbsence(pid, a.id); loadDayData(); }}
+                  style={{ background: "none", border: "none", color: "var(--danger-400)", cursor: "pointer", fontSize: "0.82rem", padding: 0, lineHeight: 1 }}
+                  title="Remove absence">✕</button>
+              </span>
+            ))}
+            {absences.length === 0 && <span style={{ color: "var(--slate-400)", fontSize: "0.82rem" }}>No absences recorded</span>}
+
+            {/* Add teacher button */}
+            <button onClick={() => {}} style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "4px 10px", borderRadius: "var(--radius-full)",
+              border: "1.5px dashed var(--slate-300)", background: "none",
+              fontSize: "0.78rem", fontWeight: 600, color: "var(--slate-500)",
+              cursor: "pointer",
+            }}>+ Add teacher</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Mark Absent Form (collapsed by default, attached to "+ Add teacher") ── */}
+      <div className="card" style={{ marginBottom: "1.25rem" }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", marginBottom: "0.75rem" }}>
           <div>
-            <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#334155", display: "block", marginBottom: 3 }}>Date</label>
+            <label style={{ fontSize: "0.72rem", fontWeight: 600 }}>Date</label>
             <input type="date" value={date} onChange={e => { setDate(e.target.value); setAbsentSlots([]); }}
-              style={{ padding: "0.4rem 0.6rem", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: "0.82rem", fontFamily: "inherit" }}
+              style={{ maxWidth: 160 }}
             />
           </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#334155", display: "block", marginBottom: 3 }}>Reason (optional)</label>
-            <input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Sick leave"
-              style={{ width: "100%", padding: "0.4rem 0.6rem", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: "0.82rem", fontFamily: "inherit", boxSizing: "border-box" }}
-            />
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <label style={{ fontSize: "0.72rem", fontWeight: 600 }}>Reason</label>
+            <input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Sick leave" />
           </div>
         </div>
 
         {/* Teacher multi-select */}
-        <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: 8, padding: 4 }}>
+        <div style={{ maxHeight: 180, overflowY: "auto", border: "1px solid var(--slate-200)", borderRadius: "var(--radius-md)", padding: 4, marginBottom: 8 }}>
           {teachers.map(t => {
             const checked = selectedAbsent.includes(t.id);
             const alreadyAbsent = absences.some(a => a.teacher_id === t.id);
             return (
               <label key={t.id} style={{
-                display: "flex", alignItems: "center", gap: 8, padding: "0.35rem 0.5rem", borderRadius: 6, cursor: "pointer",
-                background: alreadyAbsent ? "#fef2f2" : checked ? "#eff6ff" : "transparent",
+                display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: "var(--radius-sm)", cursor: "pointer",
+                background: alreadyAbsent ? "var(--danger-50)" : checked ? "var(--primary-50)" : "transparent",
                 opacity: alreadyAbsent ? 0.5 : 1,
               }}>
                 <input type="checkbox" checked={checked || alreadyAbsent} disabled={alreadyAbsent}
                   onChange={() => setSelectedAbsent(prev => checked ? prev.filter(x => x !== t.id) : [...prev, t.id])}
+                  style={{ accentColor: "var(--primary-500)", width: 15, height: 15 }}
                 />
                 <span style={{ fontWeight: 600, fontSize: "0.82rem" }}>{t.first_name} {t.last_name}</span>
-                <span style={{ color: "#94a3b8", fontSize: "0.72rem", fontFamily: "monospace" }}>{t.code}</span>
-                {alreadyAbsent && <span style={{ color: "#ef4444", fontSize: "0.7rem", marginLeft: "auto" }}>Already absent</span>}
+                <span style={{ color: "var(--slate-400)", fontSize: "0.68rem", fontFamily: "var(--font-mono)" }}>{t.code}</span>
+                {alreadyAbsent && <span style={{ color: "var(--danger-500)", fontSize: "0.65rem", marginLeft: "auto" }}>Already absent</span>}
               </label>
             );
           })}
         </div>
 
-        <button onClick={handleMarkAbsent} disabled={loading || !selectedAbsent.length}
-          style={{
-            marginTop: 10, padding: "0.5rem 1.2rem", borderRadius: 8, border: "none",
-            background: selectedAbsent.length ? "linear-gradient(135deg, #ef4444, #dc2626)" : "#e2e8f0",
-            color: selectedAbsent.length ? "#fff" : "#94a3b8", fontWeight: 700, fontSize: "0.82rem",
-            cursor: selectedAbsent.length ? "pointer" : "default", fontFamily: "inherit",
-          }}
-        >
+        <button onClick={handleMarkAbsent} disabled={loading || !selectedAbsent.length} className="btn btn-danger"
+          style={{ fontSize: "0.82rem" }}>
           {loading ? "⏳ Processing…" : `Mark ${selectedAbsent.length} Teacher(s) Absent`}
         </button>
       </div>
 
-      {/* Step 2: Absent teachers' periods needing coverage */}
-      {absentSlots.length > 0 && (
-        <div className="card" style={{ marginBottom: "1rem" }}>
-          <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 700 }}>Step 2: Assign Substitutes</h3>
-          {Object.entries(slotsByTeacher).map(([tId, slots]) => (
-            <div key={tId} style={{ marginBottom: "0.75rem" }}>
-              <div style={{ fontWeight: 700, color: "#0f172a", fontSize: "0.88rem", marginBottom: 6 }}>
-                🧑‍🏫 {teacherName(Number(tId))}
-              </div>
-              {slots.sort((a, b) => a.period_index - b.period_index).map(slot => {
-                const key = `${tId}-${slot.period_index}`;
-                const isExpanded = expandedPeriod === key;
-                const freeTeachers = freeMap[key] || [];
-                const alreadyAssigned = subs.find(s => s.absent_teacher_id === Number(tId) && s.period_index === slot.period_index);
-                return (
-                  <div key={slot.period_index} style={{ marginLeft: "1rem", marginBottom: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontWeight: 600, fontSize: "0.8rem", minWidth: 80 }}>Lesson {slot.period_index + 1}</span>
-                      {alreadyAssigned ? (
-                        <span style={{ fontSize: "0.78rem", color: "#10b981", fontWeight: 600 }}>
-                          ✅ Covered by {alreadyAssigned.sub_teacher_name}
-                        </span>
-                      ) : (
-                        <button onClick={() => handleFindFree(slot.period_index, Number(tId))}
-                          style={{
-                            padding: "0.3rem 0.8rem", borderRadius: 6, border: "1px solid #3b82f6",
-                            background: isExpanded ? "#3b82f6" : "transparent", color: isExpanded ? "#fff" : "#3b82f6",
-                            fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-                          }}>
-                          {isExpanded ? "▲ Hide" : "🔍 Find Substitute"}
-                        </button>
-                      )}
+      {/* ── Periods to Cover ── */}
+      {Object.entries(slotsByTeacher).map(([tId, slots]) => (
+        <div key={tId} style={{ marginBottom: "1.25rem" }}>
+          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
+            PERIODS TO COVER — {teacherName(Number(tId)).toUpperCase()}
+          </div>
+
+          {slots.sort((a, b) => a.period_index - b.period_index).map(slot => {
+            const key = `${tId}-${slot.period_index}`;
+            const isExpanded = expandedSlot === key;
+            const freeTeachers = freeMap[key] || [];
+            const assigned = subs.find(s => s.absent_teacher_id === Number(tId) && s.period_index === slot.period_index);
+
+            return (
+              <div key={slot.period_index} className="card" style={{ padding: "0.75rem 1rem", marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {/* Period badge */}
+                  <div style={{
+                    width: 34, height: 34, borderRadius: "50%",
+                    background: assigned ? "var(--success-50)" : "var(--primary-50)",
+                    color: assigned ? "var(--success-600)" : "var(--primary-600)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "0.72rem", fontWeight: 700, fontFamily: "var(--font-mono)", flexShrink: 0,
+                  }}>P{slot.period_index + 1}</div>
+
+                  {/* Slot info */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--slate-900)" }}>
+                      Lesson {slot.period_index + 1}
                     </div>
-                    {isExpanded && (
-                      <div style={{ marginTop: 6, marginLeft: "1rem", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 6 }}>
-                        {freeTeachers.length === 0 ? (
-                          <div style={{ color: "#94a3b8", fontSize: "0.78rem", gridColumn: "1/-1" }}>No free teachers available for this lesson.</div>
-                        ) : freeTeachers.map(ft => {
-                          const pct = ft.utilization_pct;
-                          const borderColor = pct > 100 ? "#ef4444" : pct > 85 ? "#f59e0b" : "#10b981";
-                          return (
-                            <button key={ft.teacher_id} onClick={() => handleAssign(slot.period_index, Number(tId), ft.teacher_id, slot.lesson_id, slot.room_id)}
-                              style={{
-                                padding: "0.5rem", borderRadius: 8, border: `2px solid ${borderColor}40`,
-                                background: "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                                transition: "all 0.15s ease",
-                              }}
-                              onMouseEnter={e => { e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                              onMouseLeave={e => { e.currentTarget.style.borderColor = `${borderColor}40`; e.currentTarget.style.transform = "none"; }}
-                            >
-                              <div style={{ fontWeight: 700, fontSize: "0.8rem", color: "#0f172a" }}>{ft.teacher_name}</div>
-                              <div style={{ fontSize: "0.68rem", color: "#64748b", marginTop: 2 }}>
-                                Load: {ft.total}/{ft.max} ({ft.utilization_pct}%) · Subs: {ft.substitutions}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <div style={{ fontSize: "0.72rem", color: "var(--slate-400)" }}>
+                      {teacherName(Number(tId))} is absent
+                    </div>
                   </div>
-                );
-              })}
+
+                  {/* Status */}
+                  {assigned ? (
+                    <span style={{
+                      padding: "3px 10px", borderRadius: "var(--radius-full)",
+                      background: "var(--success-50)", border: "1px solid var(--success-100)",
+                      fontSize: "0.72rem", fontWeight: 700, color: "var(--success-600)",
+                    }}>{assigned.sub_teacher_name} assigned</span>
+                  ) : (
+                    <span style={{
+                      padding: "3px 10px", borderRadius: "var(--radius-full)",
+                      background: "var(--warning-50)", border: "1px solid var(--warning-100)",
+                      fontSize: "0.72rem", fontWeight: 700, color: "var(--warning-600)",
+                    }}>Unassigned</span>
+                  )}
+
+                  {/* Expand toggle */}
+                  {!assigned && (
+                    <button onClick={() => handleFindFree(slot.period_index, Number(tId))}
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.9rem", color: "var(--slate-400)", padding: 2 }}>
+                      {isExpanded ? "▲" : "▼"}
+                    </button>
+                  )}
+                </div>
+
+                {/* ── Free teacher cards ── */}
+                {isExpanded && (
+                  <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {freeTeachers.length === 0 ? (
+                      <div style={{ color: "var(--slate-400)", fontSize: "0.82rem", padding: "0.5rem 0" }}>No free teachers available for this period.</div>
+                    ) : freeTeachers.map(ft => {
+                      const pct = ft.utilization_pct;
+                      const barColor = pct > 100 ? "var(--danger-500)" : pct > 85 ? "var(--warning-500)" : "var(--success-500)";
+                      return (
+                        <div key={ft.teacher_id} style={{
+                          display: "flex", alignItems: "center", gap: 12,
+                          padding: "0.6rem 0.75rem", borderRadius: "var(--radius-md)",
+                          border: "1px solid var(--slate-200)", background: "var(--slate-50)",
+                        }}>
+                          <Initials name={ft.teacher_name} color={avatarColor(ft.teacher_id)} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--slate-900)" }}>{ft.teacher_name}</div>
+                            <div style={{ fontSize: "0.68rem", color: "var(--slate-400)" }}>Free P{slot.period_index + 1}</div>
+                          </div>
+                          {/* Workload bar */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 160 }}>
+                            <span style={{ fontSize: "0.65rem", color: "var(--slate-400)", fontWeight: 600, whiteSpace: "nowrap" }}>Workload</span>
+                            <div style={{ flex: 1, height: 6, background: "var(--slate-200)", borderRadius: 3, overflow: "hidden", minWidth: 60 }}>
+                              <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", background: barColor, borderRadius: 3, transition: "width 0.3s" }} />
+                            </div>
+                            <span style={{ fontSize: "0.68rem", fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--slate-600)", whiteSpace: "nowrap" }}>{ft.total}/{ft.max}</span>
+                          </div>
+                          <span style={{ fontSize: "0.68rem", color: "var(--slate-400)", whiteSpace: "nowrap" }}>{ft.substitutions} subs taken</span>
+                          <button onClick={() => handleAssign(slot.period_index, Number(tId), ft.teacher_id, slot.lesson_id, slot.room_id)}
+                            className="btn" style={{ padding: "0.3rem 0.8rem", fontSize: "0.75rem", fontWeight: 700 }}>
+                            Assign
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+
+      {/* ── Today's assigned subs summary ── */}
+      {subs.length > 0 && (
+        <div style={{ marginTop: "1rem" }}>
+          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
+            ASSIGNED SUBSTITUTIONS
+          </div>
+          {subs.map(s => (
+            <div key={s.id} className="card" style={{ padding: "0.6rem 1rem", marginBottom: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{
+                  width: 30, height: 30, borderRadius: "50%",
+                  background: "var(--success-50)", color: "var(--success-600)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "0.65rem", fontWeight: 700, fontFamily: "var(--font-mono)", flexShrink: 0,
+                }}>P{s.period_index + 1}</div>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--danger-600)" }}>{s.absent_teacher_name}</span>
+                  <span style={{ color: "var(--slate-400)", fontSize: "0.78rem" }}> → </span>
+                  <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--success-600)" }}>{s.sub_teacher_name}</span>
+                </div>
+                <button onClick={async () => { await deleteSubstitution(pid, s.id); loadDayData(); }}
+                  style={{ background: "none", border: "none", color: "var(--danger-400)", cursor: "pointer", fontSize: "0.82rem" }}>🗑️</button>
+              </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Today's absences + substitutions */}
-      {(absences.length > 0 || subs.length > 0) && (
-        <div className="card">
-          <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 700 }}>📋 Today's Summary</h3>
-
-          {absences.length > 0 && (
-            <div style={{ marginBottom: "0.75rem" }}>
-              <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#ef4444", marginBottom: 6 }}>Absent Teachers</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {absences.map(a => (
-                  <span key={a.id} style={{
-                    display: "inline-flex", alignItems: "center", gap: 6,
-                    padding: "4px 10px", borderRadius: 6, background: "#fef2f2", border: "1px solid #fecaca",
-                    fontSize: "0.78rem", fontWeight: 600, color: "#dc2626",
-                  }}>
-                    {a.teacher_name}
-                    {a.reason && <span style={{ color: "#f87171", fontWeight: 400 }}>({a.reason})</span>}
-                    <button onClick={async () => { await removeAbsence(pid, a.id); loadDayData(); }}
-                      style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "0.9rem", padding: 0 }}
-                      title="Remove absence">✕</button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {subs.length > 0 && (
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#10b981", marginBottom: 6 }}>Assigned Substitutions</div>
-              <table style={{ width: "100%", fontSize: "0.78rem", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ background: "#f8fafc" }}>
-                    {["Lesson", "Absent", "Substitute", ""].map(h => (
-                      <th key={h} style={{ padding: "0.4rem 0.6rem", textAlign: "left", fontWeight: 700, color: "#334155", borderBottom: "1px solid #e2e8f0" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {subs.map(s => (
-                    <tr key={s.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                      <td style={{ padding: "0.4rem 0.6rem", fontWeight: 600 }}>Lesson {s.period_index + 1}</td>
-                      <td style={{ padding: "0.4rem 0.6rem", color: "#ef4444" }}>{s.absent_teacher_name}</td>
-                      <td style={{ padding: "0.4rem 0.6rem", color: "#10b981", fontWeight: 600 }}>{s.sub_teacher_name}</td>
-                      <td style={{ padding: "0.4rem 0.6rem" }}>
-                        <button onClick={async () => { await deleteSubstitution(pid, s.id); loadDayData(); }}
-                          style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "0.82rem" }}>🗑️</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
       )}
     </div>
