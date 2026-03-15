@@ -43,6 +43,10 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
   const [fMaxWeek, setFMaxWeek] = useState(30);
   const [fSubjects, setFSubjects] = useState<number[]>([]);
 
+  // Exam duty summary (lazy-loaded per teacher on select)
+  const [examSummary, setExamSummary] = useState<api.TeacherExamSummary | null>(null);
+  const [examSummaryLoading, setExamSummaryLoading] = useState(false);
+
   // Subject lookup by id
   const subjectMap = new Map(subjects.map(s => [s.id, s]));
 
@@ -64,6 +68,17 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     // Run when pid or teacher IDs change (not on every object reference change)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pid, list.map(t => t.id).join(",")]);
+
+  // ── Fetch exam duty summary for selected teacher ──
+
+  useEffect(() => {
+    if (selectedId == null) { setExamSummary(null); return; }
+    setExamSummaryLoading(true);
+    api.getTeacherExamSummary(pid, selectedId)
+      .then(s => setExamSummary(s))
+      .catch(() => setExamSummary(null))
+      .finally(() => setExamSummaryLoading(false));
+  }, [pid, selectedId]);
 
   // ── Checkbox helpers ──
 
@@ -277,6 +292,48 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                       </div>
                     </td>
                   </tr>
+
+                  {/* ── Exam duty summary detail strip ── */}
+                  {selectedId === t.id && !confirmDeleteId && (
+                    <tr>
+                      <td colSpan={9} style={{ padding: 0 }}>
+                        <div style={{
+                          background: "var(--surface-card)", border: "1px solid var(--primary-100)",
+                          borderRadius: "var(--radius-sm)", padding: "0.6rem 1rem",
+                          display: "flex", alignItems: "center", gap: "1.25rem", flexWrap: "wrap",
+                          fontSize: "0.78rem", color: "var(--slate-600)",
+                          animation: "slideUp var(--duration-normal) var(--ease-out)",
+                        }}>
+                          <strong style={{ color: "var(--slate-700)", fontSize: "0.82rem" }}>
+                            {t.first_name} {t.last_name}
+                          </strong>
+                          <span>
+                            Subjects: {(teacherSubjectIds.get(t.id) || []).map(sid => subjectMap.get(sid)?.name).filter(Boolean).join(", ") || "—"}
+                          </span>
+                          {examSummaryLoading ? (
+                            <span style={{ color: "var(--slate-400)" }}>Loading exam data…</span>
+                          ) : examSummary && examSummary.teacher_id === t.id ? (
+                            <>
+                              <span>Exam duties: <strong>{examSummary.sessions_assigned}</strong> sessions</span>
+                              <span>Total: <strong>{examSummary.duty_minutes_total}</strong> min</span>
+                              <span>
+                                Exempted: <strong style={{ color: examSummary.exempt ? "var(--warning-600)" : "var(--success-600)" }}>
+                                  {examSummary.exempt ? "Yes" : "No"}
+                                </strong>
+                              </span>
+                              {examSummary.excluded_subjects.length > 0 && (
+                                <span>
+                                  Excluded on: {examSummary.excluded_subjects.map(s => s.name).join(", ")}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span style={{ color: "var(--slate-400)" }}>No exam duty data</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
 
                   {/* ── Inline delete confirmation strip ── */}
                   {confirmDeleteId === t.id && (

@@ -431,11 +431,11 @@ th { background: var(--slate-50); font-weight: 600; color: var(--slate-600); fon
 .duty-chip:hover { opacity: 0.85; }
 .duty-chip-gate      { background: var(--primary-50);  color: var(--primary-700);  border-color: var(--primary-200); }
 .duty-chip-canteen   { background: var(--warning-50);  color: var(--warning-700);  border-color: var(--warning-200); }
-.duty-chip-library   { background: var(--subj-hist-bg, #fdf4ff); color: var(--subj-hist-text, #6b21a8); border-color: var(--subj-human-accent, #a855f7); }
-.duty-chip-hall      { background: var(--subj-phy-bg, #f0f9ff);  color: var(--subj-phy-text, #075985);  border-color: var(--blue-200); }
-.duty-chip-break     { background: var(--success-50);  color: var(--success-700);  border-color: var(--success-200); }
-.duty-chip-corridor  { background: var(--subj-pe-tint, #f0fdfa); color: var(--subj-pe-accent, #14b8a6); border-color: var(--subj-pe-accent, #14b8a6); }
-.duty-chip-exam      { background: var(--subj-hist-bg, #fdf4ff); color: var(--subj-hist-text, #6b21a8); border-color: var(--subj-human-accent, #a855f7); }
+.duty-chip-library   { background: var(--subj-hist-bg);  color: var(--subj-hist-text);  border-color: var(--subj-human-accent); }
+.duty-chip-hall      { background: var(--subj-phy-bg);   color: var(--subj-phy-text);   border-color: var(--blue-200); }
+.duty-chip-break     { background: var(--success-50);    color: var(--success-700);     border-color: var(--success-200); }
+.duty-chip-corridor  { background: var(--subj-pe-tint);  color: var(--subj-pe-accent);  border-color: var(--subj-pe-accent); }
+.duty-chip-exam      { background: var(--subj-hist-bg);  color: var(--subj-hist-text);  border-color: var(--subj-human-accent); }
 .duty-chip-other     { background: var(--slate-50);    color: var(--slate-600);    border-color: var(--slate-200); }
 .duty-chip-empty { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: var(--radius-sm); border: 1.5px dashed var(--primary-200); color: var(--primary-300); font-size: 0.95rem; cursor: pointer; transition: all var(--t-fast); }
 .duty-chip-empty:hover { border-color: var(--primary-400); color: var(--primary-500); background: var(--primary-50); }
