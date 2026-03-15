@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
-import { api, createAcademicYear, getAcademicYear, createProject, createDemoProject, importProject, exportProject, type AcademicYearData, type AcademicWeekInfo } from "../api";
+import { useParams } from "react-router-dom";
+import { api, createAcademicYear, getAcademicYear, createProject, createDemoProject, importProject, exportProject, deleteProject, type AcademicYearData, type AcademicWeekInfo } from "../api";
 
 function fmtDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
@@ -344,40 +344,71 @@ export default function AcademicYearPage() {
             <div style={{ fontSize: "0.78rem", color: "var(--slate-400)", padding: "0.5rem 0" }}>No projects yet — create one above</div>
           )}
           {projects.map((p, i) => (
-            <Link key={p.id} to={`/project/${p.id}/dashboard`}
-              style={{
-                display: "block", padding: "0.6rem 0.75rem", marginBottom: 6,
-                borderRadius: "var(--radius-md)", textDecoration: "none",
-                background: p.id === pid ? "var(--primary-50)" : "var(--slate-50)",
-                border: `1px solid ${p.id === pid ? "var(--primary-200)" : "var(--slate-200)"}`,
-                transition: "all 0.15s",
-              }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                  background: `hsl(${(i * 67) % 360}, 60%, 55%)`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "0.6rem", fontWeight: 700, color: "#fff",
+            <div key={p.id} style={{
+              display: "flex", alignItems: "center", gap: 4,
+              marginBottom: 6,
+            }}>
+              <a href={`/project/${p.id}/settings`}
+                onClick={(e) => { e.preventDefault(); window.location.href = `/project/${p.id}/settings`; }}
+                style={{
+                  flex: 1, display: "block", padding: "0.6rem 0.75rem",
+                  borderRadius: "var(--radius-md)", textDecoration: "none",
+                  background: p.id === pid ? "var(--primary-50)" : "var(--slate-50)",
+                  border: `1px solid ${p.id === pid ? "var(--primary-200)" : "var(--slate-200)"}`,
+                  transition: "all 0.15s", cursor: "pointer",
                 }}>
-                  {p.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{
-                    fontWeight: 700, fontSize: "0.78rem",
-                    color: p.id === pid ? "var(--primary-700)" : "var(--slate-800)",
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>{p.name}</div>
-                  <div style={{ fontSize: "0.62rem", color: "var(--slate-400)" }}>{p.academic_year}</div>
+                    width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                    background: `hsl(${(i * 67) % 360}, 60%, 55%)`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "0.6rem", fontWeight: 700, color: "#fff",
+                  }}>
+                    {p.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontWeight: 700, fontSize: "0.78rem",
+                      color: p.id === pid ? "var(--primary-700)" : "var(--slate-800)",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>{p.name}</div>
+                    <div style={{ fontSize: "0.62rem", color: "var(--slate-400)" }}>{p.academic_year}</div>
+                  </div>
+                  {p.id === pid && (
+                    <span style={{
+                      fontSize: "0.55rem", fontWeight: 700, padding: "1px 6px",
+                      borderRadius: "var(--radius-full)",
+                      background: "var(--primary-100)", color: "var(--primary-600)",
+                    }}>Current</span>
+                  )}
                 </div>
-                {p.id === pid && (
-                  <span style={{
-                    fontSize: "0.55rem", fontWeight: 700, padding: "1px 6px",
-                    borderRadius: "var(--radius-full)",
-                    background: "var(--primary-100)", color: "var(--primary-600)",
-                  }}>Current</span>
-                )}
-              </div>
-            </Link>
+              </a>
+              {/* Delete button */}
+              <button
+                onClick={async () => {
+                  if (!window.confirm(`Delete "${p.name}"? This will permanently remove all data for this project.`)) return;
+                  try {
+                    await deleteProject(p.id);
+                    const remaining = projects.filter(x => x.id !== p.id);
+                    setProjects(remaining);
+                    if (p.id === pid && remaining.length > 0) {
+                      window.location.href = `/project/${remaining[0].id}/settings`;
+                    } else if (remaining.length === 0) {
+                      window.location.href = "/";
+                    }
+                  } catch (err) { alert("Failed to delete: " + (err as Error).message); }
+                }}
+                title="Delete project"
+                style={{
+                  width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                  border: "1px solid var(--slate-200)", background: "var(--slate-50)",
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "0.7rem", color: "var(--slate-400)", transition: "all 0.15s",
+                }}
+                onMouseEnter={e => { (e.target as HTMLElement).style.background = "var(--danger-50)"; (e.target as HTMLElement).style.color = "var(--danger-600)"; (e.target as HTMLElement).style.borderColor = "var(--danger-200)"; }}
+                onMouseLeave={e => { (e.target as HTMLElement).style.background = "var(--slate-50)"; (e.target as HTMLElement).style.color = "var(--slate-400)"; (e.target as HTMLElement).style.borderColor = "var(--slate-200)"; }}
+              >🗑️</button>
+            </div>
           ))}
         </div>
       </div>

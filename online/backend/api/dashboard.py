@@ -161,33 +161,52 @@ def get_dashboard(
     else:
         present_count = total_teachers - absent_count
 
+    # ── Pre-load all teachers for this project (avoid N+1) ──
+    all_teachers = db.query(Teacher).filter(Teacher.project_id == project_id).all()
+    teachers_by_id = {t.id: t for t in all_teachers}
+
+    def teacher_name(tid):
+        t = teachers_by_id.get(tid)
+        return f"{t.first_name or ''} {t.last_name or ''}".strip() if t else ""
+
+    def teacher_initials(tid):
+        name = teacher_name(tid)
+        return "".join(w[0] for w in name.split() if w).upper()[:2]
+
     # ── Substitutions today ──
     subs_today = db.query(Substitution).filter(
         Substitution.project_id == project_id,
         Substitution.date == today,
     ).all()
 
+    # Batch-load lessons, subjects, classes for subs
+    from backend.models.project import Subject
+    lesson_ids = [s.lesson_id for s in subs_today if s.lesson_id]
+    lessons_map = {}
+    subjects_map = {}
+    classes_map = {}
+    if lesson_ids:
+        lessons = db.query(Lesson).filter(Lesson.id.in_(lesson_ids)).all()
+        lessons_map = {l.id: l for l in lessons}
+        subj_ids = [l.subject_id for l in lessons if l.subject_id]
+        cls_ids = [l.class_id for l in lessons if l.class_id]
+        if subj_ids:
+            subjects_map = {s.id: s for s in db.query(Subject).filter(Subject.id.in_(subj_ids)).all()}
+        if cls_ids:
+            classes_map = {c.id: c for c in db.query(SchoolClass).filter(SchoolClass.id.in_(cls_ids)).all()}
+
     sub_details = []
     for s in subs_today:
-        sub_teacher = db.query(Teacher).get(s.sub_teacher_id)
-        absent_teacher = db.query(Teacher).get(s.absent_teacher_id)
-
-        lesson = db.query(Lesson).get(s.lesson_id) if s.lesson_id else None
-        subject_name = ""
-        class_name = ""
-        if lesson:
-            from backend.models.project import Subject
-            subj = db.query(Subject).get(lesson.subject_id) if lesson.subject_id else None
-            cls = db.query(SchoolClass).get(lesson.class_id) if lesson.class_id else None
-            subject_name = subj.name if subj else ""
-            class_name = cls.name if cls else ""
+        lesson = lessons_map.get(s.lesson_id) if s.lesson_id else None
+        subject_name = subjects_map.get(lesson.subject_id, None).name if lesson and lesson.subject_id and lesson.subject_id in subjects_map else ""
+        class_name = classes_map.get(lesson.class_id, None).name if lesson and lesson.class_id and lesson.class_id in classes_map else ""
 
         sub_details.append({
             "id": s.id,
             "period_index": s.period_index,
-            "sub_teacher_name": f"{sub_teacher.first_name or ''} {sub_teacher.last_name or ''}".strip() if sub_teacher else "",
-            "sub_teacher_initials": "".join(w[0] for w in (f"{sub_teacher.first_name or ''} {sub_teacher.last_name or ''}".strip()).split() if w).upper()[:2] if sub_teacher else "",
-            "absent_teacher_name": f"{absent_teacher.first_name or ''} {absent_teacher.last_name or ''}".strip() if absent_teacher else "",
+            "sub_teacher_name": teacher_name(s.sub_teacher_id),
+            "sub_teacher_initials": teacher_initials(s.sub_teacher_id),
+            "absent_teacher_name": teacher_name(s.absent_teacher_id),
             "subject_name": subject_name,
             "class_name": class_name,
             "is_override": getattr(s, 'is_override', False),
@@ -210,10 +229,8 @@ def get_dashboard(
         for entry, lesson in absent_entries:
             key = (lesson.teacher_id, entry.period_index)
             if key not in assigned_keys:
-                teacher = db.query(Teacher).get(lesson.teacher_id)
-                tname = f"{teacher.first_name or ''} {teacher.last_name or ''}".strip() if teacher else ""
                 unassigned.append({
-                    "teacher_name": tname,
+                    "teacher_name": teacher_name(lesson.teacher_id),
                     "period_index": entry.period_index,
                 })
 
@@ -369,7 +386,7 @@ def get_dashboard(
             {
                 "id": a.id,
                 "teacher_id": a.teacher_id,
-                "teacher_name": (lambda t: f"{t.first_name or ''} {t.last_name or ''}".strip() if t else "")(db.query(Teacher).get(a.teacher_id)),
+                "teacher_name": teacher_name(a.teacher_id),
                 "reason": a.reason or "",
             }
             for a in absences
