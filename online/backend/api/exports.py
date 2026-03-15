@@ -317,13 +317,26 @@ def export_csv(
     entries = _get_all_entries(db, project.id, run.id)
     sett = _full_settings(db, project.id)
     cols = _compute_col_headers(sett)
+    fri_cols = _compute_friday_headers(sett)
     days = getattr(sett, "days_per_week", 5)
 
-    # Build period_index → time slot lookup
+    bell = {}
+    try: bell = json.loads(getattr(sett, "bell_schedule_json", "{}") or "{}")
+    except: pass
+    fri_day_idx = bell.get("friday_day_index", 4)
+
+    # Build period_index → time slot lookup for REGULAR days
     slot_times = {}
     for col in cols:
         if col["type"] == "period":
             slot_times[col["period_index"]] = col["sub"]
+
+    # Build period_index → time slot lookup for FRIDAY
+    fri_slot_times = {}
+    if fri_cols:
+        for col in fri_cols:
+            if col["type"] == "period":
+                fri_slot_times[col["period_index"]] = col["sub"]
 
     buf = io.StringIO()
     writer = csv_mod.writer(buf)
@@ -338,22 +351,26 @@ def export_csv(
 
     for cn in sorted(by_class.keys()):
         for e in sorted(by_class[cn], key=lambda x: (x["day_index"], x["period_index"])):
+            is_fri = e["day_index"] == fri_day_idx and fri_cols
+            times = fri_slot_times if is_fri else slot_times
             writer.writerow([
                 "Class", cn,
                 DAY_SHORT[e["day_index"]] if e["day_index"] < len(DAY_SHORT) else f"Day{e['day_index']+1}",
                 e["period_index"] + 1,
-                slot_times.get(e["period_index"], ""),
+                times.get(e["period_index"], ""),
                 e.get("subject_name", ""), e.get("subject_code", ""),
                 e.get("teacher_name", ""), e.get("class_name", ""), e.get("room_name", ""),
             ])
 
     for tn in sorted(by_teacher.keys()):
         for e in sorted(by_teacher[tn], key=lambda x: (x["day_index"], x["period_index"])):
+            is_fri = e["day_index"] == fri_day_idx and fri_cols
+            times = fri_slot_times if is_fri else slot_times
             writer.writerow([
                 "Teacher", tn,
                 DAY_SHORT[e["day_index"]] if e["day_index"] < len(DAY_SHORT) else f"Day{e['day_index']+1}",
                 e["period_index"] + 1,
-                slot_times.get(e["period_index"], ""),
+                times.get(e["period_index"], ""),
                 e.get("subject_name", ""), e.get("subject_code", ""),
                 e.get("teacher_name", ""), e.get("class_name", ""), e.get("room_name", ""),
             ])
@@ -419,7 +436,7 @@ def _build_pdf_table(entries_group, cols, days, fri_day_idx, fri_cols, label_key
     return data
 
 
-def _style_pdf_table(tbl, cols, has_fri_row, fri_row_idx):
+def _style_pdf_table(tbl, cols, has_fri_row, fri_row_idx, fri_cols=None):
     from reportlab.lib import colors
     from reportlab.platypus import TableStyle
 
@@ -524,11 +541,12 @@ def export_pdf_current(
     elements.append(Paragraph(title, ParagraphStyle("S", parent=styles["Heading2"], fontSize=13, spaceAfter=4)))
     elements.append(Spacer(1, 3))
 
+    max_data_cols = max(len(cols), len(fri_cols) if fri_cols else 0)
     page_w = landscape(A4)[0] - 16*mm
     day_w = 22*mm
-    col_w = (page_w - day_w) / len(cols)
-    tbl = Table(data, colWidths=[day_w] + [col_w] * len(cols), repeatRows=1)
-    _style_pdf_table(tbl, cols, has_fri, fri_day_idx)
+    col_w = (page_w - day_w) / max(max_data_cols, 1)
+    tbl = Table(data, colWidths=[day_w] + [col_w] * max_data_cols, repeatRows=1)
+    _style_pdf_table(tbl, cols, has_fri, fri_day_idx, fri_cols)
     elements.append(tbl)
 
     doc.build(elements)
@@ -577,9 +595,10 @@ def export_pdf_all_classes(
     elements = []
     title_s = ParagraphStyle("T", parent=styles["Title"], fontSize=16, spaceAfter=2)
     sub_s = ParagraphStyle("S", parent=styles["Heading2"], fontSize=13, spaceAfter=4)
+    max_data_cols = max(len(cols), len(fri_cols) if fri_cols else 0)
     page_w = landscape(A4)[0] - 16*mm
     day_w = 22*mm
-    col_w = (page_w - day_w) / len(cols)
+    col_w = (page_w - day_w) / max(max_data_cols, 1)
     has_fri = fri_cols is not None and fri_day_idx < days
 
     for idx, cn in enumerate(sorted(by_class.keys())):
@@ -587,8 +606,8 @@ def export_pdf_all_classes(
         elements.append(Paragraph(f"Class: {cn}", sub_s))
         elements.append(Spacer(1, 3))
         data = _build_pdf_table(by_class[cn], cols, days, fri_day_idx, fri_cols, "teacher_name")
-        tbl = Table(data, colWidths=[day_w] + [col_w] * len(cols), repeatRows=1)
-        _style_pdf_table(tbl, cols, has_fri, fri_day_idx)
+        tbl = Table(data, colWidths=[day_w] + [col_w] * max_data_cols, repeatRows=1)
+        _style_pdf_table(tbl, cols, has_fri, fri_day_idx, fri_cols)
         elements.append(tbl)
         if idx < len(by_class) - 1:
             elements.append(PageBreak())
@@ -639,9 +658,10 @@ def export_pdf_all_teachers(
     elements = []
     title_s = ParagraphStyle("T", parent=styles["Title"], fontSize=16, spaceAfter=2)
     sub_s = ParagraphStyle("S", parent=styles["Heading2"], fontSize=13, spaceAfter=4)
+    max_data_cols = max(len(cols), len(fri_cols) if fri_cols else 0)
     page_w = landscape(A4)[0] - 16*mm
     day_w = 22*mm
-    col_w = (page_w - day_w) / len(cols)
+    col_w = (page_w - day_w) / max(max_data_cols, 1)
     has_fri = fri_cols is not None and fri_day_idx < days
 
     for idx, tn in enumerate(sorted(by_teacher.keys())):
@@ -649,8 +669,8 @@ def export_pdf_all_teachers(
         elements.append(Paragraph(f"Teacher: {tn}", sub_s))
         elements.append(Spacer(1, 3))
         data = _build_pdf_table(by_teacher[tn], cols, days, fri_day_idx, fri_cols, "class_name")
-        tbl = Table(data, colWidths=[day_w] + [col_w] * len(cols), repeatRows=1)
-        _style_pdf_table(tbl, cols, has_fri, fri_day_idx)
+        tbl = Table(data, colWidths=[day_w] + [col_w] * max_data_cols, repeatRows=1)
+        _style_pdf_table(tbl, cols, has_fri, fri_day_idx, fri_cols)
         elements.append(tbl)
         if idx < len(by_teacher) - 1:
             elements.append(PageBreak())
