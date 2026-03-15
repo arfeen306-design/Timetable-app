@@ -152,13 +152,13 @@ export default function ProjectDashboard() {
       {/* ═══ TOPBAR ═══ */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        background: "#fff", borderRadius: 14, padding: "14px 20px",
-        border: "1px solid var(--slate-200)",
+        background: "#fff", padding: "14px 20px",
+        borderBottom: "1px solid var(--slate-200)",
       }}>
         <div>
           <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--slate-900)", letterSpacing: "-0.02em" }}>Dashboard</div>
           <div style={{ fontSize: "0.72rem", color: "var(--slate-400)", marginTop: 1 }}>
-            {d.school_name} · {d.academic_year} · {d.week_label} · <span style={{ color: "var(--color-success, #0EA875)", fontWeight: 600 }}>{d.date_formatted}</span>
+            {d.school_name} · {d.academic_year} · {d.week_label} · <span style={{ color: "#0EA875", fontWeight: 600 }}>{d.date_formatted}</span>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -170,9 +170,22 @@ export default function ProjectDashboard() {
             <span>{cc ? countryFlag(cc) : "🌐"}</span>
             <span>{clock}</span>
           </div>
-          <button className="btn" onClick={() => setShowHistory(!showHistory)} style={{ fontSize: "0.72rem", padding: "5px 12px" }}>
-            {showHistory ? "Close History" : "📅 History"}
+          <button className="btn" onClick={() => setShowHistory(!showHistory)} style={{ fontSize: "0.72rem", padding: "5px 12px", display: "flex", alignItems: "center", gap: 5 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            {showHistory ? "Close" : "History"}
           </button>
+          <Link to={`/project/${pid}/export`} style={{
+            fontSize: "0.72rem", padding: "5px 12px", borderRadius: 6,
+            background: "#5B4EE8", color: "#fff", textDecoration: "none", fontWeight: 700,
+            display: "flex", alignItems: "center", gap: 5,
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Export PDF
+          </Link>
         </div>
       </div>
 
@@ -204,7 +217,7 @@ export default function ProjectDashboard() {
       {/* ═══ STAT CARDS (5 across) ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12 }}>
         {/* Present */}
-        <div className="sc" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+        <div className="sc anim-card" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#0EA875", opacity: 0.08 }} />
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Present today</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0EA875", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>
@@ -216,7 +229,7 @@ export default function ProjectDashboard() {
         </div>
 
         {/* Absent */}
-        <div className="sc" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+        <div className="sc anim-card" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#E8334A", opacity: 0.08 }} />
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Absent today</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#E8334A", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>
@@ -227,7 +240,7 @@ export default function ProjectDashboard() {
         </div>
 
         {/* Busy */}
-        <div className="sc" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+        <div className="sc anim-card" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#5B4EE8", opacity: 0.08 }} />
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Busy right now</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#5B4EE8", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>
@@ -240,7 +253,7 @@ export default function ProjectDashboard() {
         </div>
 
         {/* Workload */}
-        <div className="sc" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+        <div className="sc anim-card" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#E8A020", opacity: 0.08 }} />
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Avg. workload</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#E8A020", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>{s.avg_workload}</div>
@@ -249,7 +262,7 @@ export default function ProjectDashboard() {
         </div>
 
         {/* Classes */}
-        <div className="sc" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+        <div className="sc anim-card" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#F06830", opacity: 0.08 }} />
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Total classes</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#F06830", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>{s.total_classes}</div>
@@ -335,7 +348,14 @@ export default function ProjectDashboard() {
                     </div>
                   )}
                   {t.status === "sub" && (
-                    <div style={{ fontSize: "0.6rem", color: "#F06830", fontWeight: 600 }}>{t.subject_name}</div>
+                    <div style={{ fontSize: "0.6rem", display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{
+                        background: "rgba(240,104,48,0.25)", color: "#F06830",
+                        fontSize: "0.58rem", fontWeight: 700, padding: "1px 6px", borderRadius: 4,
+                        fontFamily: "var(--font-mono)",
+                      }}>{t.class_name}</span>
+                      <span style={{ color: "#F06830", fontWeight: 600 }}>↔ {t.subject_name}</span>
+                    </div>
                   )}
                   {t.status === "free" && (
                     <div style={{ fontSize: "0.6rem", color: "#0EA875", fontWeight: 600 }}>Available for substitution</div>
@@ -415,8 +435,8 @@ export default function ProjectDashboard() {
         <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
-              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Weekly workload — lessons per teacher</div>
-              <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Top 10 · orange = sub · red = over</div>
+              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Today's workload — periods per teacher</div>
+              <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Sorted highest to lowest · orange = substitution · red = over limit</div>
             </div>
             <div style={{ display: "flex", gap: 12 }}>
               {[{ c: "#5B4EE8", l: "Sched" }, { c: "#F06830", l: "Sub" }, { c: "#E8334A", l: "Over" }].map(x => (
