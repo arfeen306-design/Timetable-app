@@ -1,7 +1,7 @@
 """Dashboard API — aggregated data for the project command center."""
 from __future__ import annotations
 from datetime import date, timedelta, datetime
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, Request
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -20,6 +20,7 @@ router = APIRouter()
 
 @router.get("")
 def get_dashboard(
+    request: Request,
     project_id: int = Path(...),
     dt: Optional[str] = Query(None, alias="date", description="YYYY-MM-DD, defaults to today"),
     project=Depends(get_project_or_404),
@@ -40,9 +41,6 @@ def get_dashboard(
 
     # ── Weekend / Holiday detection ──
     weekend_days_str = getattr(settings, 'weekend_days', '5,6') or '5,6'
-    # weekend_days uses 0=Sun, 1=Mon, ..., 6=Sat
-    # Python weekday(): 0=Mon, 1=Tue, ..., 6=Sun
-    # Convert: Python Sun(6)->0, Mon(0)->1, ..., Sat(5)->6
     python_weekday = today.weekday()  # 0=Mon..6=Sun
     settings_day = (python_weekday + 1) % 7  # 0=Sun, 1=Mon, ..., 6=Sat
     weekend_set = set()
@@ -56,7 +54,7 @@ def get_dashboard(
     # ── Generate real lesson slots from bell schedule ──
     from backend.services.time_engine import generate_period_slots_for_day
     lesson_slots = []
-    current_lesson_index = -1  # -1 means no lesson right now
+    current_lesson_index = -1
     current_lesson_start = ""
     current_lesson_end = ""
 
@@ -78,7 +76,6 @@ def get_dashboard(
         now_minutes = now.hour * 60 + now.minute
         lesson_num = 0
         for slot in slots:
-            # Parse slot times to minutes
             sh, sm = slot.start_time.split(':')
             eh, em = slot.end_time.split(':')
             start_min = int(sh) * 60 + int(sm)
@@ -114,8 +111,22 @@ def get_dashboard(
     # ── Teachers ──
     total_teachers = db.query(func.count(Teacher.id)).filter(Teacher.project_id == project_id).scalar() or 0
 
-    # ── Classes ──
+    # ── Classes — with grade breakdown ──
     total_classes = db.query(func.count(SchoolClass.id)).filter(SchoolClass.project_id == project_id).scalar() or 0
+
+    # Grade breakdown: group by grade, count sections per grade
+    grade_rows = (
+        db.query(SchoolClass.grade, func.count(SchoolClass.id).label("section_count"))
+        .filter(SchoolClass.project_id == project_id)
+        .group_by(SchoolClass.grade)
+        .order_by(SchoolClass.grade)
+        .all()
+    )
+    class_breakdown = [
+        {"grade": row.grade or "Ungraded", "sections": row.section_count}
+        for row in grade_rows
+    ]
+    total_grades = len(class_breakdown)
 
     # ── Lessons per week ──
     total_lessons = db.query(func.count(TimetableEntry.id)).filter(TimetableEntry.project_id == project_id).scalar() or 0
@@ -127,7 +138,13 @@ def get_dashboard(
     ).all()
     absent_ids = [a.teacher_id for a in absences]
     absent_count = len(set(absent_ids))
-    present_count = total_teachers - absent_count
+
+    # On off-days: present = 0, absent = 0 (nobody is at school)
+    if is_off_day:
+        present_count = 0
+        absent_count = 0
+    else:
+        present_count = total_teachers - absent_count
 
     # ── Substitutions today ──
     subs_today = db.query(Substitution).filter(
@@ -135,13 +152,11 @@ def get_dashboard(
         Substitution.date == today,
     ).all()
 
-    # Build substitution details
     sub_details = []
     for s in subs_today:
         sub_teacher = db.query(Teacher).get(s.sub_teacher_id)
         absent_teacher = db.query(Teacher).get(s.absent_teacher_id)
 
-        # Get lesson info
         lesson = db.query(Lesson).get(s.lesson_id) if s.lesson_id else None
         subject_name = ""
         class_name = ""
@@ -163,10 +178,9 @@ def get_dashboard(
             "is_override": getattr(s, 'is_override', False),
         })
 
-    # ── Unassigned periods (absent teacher slots without substitutions) ──
-    # Find all timetable entries for absent teachers on this day
+    # ── Unassigned periods ──
     unassigned = []
-    if absent_ids:
+    if absent_ids and not is_off_day:
         absent_entries = (
             db.query(TimetableEntry, Lesson)
             .join(Lesson, TimetableEntry.lesson_id == Lesson.id)
@@ -189,27 +203,28 @@ def get_dashboard(
                 })
 
     # ── Busy/free teachers right now ──
-    current_period = current_lesson_index if current_lesson_index >= 0 else 0
-
-    busy_now = (
-        db.query(func.count(func.distinct(Lesson.teacher_id)))
-        .join(TimetableEntry, TimetableEntry.lesson_id == Lesson.id)
-        .filter(
-            TimetableEntry.project_id == project_id,
-            TimetableEntry.day_index == day_index,
-            TimetableEntry.period_index == current_period,
+    if is_off_day:
+        busy_now = 0
+        on_sub_now = 0
+        free_now = 0
+    else:
+        current_period = current_lesson_index if current_lesson_index >= 0 else 0
+        busy_now = (
+            db.query(func.count(func.distinct(Lesson.teacher_id)))
+            .join(TimetableEntry, TimetableEntry.lesson_id == Lesson.id)
+            .filter(
+                TimetableEntry.project_id == project_id,
+                TimetableEntry.day_index == day_index,
+                TimetableEntry.period_index == current_period,
+            )
+            .scalar() or 0
         )
-        .scalar() or 0
-    )
-
-    # Teachers on sub duty right now
-    on_sub_now = db.query(func.count(func.distinct(Substitution.sub_teacher_id))).filter(
-        Substitution.project_id == project_id,
-        Substitution.date == today,
-        Substitution.period_index == current_period,
-    ).scalar() or 0
-
-    free_now = max(0, total_teachers - busy_now - on_sub_now - absent_count)
+        on_sub_now = db.query(func.count(func.distinct(Substitution.sub_teacher_id))).filter(
+            Substitution.project_id == project_id,
+            Substitution.date == today,
+            Substitution.period_index == current_period,
+        ).scalar() or 0
+        free_now = max(0, total_teachers - busy_now - on_sub_now - absent_count)
 
     # ── Workload overview ──
     workloads = get_all_workloads(db, project_id)
@@ -231,7 +246,7 @@ def get_dashboard(
         week_label = current_week.label or f"Week {week_number}"
         academic_year_name = current_week.academic_year or ""
 
-    # ── Top workload bars (for the chart) ──
+    # ── Weekly workload chart (all teachers, weekly totals) ──
     workload_chart = []
     for w in sorted(workloads, key=lambda x: x.get("total", 0), reverse=True)[:10]:
         initials = "".join(word[0] for word in w.get("teacher_name", "").split() if word).upper()[:2]
@@ -246,8 +261,60 @@ def get_dashboard(
             "utilization_pct": w.get("utilization_pct", 0),
         })
 
+    # ── Substitution history (last 30 days) ──
+    history_start = today - timedelta(days=30)
+    history_subs = (
+        db.query(
+            Substitution.date,
+            func.count(Substitution.id).label("count"),
+        )
+        .filter(
+            Substitution.project_id == project_id,
+            Substitution.date >= history_start,
+            Substitution.date <= today,
+        )
+        .group_by(Substitution.date)
+        .order_by(Substitution.date.desc())
+        .all()
+    )
+    history_absences = (
+        db.query(
+            TeacherAbsence.date,
+            func.count(TeacherAbsence.id).label("count"),
+        )
+        .filter(
+            TeacherAbsence.project_id == project_id,
+            TeacherAbsence.date >= history_start,
+            TeacherAbsence.date <= today,
+        )
+        .group_by(TeacherAbsence.date)
+        .order_by(TeacherAbsence.date.desc())
+        .all()
+    )
+
+    sub_history = {}
+    for row in history_subs:
+        sub_history[row.date.isoformat()] = {"subs": row.count, "absences": 0}
+    for row in history_absences:
+        key = row.date.isoformat()
+        if key not in sub_history:
+            sub_history[key] = {"subs": 0, "absences": row.count}
+        else:
+            sub_history[key]["absences"] = row.count
+
+    substitution_history = [
+        {"date": k, "subs": v["subs"], "absences": v["absences"]}
+        for k, v in sorted(sub_history.items(), reverse=True)
+    ]
+
     # Day name for display
     day_name = today.strftime("%A")
+
+    # ── Attendance percentage ──
+    if is_off_day:
+        attendance_pct = 0
+    else:
+        attendance_pct = round((present_count / total_teachers * 100) if total_teachers else 0)
 
     return {
         "school_name": school_name,
@@ -259,7 +326,7 @@ def get_dashboard(
         "day_name": day_name,
         "time": now.strftime("%I:%M %p"),
         "is_off_day": is_off_day,
-        "current_period": current_period,
+        "current_period": current_lesson_index if current_lesson_index >= 0 else 0,
         "current_lesson_start": current_lesson_start,
         "current_lesson_end": current_lesson_end,
         "num_periods": num_periods,
@@ -268,18 +335,21 @@ def get_dashboard(
             "total_teachers": total_teachers,
             "present_today": present_count,
             "absent_today": absent_count,
-            "busy_now": busy_now if not is_off_day else 0,
+            "busy_now": busy_now,
             "on_sub_now": on_sub_now if not is_off_day else 0,
-            "free_now": free_now if not is_off_day else total_teachers,
+            "free_now": free_now,
             "avg_workload": avg_workload,
             "over_max": over_max,
             "total_classes": total_classes,
+            "total_grades": total_grades,
             "total_lessons": total_lessons,
-            "attendance_pct": round((present_count / total_teachers * 100) if total_teachers else 0),
+            "attendance_pct": attendance_pct,
         },
+        "class_breakdown": class_breakdown,
         "unassigned": unassigned,
         "substitutions_today": sub_details,
         "workload_chart": workload_chart,
+        "substitution_history": substitution_history,
         "absent_teachers": [
             {
                 "id": a.id,
