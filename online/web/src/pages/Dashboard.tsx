@@ -16,6 +16,7 @@ export default function Dashboard() {
   const [importing, setImporting] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [exporting, setExporting] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -57,11 +58,10 @@ export default function Dashboard() {
   }
 
   async function handleDelete(p: Project) {
-    if (!confirm(`Delete "${p.name}"? This will remove ALL data. This cannot be undone.`)) return;
     setDeleting(p.id); setError("");
     try { await api.deleteProject(p.id); setProjects(prev => prev.filter(x => x.id !== p.id)); }
     catch (err) { setError(err instanceof Error ? err.message : "Delete failed"); }
-    finally { setDeleting(null); }
+    finally { setDeleting(null); setConfirmDeleteId(null); }
   }
 
   async function handleExport(p: Project) {
@@ -308,7 +308,7 @@ export default function Dashboard() {
               }}>📅</div>
 
               {/* Name + year */}
-              <Link to={`/project/${p.id}/settings`} style={{
+              <Link to={`/project/${p.id}/dashboard`} style={{
                 flex: 1, fontWeight: 600, fontSize: "0.88rem", color: "var(--primary-700)",
                 textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}>
@@ -316,31 +316,51 @@ export default function Dashboard() {
                 {p.academic_year && <span style={{ fontWeight: 400, color: "var(--slate-400)", fontSize: "0.78rem", marginLeft: 8 }}>— {p.academic_year}</span>}
               </Link>
 
+              {/* Inline delete confirm row */}
+              {confirmDeleteId === p.id && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "var(--danger-50)", border: "1px solid var(--danger-200)",
+                  borderRadius: "var(--radius-sm)", padding: "4px 10px",
+                  fontSize: "0.72rem", fontWeight: 600, color: "var(--danger-700)",
+                }}>
+                  Delete "{p.name}"? This cannot be undone.
+                  <button type="button" style={{ ...actionBtn("var(--danger-500)", "#fff"), marginLeft: 4 }}
+                    disabled={deleting === p.id}
+                    onClick={() => handleDelete(p)}>
+                    {deleting === p.id ? "⏳" : "Yes, delete"}
+                  </button>
+                  <button type="button" style={actionBtn("var(--slate-100)", "var(--slate-700)")}
+                    onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                </div>
+              )}
+
               {/* Actions */}
-              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                <Link to={`/project/${p.id}/settings`}
-                  style={{ ...actionBtn("var(--primary-50)", "var(--primary-700)"), textDecoration: "none" }}
-                  title="Edit project"
-                  onMouseEnter={e => { e.currentTarget.style.background = "var(--primary-100)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "var(--primary-50)"; }}
-                >✏️ Edit</Link>
-                <button type="button"
-                  style={actionBtn("var(--success-50)", "var(--success-700)")}
-                  disabled={exporting === p.id}
-                  onClick={() => handleExport(p)}
-                  title="Download project file"
-                  onMouseEnter={e => { e.currentTarget.style.background = "var(--success-100)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "var(--success-50)"; }}
-                >{exporting === p.id ? "⏳" : "💾"} Save</button>
-                <button type="button"
-                  style={actionBtn("var(--danger-50)", "var(--danger-700)")}
-                  disabled={deleting === p.id}
-                  onClick={() => handleDelete(p)}
-                  title="Delete project permanently"
-                  onMouseEnter={e => { e.currentTarget.style.background = "var(--danger-100)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "var(--danger-50)"; }}
-                >{deleting === p.id ? "⏳" : "🗑️"} Delete</button>
-              </div>
+              {confirmDeleteId !== p.id && (
+                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                  <Link to={`/project/${p.id}/settings`}
+                    style={{ ...actionBtn("var(--primary-50)", "var(--primary-700)"), textDecoration: "none" }}
+                    title="Edit project"
+                    onMouseEnter={e => { e.currentTarget.style.background = "var(--primary-100)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "var(--primary-50)"; }}
+                  >✏️ Edit</Link>
+                  <button type="button"
+                    style={actionBtn("var(--success-50)", "var(--success-700)")}
+                    disabled={exporting === p.id}
+                    onClick={() => handleExport(p)}
+                    title="Download project file"
+                    onMouseEnter={e => { e.currentTarget.style.background = "var(--success-100)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "var(--success-50)"; }}
+                  >{exporting === p.id ? "⏳" : "💾"} Save</button>
+                  <button type="button"
+                    style={actionBtn("var(--danger-50)", "var(--danger-700)")}
+                    onClick={() => setConfirmDeleteId(p.id)}
+                    title="Delete project permanently"
+                    onMouseEnter={e => { e.currentTarget.style.background = "var(--danger-100)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "var(--danger-50)"; }}
+                  >🗑️ Delete</button>
+                </div>
+              )}
             </div>
           ))}
         </div>
