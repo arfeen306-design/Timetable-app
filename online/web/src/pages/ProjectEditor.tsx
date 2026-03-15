@@ -86,6 +86,19 @@ export default function ProjectEditor() {
 }
 
 /* ══════════════════════════════════════════════════
+   Utilities for time validation
+   ══════════════════════════════════════════════════ */
+function parseTime(t: string): number {
+  if (!t || !t.includes(":")) return 8 * 60;
+  const [h, m] = t.split(":").map(Number);
+  return (isNaN(h) ? 8 : h) * 60 + (isNaN(m) ? 0 : m);
+}
+function fmtTimeHelper(mins: number): string {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/* ══════════════════════════════════════════════════
    Settings Tab — kept inline
    ══════════════════════════════════════════════════ */
 
@@ -208,15 +221,47 @@ function SettingsTab({
       <div className="settings-section">
         <h3 className="settings-section-title">Breaks</h3>
         <div className="settings-field"><label className="settings-label">Number of breaks (0–9)</label><select value={numBreaks} onChange={e => setNumBreaks(Number(e.target.value))} style={inputNarrow}>{Array.from({length:10},(_,i) => <option key={i} value={i}>{i}</option>)}</select></div>
-        {breaks.map((b, i) => (
-          <div key={i} className="break-card">
-            <div className="break-card-title">Break {i + 1}</div>
-            <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Name</label><input value={b.name} onChange={e => updateBreak(i,"name",e.target.value)} placeholder="e.g. Short Break" style={{width:200}} /></div>
-            <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Start time</label><select value={b.start} onChange={e => updateBreak(i,"start",e.target.value)} style={{width:110}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-            <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>End time</label><select value={b.end} onChange={e => updateBreak(i,"end",e.target.value)} style={{width:110}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-            <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>After period</label><select value={b.after_period} onChange={e => updateBreak(i,"after_period",Number(e.target.value))} style={inputNarrow}>{Array.from({length:periodsPerDay},(_,p) => <option key={p+1} value={p+1}>{p+1} (after period)</option>)}</select></div>
-          </div>
-        ))}
+        {breaks.map((b, i) => {
+          // Compute expected break start: first_period_start + sum of period durations + previous break durations
+          const fpStart = parseTime(firstPeriodStart);
+          let expectedStart = fpStart;
+          // after_period is 1-indexed: after_period=2 means after 2 periods
+          expectedStart += periodDuration * b.after_period;
+          // Add durations of earlier breaks that come before this one
+          for (const prev of breaks) {
+            if (prev !== b && prev.after_period < b.after_period) {
+              expectedStart += (parseTime(prev.end) - parseTime(prev.start));
+            }
+          }
+          const expectedStartStr = fmtTimeHelper(expectedStart);
+          const userStart = b.start;
+          const userEnd = b.end;
+          const startMismatch = userStart && expectedStartStr !== userStart;
+          const endBeforeStart = userStart && userEnd && parseTime(userEnd) <= parseTime(userStart);
+
+          return (
+            <div key={i}>
+              <div className="break-card" style={startMismatch || endBeforeStart ? { border: "2px solid #ef4444", background: "#fef2f2" } : undefined}>
+                <div className="break-card-title">Break {i + 1}</div>
+                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Name</label><input value={b.name} onChange={e => updateBreak(i,"name",e.target.value)} placeholder="e.g. Short Break" style={{width:200}} /></div>
+                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Start time</label><select value={b.start} onChange={e => updateBreak(i,"start",e.target.value)} style={{width:110, borderColor: startMismatch ? "#ef4444" : undefined}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>End time</label><select value={b.end} onChange={e => updateBreak(i,"end",e.target.value)} style={{width:110, borderColor: endBeforeStart ? "#ef4444" : undefined}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>After period</label><select value={b.after_period} onChange={e => updateBreak(i,"after_period",Number(e.target.value))} style={inputNarrow}>{Array.from({length:periodsPerDay},(_,p) => <option key={p+1} value={p+1}>{p+1} (after period)</option>)}</select></div>
+                {startMismatch && (
+                  <div style={{ background: "#fef2f2", border: "1px solid #ef4444", borderRadius: 6, padding: "0.5rem 0.75rem", marginTop: "0.5rem", fontSize: "0.8rem", color: "#dc2626" }}>
+                    ⚠️ <strong>Time conflict!</strong> Period {b.after_period} ends at <strong>{expectedStartStr}</strong>, but break starts at <strong>{userStart}</strong>.
+                    Please set break start time to <strong>{expectedStartStr}</strong>.
+                  </div>
+                )}
+                {endBeforeStart && (
+                  <div style={{ background: "#fef2f2", border: "1px solid #ef4444", borderRadius: 6, padding: "0.5rem 0.75rem", marginTop: "0.5rem", fontSize: "0.8rem", color: "#dc2626" }}>
+                    ⚠️ <strong>Invalid!</strong> Break end time ({userEnd}) is before or equal to start time ({userStart}).
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
         <p className="settings-hint">Lesson length in periods (single, double, etc.) is set per lesson in the Lessons tab.</p>
       </div>
 

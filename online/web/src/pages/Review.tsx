@@ -13,10 +13,10 @@ interface Entry {
 type ViewType = "class" | "teacher" | "room";
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-/* ── Client-side slot computation (matches desktop time engine) ── */
+/* ── Slot definition ── */
 interface SlotDef {
-  type: "period" | "break";
-  periodIndex: number; // -1 for breaks
+  type: "period" | "break" | "zero";
+  periodIndex: number; // -1 for breaks/zero
   start: string;
   end: string;
   breakName?: string;
@@ -34,41 +34,49 @@ function fmtTime(mins: number): string {
 
 interface BreakDef { name?: string; start?: string; end?: string; after_period?: number; duration_minutes?: number; is_friday?: boolean }
 
+/**
+ * Compute slot sequence using first_period_start (NOT school_start).
+ * after_period from UI is 1-indexed: "after period 2" = after_period=2 → after periodIndex=1.
+ * Break uses its user-entered start/end, cursor advances to break.end.
+ */
 function computeSlots(
-  startTime: string, periodDuration: number, numPeriods: number,
+  firstPeriodStart: string, periodDuration: number, numPeriods: number,
   breaks: BreakDef[], isFriday: boolean,
-  fridayStartTime?: string, fridayDuration?: number,
+  fridayFirstPeriodStart?: string, fridayDuration?: number,
+  schoolStartTime?: string, zeroPeriodEnabled?: boolean,
 ): SlotDef[] {
-  const isFri = isFriday;
-  const startMin = parseTime(isFri && fridayStartTime ? fridayStartTime : startTime);
-  const dur = isFri && fridayDuration ? fridayDuration : periodDuration;
+  const startMin = parseTime(isFriday && fridayFirstPeriodStart ? fridayFirstPeriodStart : firstPeriodStart);
+  const dur = isFriday && fridayDuration ? fridayDuration : periodDuration;
 
-  // Filter breaks for this context
-  const dayBreaks = breaks.filter(b => isFri ? !!b.is_friday : !b.is_friday);
-  // Build after_period map
-  const breakByPeriod: Record<number, BreakDef> = {};
+  const dayBreaks = breaks.filter(b => isFriday ? !!b.is_friday : !b.is_friday);
+  // after_period is 1-indexed from UI → convert to 0-indexed
+  const breakByIdx: Record<number, BreakDef> = {};
   for (const b of dayBreaks) {
-    if (b.after_period !== undefined && b.after_period !== null) {
-      breakByPeriod[b.after_period] = b;
-    }
+    if (b.after_period != null) breakByIdx[b.after_period - 1] = b;
   }
 
   const slots: SlotDef[] = [];
+
+  // Zero period: school_start → first_period_start
+  if (zeroPeriodEnabled && schoolStartTime) {
+    const ss = parseTime(schoolStartTime);
+    if (ss < startMin) {
+      slots.push({ type: "zero", periodIndex: -1, start: fmtTime(ss), end: fmtTime(startMin), breakName: "Zero Period" });
+    }
+  }
+
   let current = startMin;
   for (let p = 0; p < numPeriods; p++) {
     const end = current + dur;
     slots.push({ type: "period", periodIndex: p, start: fmtTime(current), end: fmtTime(end) });
     current = end;
-    // Insert break after this period if configured
-    const brk = breakByPeriod[p];
+
+    const brk = breakByIdx[p];
     if (brk) {
-      const bStart = brk.start ? parseTime(brk.start) : current;
-      const bEnd = brk.end ? parseTime(brk.end) : bStart + (brk.duration_minutes || 20);
-      // Use actual break start/end if provided, otherwise compute
-      const breakStart = brk.start ? bStart : current;
-      const breakEnd = brk.end ? bEnd : current + (brk.duration_minutes || 20);
-      slots.push({ type: "break", periodIndex: -1, start: fmtTime(breakStart), end: fmtTime(breakEnd), breakName: brk.name || "Break" });
-      current = breakEnd;
+      const brkStart = brk.start ? parseTime(brk.start) : current;
+      const brkEnd = brk.end ? parseTime(brk.end) : brkStart + (brk.duration_minutes || 20);
+      slots.push({ type: "break", periodIndex: -1, start: fmtTime(brkStart), end: fmtTime(brkEnd), breakName: brk.name || "Break" });
+      current = brkEnd;
     }
   }
   return slots;
@@ -106,7 +114,6 @@ export default function Review() {
     api.listClasses(pid).then(c => { setClasses(c); if (c.length > 0) setClassId(c[0].id); });
     api.listTeachers(pid).then(t => { setTeachers(t); if (t.length > 0) setTeacherId(t[0].id); });
     api.listRooms(pid).then(r => { setRooms(r); if (r.length > 0) setRoomId(r[0].id); });
-    // Fetch FULL school settings (including breaks_json, bell_schedule_json, school_start_time, etc.)
     fetch(`/api/projects/${pid}/school-settings`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("timetable_token")}` }
     }).then(r => r.json()).then(s => setSettings(s)).catch(() => setSettings(null));
@@ -131,31 +138,27 @@ export default function Review() {
   const { regularSlots, fridaySlots, hasFridayDiff, fridayDayIndex } = useMemo(() => {
     if (!settings) return { regularSlots: [] as SlotDef[], fridaySlots: [] as SlotDef[], hasFridayDiff: false, fridayDayIndex: 4 };
 
-    const startTime = (settings.school_start_time as string) || "08:00";
+    const schoolStart = (settings.school_start_time as string) || "08:00";
     const periodDuration = (settings.period_duration_minutes as number) || 45;
     const numPeriods = (settings.periods_per_day as number) || 7;
 
-    // Parse breaks
     let breaks: BreakDef[] = [];
-    try {
-      const raw = settings.breaks_json as string;
-      if (raw) breaks = JSON.parse(raw);
-    } catch { /* ignore */ }
+    try { const raw = settings.breaks_json as string; if (raw) breaks = JSON.parse(raw); } catch { /* */ }
 
-    // Parse bell schedule for Friday settings
     let bell: Record<string, unknown> = {};
-    try {
-      const raw = settings.bell_schedule_json as string;
-      if (raw) bell = JSON.parse(raw);
-    } catch { /* ignore */ }
+    try { const raw = settings.bell_schedule_json as string; if (raw) bell = JSON.parse(raw); } catch { /* */ }
 
+    const firstPeriodStart = (bell.first_period_start as string) || schoolStart;
+    const zeroPeriod = !!(bell.zero_period);
     const fridayDiff = !!(bell.friday_different);
     const friDayIdx = (bell.friday_day_index as number) ?? 4;
-    const friStartTime = (bell.friday_first_period_start as string) || undefined;
-    const friDuration = (bell.friday_period_duration as number) || undefined;
+    const friStart = (bell.friday_first_period_start as string) || undefined;
+    const friDur = (bell.friday_period_duration as number) || undefined;
 
-    const regular = computeSlots(startTime, periodDuration, numPeriods, breaks, false);
-    const friday = fridayDiff ? computeSlots(startTime, periodDuration, numPeriods, breaks, true, friStartTime, friDuration) : regular;
+    const regular = computeSlots(firstPeriodStart, periodDuration, numPeriods, breaks, false, undefined, undefined, schoolStart, zeroPeriod);
+    const friday = fridayDiff
+      ? computeSlots(firstPeriodStart, periodDuration, numPeriods, breaks, true, friStart, friDur, schoolStart, zeroPeriod)
+      : regular;
 
     return { regularSlots: regular, fridaySlots: friday, hasFridayDiff: fridayDiff, fridayDayIndex: friDayIdx };
   }, [settings]);
@@ -204,7 +207,6 @@ export default function Review() {
   const noRun = !run || run.status !== "completed";
   const selectedId = view === "class" ? classId : view === "teacher" ? teacherId : roomId;
 
-  // Column count = number of slots in regular schedule
   const colSlots = regularSlots.length > 0 ? regularSlots : Array.from({ length: gridPeriods }, (_, i) => ({ type: "period" as const, periodIndex: i, start: "", end: "" }));
 
   return (
@@ -267,7 +269,6 @@ export default function Review() {
       {!loading && selectedId > 0 && (
         <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "auto", marginBottom: "1.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
-            {/* ── Header row: period numbers + times, with break columns ── */}
             <thead>
               <tr style={{ background: "#2d3748" }}>
                 <th style={{ padding: "0.5rem 0.6rem", textAlign: "left", borderBottom: "2px solid #1a202c", width: 64, color: "#e2e8f0", fontSize: "0.75rem" }}></th>
@@ -275,18 +276,23 @@ export default function Review() {
                   <th key={i} style={{
                     padding: "0.4rem 0.25rem", textAlign: "center", borderBottom: "2px solid #1a202c",
                     borderLeft: "1px solid #4a5568", fontSize: "0.68rem", color: "#fff", lineHeight: 1.3,
-                    background: slot.type === "break" ? "#4a5568" : "#2d3748",
-                    minWidth: slot.type === "break" ? 70 : 90,
+                    background: slot.type === "break" ? "#4a5568" : slot.type === "zero" ? "#2c5282" : "#2d3748",
+                    minWidth: slot.type === "break" ? 70 : slot.type === "zero" ? 80 : 90,
                   }}>
                     {slot.type === "period" ? (
                       <>
                         <div style={{ fontWeight: 700, fontSize: "0.8rem" }}>{slot.periodIndex + 1}</div>
-                        {slot.start && <div style={{ fontWeight: 400, color: "#cbd5e0", fontSize: "0.6rem" }}>{slot.start} to {slot.end}</div>}
+                        {slot.start && <div style={{ fontWeight: 400, color: "#cbd5e0", fontSize: "0.58rem" }}>{slot.start} TO {slot.end}</div>}
+                      </>
+                    ) : slot.type === "zero" ? (
+                      <>
+                        <div style={{ fontWeight: 600, fontSize: "0.7rem", color: "#90cdf4" }}>0</div>
+                        {slot.start && <div style={{ fontWeight: 400, color: "#90cdf4", fontSize: "0.55rem" }}>{slot.start} TO {slot.end}</div>}
                       </>
                     ) : (
                       <>
-                        <div style={{ fontWeight: 600, fontSize: "0.7rem" }}>{slot.breakName || "Break"}</div>
-                        {slot.start && <div style={{ fontWeight: 400, color: "#a0aec0", fontSize: "0.58rem" }}>{slot.start} to {slot.end}</div>}
+                        <div style={{ fontWeight: 600, fontSize: "0.68rem", textTransform: "uppercase" }}>{slot.breakName || "Break"}</div>
+                        {slot.start && <div style={{ fontWeight: 400, color: "#a0aec0", fontSize: "0.55rem" }}>{slot.start} TO {slot.end}</div>}
                       </>
                     )}
                   </th>
@@ -300,7 +306,7 @@ export default function Review() {
 
                 return (
                   <>
-                    {/* ── Friday times row ── */}
+                    {/* Friday times row */}
                     {isFridayRow && hasFridayDiff && (
                       <tr key={`fri-times-${dayIdx}`} style={{ background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)" }}>
                         <td style={{ padding: "0.25rem 0.5rem", fontWeight: 700, color: "#92400e", fontSize: "0.72rem", whiteSpace: "nowrap" }}>
@@ -308,21 +314,20 @@ export default function Review() {
                         </td>
                         {fridaySlots.map((slot, i) => (
                           <td key={i} style={{
-                            textAlign: "center", padding: "0.2rem 0.15rem", fontSize: "0.58rem", color: "#92400e",
+                            textAlign: "center", padding: "0.2rem 0.15rem", fontSize: "0.55rem", color: "#92400e",
                             fontWeight: 500, borderLeft: "1px solid #fde68a",
                             background: slot.type === "break" ? "#fcd34d50" : undefined,
                           }}>
                             {slot.start} to {slot.end}
                           </td>
                         ))}
-                        {/* Fill remaining columns if Friday has fewer slots */}
                         {fridaySlots.length < colSlots.length && Array.from({ length: colSlots.length - fridaySlots.length }, (_, i) => (
                           <td key={`fill-${i}`} style={{ borderLeft: "1px solid #fde68a" }}></td>
                         ))}
                       </tr>
                     )}
 
-                    {/* ── Day row ── */}
+                    {/* Day row */}
                     <tr key={dayIdx} style={{ borderBottom: dayIdx < gridDays - 1 ? "1px solid #e2e8f0" : undefined }}>
                       <td style={{
                         padding: "0.5rem 0.5rem", fontWeight: 700, color: "#1e293b", fontSize: "0.85rem",
@@ -333,15 +338,30 @@ export default function Review() {
                       </td>
                       {colSlots.map((slot, colIdx) => {
                         if (slot.type === "break") {
-                          // Break column — grey
-                          const friBreak = isFridayRow && hasFridayDiff && daySlots[colIdx]?.type === "break" ? daySlots[colIdx] : null;
+                          // Break column — show break name and times
+                          const friBreakSlot = isFridayRow && hasFridayDiff && daySlots[colIdx]?.type === "break" ? daySlots[colIdx] : null;
+                          const displayStart = friBreakSlot ? friBreakSlot.start : slot.start;
+                          const displayEnd = friBreakSlot ? friBreakSlot.end : slot.end;
                           return (
                             <td key={colIdx} style={{
                               background: "#e2e8f0", textAlign: "center", borderLeft: "1px solid #cbd5e0",
-                              verticalAlign: "middle", color: "#64748b", fontSize: "0.65rem", fontStyle: "italic", padding: "0.3rem",
+                              verticalAlign: "middle", color: "#64748b", fontSize: "0.62rem", fontStyle: "italic", padding: "0.3rem",
                             }}>
-                              {slot.breakName || "Break"}
-                              {friBreak ? ` ${friBreak.start}–${friBreak.end}` : slot.start ? ` ${slot.start} to ${slot.end}` : ""}
+                              <div>{slot.breakName || "Break"}</div>
+                              <div style={{ fontSize: "0.55rem", color: "#94a3b8" }}>{displayStart} to {displayEnd}</div>
+                            </td>
+                          );
+                        }
+
+                        if (slot.type === "zero") {
+                          // Zero period — empty column (class teacher time)
+                          return (
+                            <td key={colIdx} style={{
+                              background: "#ebf8ff", textAlign: "center", borderLeft: "1px solid #bee3f8",
+                              verticalAlign: "middle", color: "#2b6cb0", fontSize: "0.62rem", fontStyle: "italic", padding: "0.3rem",
+                            }}>
+                              <div style={{ fontWeight: 600, fontSize: "0.65rem" }}>Class Teacher</div>
+                              <div style={{ fontSize: "0.55rem", color: "#4299e1" }}>{slot.start}–{slot.end}</div>
                             </td>
                           );
                         }
