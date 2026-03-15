@@ -302,7 +302,8 @@ export default function Review() {
             <tbody>
               {Array.from({ length: gridDays }, (_, dayIdx) => {
                 const isFridayRow = dayIdx === fridayDayIndex;
-                const daySlots = isFridayRow && hasFridayDiff ? fridaySlots : colSlots;
+                const useSlots = isFridayRow && hasFridayDiff ? fridaySlots : colSlots;
+                const headerCols = colSlots.length;
 
                 return (
                   <>
@@ -310,7 +311,7 @@ export default function Review() {
                     {isFridayRow && hasFridayDiff && (
                       <tr key={`fri-times-${dayIdx}`} style={{ background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)" }}>
                         <td style={{ padding: "0.25rem 0.5rem", fontWeight: 700, color: "#92400e", fontSize: "0.72rem", whiteSpace: "nowrap" }}>
-                          Fri times
+                          {DAY_NAMES[fridayDayIndex] || "Fri"} times
                         </td>
                         {fridaySlots.map((slot, i) => (
                           <td key={i} style={{
@@ -318,16 +319,16 @@ export default function Review() {
                             fontWeight: 500, borderLeft: "1px solid #fde68a",
                             background: slot.type === "break" ? "#fcd34d50" : undefined,
                           }}>
-                            {slot.start} to {slot.end}
+                            {slot.type === "break" ? `${slot.breakName}\n${slot.start}–${slot.end}` : `${slot.start} to ${slot.end}`}
                           </td>
                         ))}
-                        {fridaySlots.length < colSlots.length && Array.from({ length: colSlots.length - fridaySlots.length }, (_, i) => (
+                        {fridaySlots.length < headerCols && Array.from({ length: headerCols - fridaySlots.length }, (_, i) => (
                           <td key={`fill-${i}`} style={{ borderLeft: "1px solid #fde68a" }}></td>
                         ))}
                       </tr>
                     )}
 
-                    {/* Day row */}
+                    {/* Day row — uses this day's OWN slot sequence */}
                     <tr key={dayIdx} style={{ borderBottom: dayIdx < gridDays - 1 ? "1px solid #e2e8f0" : undefined }}>
                       <td style={{
                         padding: "0.5rem 0.5rem", fontWeight: 700, color: "#1e293b", fontSize: "0.85rem",
@@ -336,25 +337,20 @@ export default function Review() {
                       }}>
                         {DAY_NAMES[dayIdx] || `Day ${dayIdx + 1}`}
                       </td>
-                      {colSlots.map((slot, colIdx) => {
+                      {useSlots.map((slot, colIdx) => {
                         if (slot.type === "break") {
-                          // Break column — show break name and times
-                          const friBreakSlot = isFridayRow && hasFridayDiff && daySlots[colIdx]?.type === "break" ? daySlots[colIdx] : null;
-                          const displayStart = friBreakSlot ? friBreakSlot.start : slot.start;
-                          const displayEnd = friBreakSlot ? friBreakSlot.end : slot.end;
                           return (
                             <td key={colIdx} style={{
                               background: "#e2e8f0", textAlign: "center", borderLeft: "1px solid #cbd5e0",
                               verticalAlign: "middle", color: "#64748b", fontSize: "0.62rem", fontStyle: "italic", padding: "0.3rem",
                             }}>
                               <div>{slot.breakName || "Break"}</div>
-                              <div style={{ fontSize: "0.55rem", color: "#94a3b8" }}>{displayStart} to {displayEnd}</div>
+                              <div style={{ fontSize: "0.55rem", color: "#94a3b8" }}>{slot.start} to {slot.end}</div>
                             </td>
                           );
                         }
 
                         if (slot.type === "zero") {
-                          // Zero period — empty column (class teacher time)
                           return (
                             <td key={colIdx} style={{
                               background: "#ebf8ff", textAlign: "center", borderLeft: "1px solid #bee3f8",
@@ -366,7 +362,7 @@ export default function Review() {
                           );
                         }
 
-                        // Period column — look for entry
+                        // Lesson column — look for entry
                         const entry = entries.find(e => e.day_index === dayIdx && e.period_index === slot.periodIndex);
                         const isDragTarget = dragOver?.day === dayIdx && dragOver?.period === slot.periodIndex;
                         const isDragSource = dragEntry?.day_index === dayIdx && dragEntry?.period_index === slot.periodIndex;
@@ -403,6 +399,10 @@ export default function Review() {
                           </td>
                         );
                       })}
+                      {/* Pad shorter rows to match header column count */}
+                      {useSlots.length < headerCols && Array.from({ length: headerCols - useSlots.length }, (_, i) => (
+                        <td key={`pad-${i}`} style={{ borderLeft: "1px solid #e2e8f0" }}></td>
+                      ))}
                     </tr>
                   </>
                 );

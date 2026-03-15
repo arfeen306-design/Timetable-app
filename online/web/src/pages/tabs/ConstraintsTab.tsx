@@ -256,7 +256,7 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
                 {/* Period rows */}
                 {Array.from({ length: numPeriods }, (_, pIdx) => (
                   <tr key={pIdx}>
-                    <td style={{ fontWeight: 500, color: "#334155", fontSize: "0.9rem" }}>Period {pIdx + 1}</td>
+                    <td style={{ fontWeight: 500, color: "#334155", fontSize: "0.9rem" }}>Lesson {pIdx + 1}</td>
                     {days.map((_, dayIdx) => (
                       <td key={dayIdx} style={{ textAlign: "center" }}>
                         <input type="checkbox" checked={isAvailable(dayIdx, pIdx)} onChange={() => toggleSlot(dayIdx, pIdx)}

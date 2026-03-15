@@ -231,13 +231,29 @@ def export_excel(
                 ws.column_dimensions[get_column_letter(ci + 2)].width = 16
             row += 1
 
-            # Day rows
+            # Day rows — each day uses its OWN slot sequence
             for d in range(days):
-                is_fri = d == fri_day_idx
+                is_fri = d == fri_day_idx and fri_cols
+                use_cols = fri_cols if is_fri else cols
+
+                # Friday times row BEFORE friday data
+                if is_fri:
+                    ws.cell(row, 1, f"{DAY_SHORT[d]} times").font = Font(bold=True, size=8, color="92400E")
+                    ws.cell(row, 1).fill = PatternFill("solid", fgColor="FEF3C7")
+                    ws.cell(row, 1).border = thin
+                    for ci, fc in enumerate(fri_cols):
+                        cell = ws.cell(row, ci + 2)
+                        cell.value = f"{fc['label']}\n{fc['sub']}"
+                        cell.font = Font(size=7, color="92400E")
+                        cell.fill = PatternFill("solid", fgColor="FEF3C7")
+                        cell.alignment = cell_align
+                        cell.border = thin
+                    row += 1
+
                 ws.cell(row, 1, DAY_SHORT[d]).font = Font(bold=True)
                 ws.cell(row, 1).alignment = cell_align
                 ws.cell(row, 1).border = thin
-                for ci, col in enumerate(cols):
+                for ci, col in enumerate(use_cols):
                     cell = ws.cell(row, ci + 2)
                     cell.border = thin
                     cell.alignment = cell_align
@@ -264,21 +280,6 @@ def export_excel(
                                 lr, lg, lb = min(ri+60,255), min(gi+60,255), min(bi+60,255)
                                 cell.fill = PatternFill("solid", fgColor=f"{lr:02X}{lg:02X}{lb:02X}")
                             except: pass
-                row += 1
-
-            # Friday times row if different
-            if fri_cols:
-                ws.cell(row, 1, "Fri times").font = Font(bold=True, size=8, color="92400E")
-                ws.cell(row, 1).fill = PatternFill("solid", fgColor="FEF3C7")
-                ws.cell(row, 1).border = thin
-                for ci, fc in enumerate(fri_cols):
-                    if ci < len(cols):
-                        cell = ws.cell(row, ci + 2)
-                        cell.value = fc["sub"]
-                        cell.font = Font(size=7, color="92400E")
-                        cell.fill = PatternFill("solid", fgColor="FEF3C7")
-                        cell.alignment = cell_align
-                        cell.border = thin
                 row += 1
 
             row += 1  # gap between entities
@@ -326,7 +327,7 @@ def export_csv(
 
     buf = io.StringIO()
     writer = csv_mod.writer(buf)
-    writer.writerow(["Type", "Name", "Day", "Period", "Time Slot", "Subject", "Subject Code", "Teacher", "Class", "Room"])
+    writer.writerow(["Type", "Name", "Day", "Lesson", "Time Slot", "Subject", "Subject Code", "Teacher", "Class", "Room"])
 
     # Classes
     by_class: dict[str, list[dict]] = {}
@@ -375,11 +376,25 @@ def _build_pdf_table(entries_group, cols, days, fri_day_idx, fri_cols, label_key
 
     lookup = {(e["day_index"], e["period_index"]): e for e in entries_group}
     header = ["Day"] + [f"{c['label']}\n{c['sub']}" for c in cols]
+    header_len = len(header)
     data = [header]
 
     for d in range(days):
+        is_fri = d == fri_day_idx and fri_cols
+        use_cols = fri_cols if is_fri else cols
+
+        # Friday times row BEFORE friday data
+        if is_fri:
+            fri_row = [f"{DAY_SHORT[d]} times"]
+            for fc in fri_cols:
+                fri_row.append(f"{fc['label']}\n{fc['sub']}")
+            # Pad to header length
+            while len(fri_row) < header_len:
+                fri_row.append("")
+            data.append(fri_row)
+
         row = [DAY_SHORT[d]]
-        for c in cols:
+        for c in use_cols:
             if c["type"] == "break":
                 row.append(c["label"].lower())
             elif c["type"] == "zero":
@@ -396,17 +411,10 @@ def _build_pdf_table(entries_group, cols, days, fri_day_idx, fri_cols, label_key
                     row.append(t)
                 else:
                     row.append("")
+        # Pad to header length
+        while len(row) < header_len:
+            row.append("")
         data.append(row)
-
-    # Friday times row
-    if fri_cols and fri_day_idx < days:
-        fri_row = ["Fri times"]
-        for i, c in enumerate(cols):
-            if i < len(fri_cols):
-                fri_row.append(fri_cols[i]["sub"])
-            else:
-                fri_row.append("")
-        data.insert(fri_day_idx + 1, fri_row)  # insert before Friday data row
 
     return data
 
