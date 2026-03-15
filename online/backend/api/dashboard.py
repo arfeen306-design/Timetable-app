@@ -258,6 +258,82 @@ def get_dashboard(
         ).scalar() or 0
         free_now = max(0, total_teachers - busy_now - on_sub_now - absent_count)
 
+    # ── Live teacher cards (for Live Now panel) ──
+    live_teachers = []
+    if not is_off_day and current_lesson_index >= 0:
+        current_period = current_lesson_index if current_lesson_index >= 0 else 0
+        # Teachers teaching right now
+        busy_entries = (
+            db.query(TimetableEntry, Lesson)
+            .join(Lesson, TimetableEntry.lesson_id == Lesson.id)
+            .filter(
+                TimetableEntry.project_id == project_id,
+                TimetableEntry.day_index == day_index,
+                TimetableEntry.period_index == current_period,
+            )
+            .all()
+        )
+        busy_teacher_ids = set()
+        for entry, lesson in busy_entries:
+            tid = lesson.teacher_id
+            if tid in absent_ids:
+                continue  # absent, skip
+            busy_teacher_ids.add(tid)
+            t = teachers_by_id.get(tid)
+            cls = db.query(SchoolClass).get(lesson.class_id) if lesson.class_id else None
+            subj_name = ""
+            if lesson.subject_id:
+                subj = subjects_map.get(lesson.subject_id)
+                if not subj:
+                    from backend.models.project import Subject as Subj2
+                    subj = db.query(Subj2).get(lesson.subject_id)
+                subj_name = subj.name if subj else ""
+            live_teachers.append({
+                "teacher_id": tid,
+                "name": teacher_name(tid),
+                "initials": teacher_initials(tid),
+                "status": "busy",
+                "class_name": cls.name if cls else "",
+                "subject_name": subj_name,
+                "color": f"hsl({(tid * 67) % 360}, 55%, 45%)",
+            })
+
+        # Teachers on substitution right now
+        sub_teacher_ids = set()
+        for s in subs_today:
+            if s.period_index == current_period:
+                sid = s.sub_teacher_id
+                sub_teacher_ids.add(sid)
+                if sid not in busy_teacher_ids:
+                    absent_t_name = teacher_name(s.absent_teacher_id)
+                    live_teachers.append({
+                        "teacher_id": sid,
+                        "name": teacher_name(sid),
+                        "initials": teacher_initials(sid),
+                        "status": "sub",
+                        "class_name": "",
+                        "subject_name": f"↔ {absent_t_name}",
+                        "color": "#F06830",
+                    })
+
+        # Free teachers (not busy, not on sub, not absent)
+        all_teacher_ids = set(teachers_by_id.keys())
+        free_ids = all_teacher_ids - busy_teacher_ids - sub_teacher_ids - set(absent_ids)
+        for tid in list(free_ids)[:4]:  # max 4 free teachers shown
+            live_teachers.append({
+                "teacher_id": tid,
+                "name": teacher_name(tid),
+                "initials": teacher_initials(tid),
+                "status": "free",
+                "class_name": "",
+                "subject_name": "",
+                "color": "#0EA875",
+            })
+
+        # Sort: busy first, then sub, then free; limit to 8
+        order = {"busy": 0, "sub": 1, "free": 2}
+        live_teachers.sort(key=lambda x: order.get(x["status"], 3))
+        live_teachers = live_teachers[:8]
     # ── Workload overview ──
     workloads = get_all_workloads(db, project_id)
     avg_workload = round(sum(w.get("total", 0) for w in workloads) / len(workloads)) if workloads else 0
@@ -391,4 +467,5 @@ def get_dashboard(
             }
             for a in absences
         ],
+        "live_teachers": live_teachers,
     }

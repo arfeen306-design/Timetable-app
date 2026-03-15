@@ -3,130 +3,91 @@ import { useParams, Link } from "react-router-dom";
 import { api } from "../api";
 
 /* ── Types ── */
+interface LiveTeacher {
+  teacher_id: number; name: string; initials: string;
+  status: "busy" | "free" | "sub"; class_name: string;
+  subject_name: string; color: string;
+}
 interface DashboardData {
-  school_name: string;
-  academic_year: string;
-  week_label: string;
-  week_number: number;
-  date: string;
-  date_formatted: string;
-  day_name: string;
-  time: string;
-  is_off_day: boolean;
-  current_period: number;
-  current_lesson_start: string;
-  current_lesson_end: string;
-  num_periods: number;
+  school_name: string; academic_year: string; week_label: string;
+  week_number: number; date: string; date_formatted: string;
+  day_name: string; time: string; is_off_day: boolean;
+  current_period: number; current_lesson_start: string;
+  current_lesson_end: string; num_periods: number;
   lesson_slots: {
-    type: "lesson" | "break";
-    lesson_number?: number;
-    period_index?: number;
-    label: string;
-    start_time: string;
-    end_time: string;
-    is_current: boolean;
-    is_past: boolean;
+    type: "lesson"|"break"; lesson_number?: number; period_index?: number;
+    label: string; start_time: string; end_time: string;
+    is_current: boolean; is_past: boolean;
   }[];
   stats: {
-    total_teachers: number;
-    present_today: number;
-    absent_today: number;
-    busy_now: number;
-    on_sub_now: number;
-    free_now: number;
-    avg_workload: number;
-    over_max: number;
-    total_classes: number;
-    total_grades: number;
-    total_lessons: number;
-    attendance_pct: number;
+    total_teachers: number; present_today: number; absent_today: number;
+    busy_now: number; on_sub_now: number; free_now: number;
+    avg_workload: number; over_max: number; total_classes: number;
+    total_grades: number; total_lessons: number; attendance_pct: number;
   };
   class_breakdown: { grade: string; sections: number }[];
   unassigned: { teacher_name: string; period_index: number }[];
   substitutions_today: {
-    id: number;
-    period_index: number;
-    sub_teacher_name: string;
-    sub_teacher_initials: string;
-    absent_teacher_name: string;
-    subject_name: string;
-    class_name: string;
-    is_override: boolean;
+    id: number; period_index: number; sub_teacher_name: string;
+    sub_teacher_initials: string; absent_teacher_name: string;
+    subject_name: string; class_name: string; is_override: boolean;
   }[];
   workload_chart: {
-    teacher_name: string;
-    teacher_code: string;
-    initials: string;
-    scheduled: number;
-    substitutions: number;
-    total: number;
-    max: number;
-    utilization_pct: number;
+    teacher_name: string; teacher_code: string; initials: string;
+    scheduled: number; substitutions: number; total: number;
+    max: number; utilization_pct: number;
   }[];
   substitution_history: { date: string; subs: number; absences: number }[];
-  absent_teachers: {
-    id: number;
-    teacher_id: number;
-    teacher_name: string;
-    reason: string;
-  }[];
+  absent_teachers: { id: number; teacher_id: number; teacher_name: string; reason: string }[];
+  live_teachers: LiveTeacher[];
 }
 
-const AVATAR_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#22c55e"];
-function avatarColor(i: number) { return AVATAR_COLORS[i % AVATAR_COLORS.length]; }
-
-function formatTime12(t: string): string {
+/* ── Helpers ── */
+function fmt12(t: string) {
   if (!t) return "";
-  const [hh, mm] = t.split(":").map(Number);
-  const ampm = hh >= 12 ? "PM" : "AM";
-  const h = hh % 12 || 12;
-  return `${h}:${String(mm).padStart(2, "0")} ${ampm}`;
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
-
-function fmtHistDate(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", weekday: "short" });
-}
-
-function countryFlag(cc: string): string {
+function countryFlag(cc: string) {
   if (!cc || cc.length !== 2) return "🌐";
-  const base = 0x1F1E6;
-  return String.fromCodePoint(base + cc.charCodeAt(0) - 65, base + cc.charCodeAt(1) - 65);
+  const b = 0x1F1E6;
+  return String.fromCodePoint(b + cc.charCodeAt(0) - 65, b + cc.charCodeAt(1) - 65);
 }
 
-/* Null-safe default for arrays that may not exist in older API responses */
-const EMPTY_SLOTS: DashboardData["lesson_slots"] = [];
-const EMPTY_BREAKDOWN: DashboardData["class_breakdown"] = [];
-const EMPTY_UNASSIGNED: DashboardData["unassigned"] = [];
-const EMPTY_SUBS: DashboardData["substitutions_today"] = [];
-const EMPTY_CHART: DashboardData["workload_chart"] = [];
-const EMPTY_HISTORY: DashboardData["substitution_history"] = [];
-const EMPTY_ABSENT: DashboardData["absent_teachers"] = [];
+const COLORS = ["#5B4EE8","#0369A1","#7C3AED","#DC2626","#B45309","#0EA875","#F06830","#0891B2"];
+const av = (i: number) => COLORS[i % COLORS.length];
 
+/* ── Null-safe defaults ── */
+const E_SLOTS: DashboardData["lesson_slots"] = [];
+// class_breakdown not needed in current layout
+const E_UN: DashboardData["unassigned"] = [];
+const E_SUB: DashboardData["substitutions_today"] = [];
+const E_WC: DashboardData["workload_chart"] = [];
+const E_SH: DashboardData["substitution_history"] = [];
+const E_AT: DashboardData["absent_teachers"] = [];
+const E_LT: LiveTeacher[] = [];
+
+/* ═══════════════════════════════════════════════════════════════
+   ProjectDashboard — "Schedulr School OS" design
+   ═══════════════════════════════════════════════════════════════ */
 export default function ProjectDashboard() {
   const { projectId } = useParams();
   const pid = Number(projectId);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [clientTime, setClientTime] = useState(() => new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }));
-  const [tz, setTz] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
-  const [countryCode, setCountryCode] = useState("");
+  const [clock, setClock] = useState(() => new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }));
+  // timezone handled via ipapi
+  const [cc, setCc] = useState("");
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setClientTime(new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }));
-    }, 1000);
-    return () => clearInterval(timer);
+    const t = setInterval(() => setClock(new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })), 1000);
+    return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
     fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(3000) })
-      .then(r => r.json())
-      .then(d => {
-        if (d.country_code) setCountryCode(d.country_code);
-        if (d.timezone) setTz(d.timezone);
-      })
-      .catch(() => {});
+      .then(r => r.json()).then(d => { if (d.country_code) setCc(d.country_code); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -135,483 +96,487 @@ export default function ProjectDashboard() {
     const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     api<DashboardData>(`/api/projects/${pid}/dashboard?tz=${encodeURIComponent(clientTz)}`)
       .then(raw => {
-        // Re-compute is_current / is_past client-side using browser's real local time
-        if (raw.lesson_slots && raw.lesson_slots.length > 0) {
+        if (raw.lesson_slots?.length) {
           const now = new Date();
           const nowMin = now.getHours() * 60 + now.getMinutes();
-          let foundCurrent = false;
-          for (const slot of raw.lesson_slots) {
-            const [sh, sm] = slot.start_time.split(":").map(Number);
-            const [eh, em] = slot.end_time.split(":").map(Number);
-            const startMin = sh * 60 + sm;
-            const endMin = eh * 60 + em;
-            slot.is_current = nowMin >= startMin && nowMin < endMin;
-            slot.is_past = nowMin >= endMin;
-            if (slot.is_current && slot.type === "lesson") foundCurrent = true;
+          let found = false;
+          for (const sl of raw.lesson_slots) {
+            const [sh, sm] = sl.start_time.split(":").map(Number);
+            const [eh, em] = sl.end_time.split(":").map(Number);
+            sl.is_current = nowMin >= sh * 60 + sm && nowMin < eh * 60 + em;
+            sl.is_past = nowMin >= eh * 60 + em;
+            if (sl.is_current && sl.type === "lesson") found = true;
           }
-          // If no lesson is current (school is over or not started), clear the live bar
-          if (!foundCurrent) {
-            raw.current_lesson_start = "";
-            raw.current_lesson_end = "";
-          }
+          if (!found) { raw.current_lesson_start = ""; raw.current_lesson_end = ""; }
         }
         return raw;
       })
-      .then(setData)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .then(setData).catch(console.error).finally(() => setLoading(false));
   }, [pid]);
 
   if (loading) return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
       <div className="skeleton skeleton-title" style={{ width: "30%" }} />
-      <div className="stat-cards" style={{ gridTemplateColumns: "repeat(5, 1fr)", marginTop: 16 }}>
-        {[1,2,3,4,5].map(i => <div key={i} className="skeleton skeleton-card" style={{ height: 100 }} />)}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginTop: 16 }}>
+        {[1,2,3,4,5].map(i => <div key={i} className="skeleton skeleton-card" style={{ height: 110 }} />)}
       </div>
-      <div className="skeleton skeleton-card" style={{ height: 340, marginTop: 16 }} />
+      <div className="skeleton skeleton-card" style={{ height: 200, marginTop: 16 }} />
     </div>
   );
-
   if (!data) return <div className="empty-state"><div className="empty-state-title">No data</div></div>;
 
   const d = data;
   const s = d.stats || {} as DashboardData["stats"];
-  const lessonSlots = d.lesson_slots || EMPTY_SLOTS;
-  const classBreakdown = d.class_breakdown || EMPTY_BREAKDOWN;
-  const unassigned = d.unassigned || EMPTY_UNASSIGNED;
-  const subsToday = d.substitutions_today || EMPTY_SUBS;
-  const workloadChart = d.workload_chart || EMPTY_CHART;
-  const subHistory = d.substitution_history || EMPTY_HISTORY;
-  const absentTeachers = d.absent_teachers || EMPTY_ABSENT;
+  const slots = d.lesson_slots || E_SLOTS;
+  // class_breakdown used below in stats card
+  const unassigned = d.unassigned || E_UN;
+  const subs = d.substitutions_today || E_SUB;
+  const wChart = d.workload_chart || E_WC;
+  const subHist = d.substitution_history || E_SH;
+  const absent = d.absent_teachers || E_AT;
+  const liveT = d.live_teachers || E_LT;
+  const chartMax = Math.max(...wChart.map(w => w.total), 1);
+  const curLesson = slots.find(sl => sl.is_current && sl.type === "lesson");
+  const uncovered = unassigned.length;
 
-  const uncoveredCount = unassigned.length;
-  const chartMax = Math.max(...workloadChart.map(w => w.total), 1);
-  const currentLessonLabel = lessonSlots.find(sl => sl.is_current && sl.type === "lesson")?.lesson_number;
+  /* ── Donut SVG calculation ── */
+  const total = s.total_teachers || 1;
+  const pPct = (s.present_today / total);
+  const aPct = (s.absent_today / total);
+  const pDash = pPct * 188.5;
+  const aDash = aPct * 188.5;
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-      {/* ═══ Header ═══ */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+    <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 18 }}>
+
+      {/* ═══ TOPBAR ═══ */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "#fff", borderRadius: 14, padding: "14px 20px",
+        border: "1px solid var(--slate-200)",
+      }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))" }}>Dashboard</h1>
-          <p style={{ margin: "2px 0 0", fontSize: "0.75rem", color: "var(--text-muted, var(--slate-400))", display: "flex", alignItems: "center", gap: 6 }}>
-            {d.school_name} · {d.academic_year || ""} · <span className="live-indicator" /> {d.week_label} · {d.date_formatted}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div style={{
-            padding: "0.35rem 0.75rem", borderRadius: "var(--r-md, var(--radius-md))",
-            background: "var(--surface-card, #fff)", border: "1px solid var(--border-default, var(--slate-200))",
-            display: "flex", alignItems: "center", gap: 8,
-          }}>
-            <span style={{ fontSize: "1rem" }}>{countryCode ? countryFlag(countryCode) : "🌐"}</span>
-            <div>
-              <div style={{ fontSize: "0.82rem", fontWeight: 700, fontFamily: "var(--font-mono)", lineHeight: 1.2 }}>{clientTime}</div>
-              <div style={{ fontSize: "0.5rem", color: "var(--text-muted, var(--slate-400))", fontFamily: "var(--font-mono)" }}>{tz}</div>
-            </div>
+          <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--slate-900)", letterSpacing: "-0.02em" }}>Dashboard</div>
+          <div style={{ fontSize: "0.72rem", color: "var(--slate-400)", marginTop: 1 }}>
+            {d.school_name} · {d.academic_year} · {d.week_label} · <span style={{ color: "var(--color-success, #0EA875)", fontWeight: 600 }}>{d.date_formatted}</span>
           </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{
+            fontFamily: "var(--font-mono)", fontSize: "0.78rem", fontWeight: 500,
+            background: "var(--slate-50)", padding: "5px 12px", borderRadius: 8,
+            border: "1px solid var(--slate-200)", display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <span>{cc ? countryFlag(cc) : "🌐"}</span>
+            <span>{clock}</span>
+          </div>
+          <button className="btn" onClick={() => setShowHistory(!showHistory)} style={{ fontSize: "0.72rem", padding: "5px 12px" }}>
+            {showHistory ? "Close History" : "📅 History"}
+          </button>
         </div>
       </div>
 
-      {/* ═══ Unassigned alert ═══ */}
-      {uncoveredCount > 0 && (
+      {/* ═══ NOTIFICATION BANNER — unassigned ═══ */}
+      {uncovered > 0 && (
         <div style={{
           display: "flex", alignItems: "center", gap: 10,
-          padding: "0.55rem 1rem", borderRadius: "var(--r-md, var(--radius-md))",
-          background: "var(--color-warning-bg, var(--warning-50))", border: "1px solid var(--warning-200, #fde68a)",
-          marginBottom: 16, fontSize: "0.78rem", color: "var(--warning-700, #b45309)",
+          background: "#FFF0F2", border: "2px solid #F8C0C8", borderRadius: 10,
+          padding: "10px 20px", animation: "fadeUp 0.3s ease",
         }}>
-          <span style={{ fontSize: "1rem" }}>⚠</span>
-          <span style={{ flex: 1 }}>
-            <strong>{uncoveredCount} unassigned lesson{uncoveredCount !== 1 ? "s" : ""}</strong> — {
-              unassigned.slice(0, 3).map(u => `${u.teacher_name} (L${u.period_index + 1})`).join(", ")
-            }{unassigned.length > 3 ? ` + ${unassigned.length - 3} more` : ""} {uncoveredCount === 1 ? "has" : "have"} no substitute assigned yet
-          </span>
-          <Link to={`/project/${pid}/substitutions`} className="btn btn-danger" style={{ fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap", padding: "4px 10px" }}>
-            Assign Now
-          </Link>
+          <div style={{
+            width: 20, height: 20, borderRadius: "50%", background: "#E8334A",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "0.6rem", color: "#fff", fontWeight: 700, flexShrink: 0,
+          }}>!</div>
+          <div style={{ flex: 1, fontSize: "0.78rem", fontWeight: 600, color: "#8A1526" }}>
+            {uncovered} unassigned period{uncovered !== 1 ? "s" : ""} <span style={{ fontWeight: 400, color: "#C0293E" }}>
+              — {unassigned.slice(0, 3).map(u => `${u.teacher_name} (L${u.period_index + 1})`).join(", ")}
+              {uncovered > 3 ? ` + ${uncovered - 3} more` : ""}
+            </span>
+          </div>
+          <Link to={`/project/${pid}/substitutions`} style={{
+            padding: "5px 12px", borderRadius: 6, background: "#E8334A", color: "#fff",
+            fontSize: "0.68rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap",
+          }}>Assign Now</Link>
         </div>
       )}
 
-      {/* ═══ Stat Cards (5 across) ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 16 }}>
-        {/* Present Today */}
-        <div className="card anim-card" style={{ padding: "0.85rem 1rem", position: "relative", overflow: "hidden", animationDelay: "0ms" }}>
-          <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(34,197,94,0.08)" }} />
-          <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--color-success, var(--success-600))", textTransform: "uppercase", letterSpacing: "0.06em" }}>PRESENT TODAY</div>
-          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>
+      {/* ═══ STAT CARDS (5 across) ═══ */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12 }}>
+        {/* Present */}
+        <div className="sc" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#0EA875", opacity: 0.08 }} />
+          <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Present today</div>
+          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0EA875", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>
             {d.is_off_day ? "—" : s.present_today}
           </div>
-          <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>
-            {d.is_off_day ? `${d.day_name} — Off day` : `of ${s.total_teachers} teachers`}
-          </div>
-          {!d.is_off_day && (
-            <div style={{ display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)", background: "var(--color-success-bg, var(--success-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-success, var(--success-600))" }}>{s.attendance_pct}% attendance</div>
-          )}
-          {d.is_off_day && (
-            <div style={{ display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)", background: "var(--warning-50)", fontSize: "0.6rem", fontWeight: 700, color: "var(--warning-600)" }}>🏖️ Holiday</div>
-          )}
+          <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>{d.is_off_day ? "Off day" : `of ${s.total_teachers} teachers`}</div>
+          {!d.is_off_day && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#E8FAF4", color: "#076644" }}>{s.attendance_pct}% attendance</div>}
+          {d.is_off_day && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#FEF3DC", color: "#8A5A00" }}>🏖️ Holiday</div>}
         </div>
 
-        {/* Absent Today */}
-        <div className="card anim-card" style={{ padding: "0.85rem 1rem", position: "relative", overflow: "hidden", animationDelay: "50ms" }}>
-          <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(239,68,68,0.08)" }} />
-          <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--color-danger, var(--danger-600))", textTransform: "uppercase", letterSpacing: "0.06em" }}>ABSENT TODAY</div>
-          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>
+        {/* Absent */}
+        <div className="sc" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#E8334A", opacity: 0.08 }} />
+          <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Absent today</div>
+          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#E8334A", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>
             {d.is_off_day ? "—" : s.absent_today}
           </div>
-          <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>
-            {d.is_off_day ? "No school today" : "marked absent"}
-          </div>
-          {!d.is_off_day && uncoveredCount > 0 && (
-            <div style={{ display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)", background: "var(--color-warning-bg, var(--warning-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-warning, var(--warning-600))" }}>{uncoveredCount} uncovered</div>
-          )}
+          <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>{d.is_off_day ? "No school" : "marked this morning"}</div>
+          {!d.is_off_day && uncovered > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#FDEAED", color: "#8A1526" }}>{uncovered} periods uncovered</div>}
         </div>
 
-        {/* Busy Right Now */}
-        <div className="card anim-card" style={{ padding: "0.85rem 1rem", position: "relative", overflow: "hidden", animationDelay: "100ms" }}>
-          <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(99,102,241,0.08)" }} />
-          <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--color-brand, var(--primary-600))", textTransform: "uppercase", letterSpacing: "0.06em" }}>BUSY RIGHT NOW</div>
-          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>
+        {/* Busy */}
+        <div className="sc" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#5B4EE8", opacity: 0.08 }} />
+          <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Busy right now</div>
+          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#5B4EE8", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>
             {d.is_off_day ? "—" : s.busy_now}
           </div>
-          <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>
-            {d.is_off_day ? "No lessons today" : currentLessonLabel ? `in Lesson ${currentLessonLabel}` : "between lessons"}
+          <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>
+            {d.is_off_day ? "No lessons" : curLesson ? `in Lesson ${curLesson.lesson_number}` : "between lessons"}
           </div>
-          {!d.is_off_day && (
-            <div style={{ display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)", background: "var(--color-brand-light, var(--primary-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-brand, var(--primary-600))" }}>{s.free_now} free</div>
-          )}
+          {!d.is_off_day && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#ECEAFD", color: "#3D32B0" }}>{s.free_now} teachers free</div>}
         </div>
 
-        {/* Avg Workload */}
-        <div className="card anim-card" style={{ padding: "0.85rem 1rem", position: "relative", overflow: "hidden", animationDelay: "150ms" }}>
-          <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(245,158,11,0.08)" }} />
-          <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--color-warning, var(--warning-600))", textTransform: "uppercase", letterSpacing: "0.06em" }}>AVG. WORKLOAD</div>
-          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>{s.avg_workload}</div>
-          <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>lessons / week</div>
-          {s.over_max > 0 && (
-            <div style={{ display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)", background: "var(--color-danger-bg, var(--danger-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-danger, var(--danger-600))" }}>{s.over_max} over max</div>
-          )}
+        {/* Workload */}
+        <div className="sc" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#E8A020", opacity: 0.08 }} />
+          <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Avg. workload</div>
+          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#E8A020", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>{s.avg_workload}</div>
+          <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>lessons this week</div>
+          {s.over_max > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#FDEAED", color: "#8A1526" }}>{s.over_max} over max limit</div>}
         </div>
 
-        {/* Total Classes */}
-        <div className="card anim-card" style={{ padding: "0.85rem 1rem", position: "relative", overflow: "hidden", animationDelay: "200ms" }}>
-          <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(6,182,212,0.08)" }} />
-          <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#0891B2", textTransform: "uppercase", letterSpacing: "0.06em" }}>TOTAL CLASSES</div>
-          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>{s.total_classes}</div>
-          <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>Sections across {s.total_grades || 0} grade{(s.total_grades || 0) !== 1 ? "s" : ""}</div>
-          {classBreakdown.length > 0 && (
-            <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 3 }}>
-              {classBreakdown.slice(0, 4).map(g => (
-                <span key={g.grade} style={{ padding: "0px 6px", borderRadius: "var(--r-pill, 999px)", background: "#ecfeff", fontSize: "0.52rem", fontWeight: 700, color: "#0891B2" }}>
-                  {g.grade}: {g.sections}
-                </span>
-              ))}
-              {classBreakdown.length > 4 && (
-                <span style={{ fontSize: "0.52rem", fontWeight: 600, color: "var(--slate-400)" }}>+{classBreakdown.length - 4}</span>
-              )}
-            </div>
-          )}
+        {/* Classes */}
+        <div className="sc" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#F06830", opacity: 0.08 }} />
+          <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Total classes</div>
+          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#F06830", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>{s.total_classes}</div>
+          <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>{s.total_grades || 0} grades</div>
+          <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#FEF0E8", color: "#8A3200" }}>{s.total_lessons} lessons / week</div>
         </div>
       </div>
 
-      {/* ═══ Live Lesson Bar ═══ */}
+      {/* ═══ LIVE NOW PANEL — dark navy ═══ */}
       {d.is_off_day ? (
-        <div className="card anim-card" style={{
-          padding: "0.8rem 1rem", marginBottom: 16, animationDelay: "250ms",
-          background: "linear-gradient(135deg, var(--surface-card, #fff) 0%, #fefce8 100%)",
-          border: "1px solid var(--warning-200, #fde68a)",
+        <div style={{
+          background: "#0D1117", borderRadius: 14, padding: "18px 20px",
+          position: "relative", overflow: "hidden",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(91,78,232,0.15) 0%, transparent 60%)" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
             <span style={{ fontSize: "1.2rem" }}>🏖️</span>
             <div>
-              <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--warning-700, #92400e)" }}>
-                {d.day_name} — No school today
-              </div>
-              <div style={{ fontSize: "0.68rem", color: "var(--warning-600, #d97706)" }}>
-                Enjoy your day off! Dashboard stats will resume on the next working day.
-              </div>
+              <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#fff" }}>{d.day_name} — No school today</div>
+              <div style={{ fontSize: "0.68rem", color: "#4A5568" }}>Dashboard stats will resume on the next working day.</div>
             </div>
           </div>
         </div>
       ) : (
-        <div className="card anim-card" style={{ padding: "0.7rem 1rem", marginBottom: 16, animationDelay: "250ms" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{
+          background: "#0D1117", borderRadius: 14, position: "relative", overflow: "hidden",
+        }}>
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(91,78,232,0.15) 0%, transparent 60%)" }} />
+
+          {/* Live header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span className="live-indicator" />
-              <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--text-primary)" }}>
-                Live right now {currentLessonLabel ? `— Lesson ${currentLessonLabel}` : ""}
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#fff" }}>
+                Live right now {curLesson ? `— Lesson ${curLesson.lesson_number}` : ""}
               </span>
               {d.current_lesson_start && (
                 <span style={{
-                  padding: "2px 10px", borderRadius: "var(--r-pill, 999px)",
-                  background: "var(--color-brand-light, var(--primary-50))", border: "1px solid var(--primary-200, #c7d2fe)",
-                  fontSize: "0.62rem", fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-brand)",
-                }}>{formatTime12(d.current_lesson_start)} – {formatTime12(d.current_lesson_end)}</span>
+                  background: "rgba(91,78,232,0.4)", color: "#C4BEFF",
+                  fontSize: "0.68rem", fontWeight: 700, padding: "3px 10px",
+                  borderRadius: 20, fontFamily: "var(--font-mono)",
+                }}>{fmt12(d.current_lesson_start)} – {fmt12(d.current_lesson_end)}</span>
               )}
             </div>
-            <div style={{ fontSize: "0.62rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+            <div style={{ fontSize: "0.68rem", color: "#4A5568", fontFamily: "var(--font-mono)" }}>
               {s.busy_now} busy · {s.free_now} free · {s.on_sub_now} on sub
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 2 }}>
-            {lessonSlots.map((slot, i) => {
-              const isBreak = slot.type === "break";
-              const isCurrent = slot.is_current;
-              const isPast = slot.is_past;
-              return (
-                <div key={i} style={{
-                  flex: isBreak ? 0.3 : 1,
-                  height: isBreak ? 28 : 36,
-                  borderRadius: 4,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: isBreak ? "0.52rem" : "0.68rem",
-                  fontWeight: 700, position: "relative",
-                  background: isCurrent ? "var(--color-brand, var(--primary-500))"
-                    : isPast ? "var(--slate-200)" : "var(--slate-100)",
-                  color: isCurrent ? "#fff" : isPast ? "var(--slate-400)" : "var(--slate-600)",
-                  transition: "all 0.3s",
+          {/* Live teacher cards */}
+          {liveT.length > 0 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "0 14px 14px", position: "relative" }}>
+              {liveT.map((t, i) => (
+                <div key={t.teacher_id || i} style={{
+                  borderRadius: 10, padding: "10px 12px",
+                  background: t.status === "free" ? "rgba(14,168,117,0.1)" : t.status === "sub" ? "rgba(240,104,48,0.15)" : "rgba(255,255,255,0.06)",
+                  border: `1px solid ${t.status === "free" ? "rgba(14,168,117,0.2)" : t.status === "sub" ? "rgba(240,104,48,0.25)" : "rgba(255,255,255,0.08)"}`,
                 }}>
-                  {isBreak ? "☕" : `L${slot.lesson_number}`}
-                  {isCurrent && !isBreak && (
-                    <span style={{
-                      position: "absolute", top: 2, right: 2,
-                      width: 5, height: 5, borderRadius: "50%",
-                      background: "#fff",
-                      animation: "livePulse 1.5s infinite",
-                    }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                    <div style={{
+                      width: 26, height: 26, borderRadius: "50%", background: t.color,
+                      fontSize: "0.55rem", fontWeight: 700, color: "#fff",
+                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    }}>{t.initials}</div>
+                    <div>
+                      <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "#E8ECF4" }}>{t.name}</div>
+                      <div style={{
+                        fontSize: "0.62rem", marginTop: 1,
+                        color: t.status === "free" ? "#0EA875" : t.status === "sub" ? "#F06830" : "#6B7A99",
+                      }}>
+                        {t.status === "busy" ? "Teaching" : t.status === "sub" ? "On substitution" : "Free this period"}
+                      </div>
+                    </div>
+                  </div>
+                  {t.status === "busy" && (
+                    <div style={{ fontSize: "0.6rem", color: "#4A5568", display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{
+                        background: "rgba(91,78,232,0.25)", color: "#9B8FF5",
+                        fontSize: "0.58rem", fontWeight: 600, padding: "1px 6px", borderRadius: 4,
+                        fontFamily: "var(--font-mono)",
+                      }}>{t.class_name}</span>
+                      <span>{t.subject_name}</span>
+                    </div>
+                  )}
+                  {t.status === "sub" && (
+                    <div style={{ fontSize: "0.6rem", color: "#F06830", fontWeight: 600 }}>{t.subject_name}</div>
+                  )}
+                  {t.status === "free" && (
+                    <div style={{ fontSize: "0.6rem", color: "#0EA875", fontWeight: 600 }}>Available for substitution</div>
                   )}
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            /* Fallback: lesson slot bar if no live teachers */
+            <div style={{ padding: "0 14px 14px", position: "relative" }}>
+              <div style={{ display: "flex", gap: 2 }}>
+                {slots.map((sl, i) => (
+                  <div key={i} style={{
+                    flex: sl.type === "break" ? 0.3 : 1, height: sl.type === "break" ? 24 : 32,
+                    borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: sl.type === "break" ? "0.52rem" : "0.62rem", fontWeight: 700,
+                    background: sl.is_current ? "#5B4EE8" : sl.is_past ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+                    color: sl.is_current ? "#fff" : sl.is_past ? "#4A5568" : "#6B7A99",
+                    border: sl.is_current ? "none" : "1px solid rgba(255,255,255,0.06)",
+                  }}>
+                    {sl.type === "break" ? "☕" : `L${sl.lesson_number}`}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
-          <div style={{ display: "flex", gap: 2, marginTop: 3 }}>
-            {lessonSlots.filter(sl => sl.type === "lesson").map((slot) => (
-              <div key={slot.lesson_number} style={{
-                flex: 1, textAlign: "center",
-                fontSize: "0.48rem", color: slot.is_current ? "var(--color-brand)" : "var(--text-muted)",
-                fontFamily: "var(--font-mono)", fontWeight: slot.is_current ? 700 : 400,
+      {/* ═══ UNASSIGNED ALERTS CARD ═══ */}
+      {uncovered > 0 && !d.is_off_day && (
+        <div style={{ background: "#fff", border: "1px solid #FCCDD3", borderRadius: 14, overflow: "hidden" }}>
+          <div style={{
+            background: "#FFF0F2", padding: "12px 18px", display: "flex", alignItems: "center", gap: 8,
+            borderBottom: "1px solid #FCCDD3",
+          }}>
+            <div style={{
+              width: 18, height: 18, borderRadius: "50%", background: "#E8334A",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "0.55rem", color: "#fff", fontWeight: 700, flexShrink: 0,
+            }}>!</div>
+            <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#8A1526" }}>Unassigned periods — absent teacher classes with no substitute</div>
+            <div style={{
+              marginLeft: "auto", background: "#E8334A", color: "#fff",
+              fontSize: "0.6rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+            }}>{uncovered} urgent</div>
+          </div>
+          <div>
+            {unassigned.map((u, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 18px", borderBottom: i < unassigned.length - 1 ? "1px solid #FEE8EB" : "none",
               }}>
-                {slot.start_time}–{slot.end_time}
+                <span style={{
+                  fontFamily: "var(--font-mono)", fontSize: "0.68rem", fontWeight: 700,
+                  background: "#FDEAED", color: "#E8334A", padding: "2px 7px", borderRadius: 4,
+                  whiteSpace: "nowrap",
+                }}>L{u.period_index + 1}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--slate-900)" }}>{u.teacher_name}</div>
+                  <div style={{ fontSize: "0.68rem", color: "var(--slate-400)" }}>Absent — no substitute assigned</div>
+                </div>
+                <Link to={`/project/${pid}/substitutions`} style={{
+                  padding: "5px 12px", background: "#5B4EE8", color: "#fff", border: "none", borderRadius: 6,
+                  fontSize: "0.68rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap",
+                }}>Assign</Link>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* ═══ Three-column grid ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-        {/* ── LEFT: Weekly Workload chart ── */}
-        <div className="card anim-card" style={{ padding: "1rem", animationDelay: "300ms" }}>
-          <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--text-primary)", marginBottom: 4 }}>
-            Weekly workload — lessons per teacher
-          </div>
-          <div style={{ fontSize: "0.62rem", color: "var(--text-muted, var(--slate-400))", marginBottom: 16, display: "flex", gap: 12 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--color-brand, var(--primary-500))", display: "inline-block" }} /> Scheduled
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--color-sub, #F97316)", display: "inline-block" }} /> Sub
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--color-danger, var(--danger-500))", display: "inline-block" }} /> Over
-            </span>
-          </div>
+      {/* ═══ BODY GRID: Chart + Subs + Activity ═══ */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14 }}>
 
-          {workloadChart.length > 0 ? (
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 140, marginBottom: 8 }}>
-              {workloadChart.map((w, i) => {
-                const schedH = (w.scheduled / chartMax) * 130;
-                const subH = (w.substitutions / chartMax) * 130;
-                const isOver = w.utilization_pct > 100;
-                return (
-                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                    <span style={{ fontSize: "0.55rem", fontWeight: 700, fontFamily: "var(--font-mono)", color: isOver ? "var(--color-danger)" : "var(--text-muted)" }}>
-                      {w.total}
-                    </span>
-                    <div style={{ width: "100%", display: "flex", flexDirection: "column-reverse", borderRadius: "3px 3px 0 0", overflow: "hidden" }}>
-                      <div className="wl-bar" style={{ height: schedH, background: isOver ? "var(--color-danger, var(--danger-500))" : "var(--color-brand, var(--primary-500))" }} />
-                      {w.substitutions > 0 && (
-                        <div className="wl-bar" style={{ height: subH, background: "var(--color-sub, #F97316)", animationDelay: `${i * 50}ms` }} />
-                      )}
+        {/* ── Workload Chart ── */}
+        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
+            <div>
+              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Weekly workload — lessons per teacher</div>
+              <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Top 10 · orange = sub · red = over</div>
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              {[{ c: "#5B4EE8", l: "Sched" }, { c: "#F06830", l: "Sub" }, { c: "#E8334A", l: "Over" }].map(x => (
+                <span key={x.l} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.6rem", color: "var(--slate-400)" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: x.c, display: "inline-block" }} />{x.l}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div style={{ padding: "16px 18px 12px" }}>
+            {wChart.length > 0 ? (
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 5, height: 100 }}>
+                {wChart.map((w, i) => {
+                  const h = (w.total / chartMax) * 90;
+                  const isOver = w.utilization_pct > 100;
+                  return (
+                    <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flex: 1 }}>
+                      <span style={{ fontSize: "0.55rem", fontWeight: 700, fontFamily: "var(--font-mono)", color: isOver ? "#E8334A" : "var(--slate-400)" }}>{w.total}</span>
+                      <div style={{ width: "100%", borderRadius: "4px 4px 0 0", overflow: "hidden", display: "flex", flexDirection: "column-reverse" }}>
+                        <div className="wl-bar" style={{ height: Math.max(h - (w.substitutions / chartMax * 90), 4), background: isOver ? "#E8334A" : "#5B4EE8" }} />
+                        {w.substitutions > 0 && <div className="wl-bar" style={{ height: (w.substitutions / chartMax * 90), background: "#F06830" }} />}
+                      </div>
+                      <span style={{ fontSize: "0.5rem", color: "var(--slate-400)", fontFamily: "var(--font-mono)" }}>{w.initials}</span>
                     </div>
-                    <span style={{ fontSize: "0.55rem", fontWeight: 600, color: "var(--text-muted)" }}>{w.initials}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "0.78rem" }}>
-              Generate a timetable to see workload data
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ height: 100, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--slate-400)", fontSize: "0.78rem" }}>Generate a timetable to see data</div>
+            )}
+          </div>
 
-          {/* Teacher status summary */}
-          <div style={{ borderTop: "1px solid var(--border-default, var(--slate-200))", paddingTop: 12, marginTop: 4 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: "50%",
-                background: `conic-gradient(var(--color-success) 0% ${d.is_off_day ? 0 : s.attendance_pct}%, var(--color-danger-bg, var(--danger-100)) ${d.is_off_day ? 0 : s.attendance_pct}% 100%)`,
-                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-              }}>
-                <div style={{
-                  width: 38, height: 38, borderRadius: "50%", background: "var(--surface-card, #fff)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "0.55rem", fontWeight: 800, flexDirection: "column", lineHeight: 1.2,
-                }}>
-                  <span style={{ fontSize: "0.85rem", fontWeight: 800 }}>{s.total_teachers}</span>
-                  <span style={{ fontSize: "0.48rem", color: "var(--text-muted)" }}>teachers</span>
+          {/* Donut */}
+          <div style={{ borderTop: "1px solid var(--slate-100)", display: "flex", alignItems: "center", gap: 16, padding: "12px 18px" }}>
+            <svg width="80" height="80" viewBox="0 0 80 80" style={{ flexShrink: 0 }}>
+              <circle cx="40" cy="40" r="30" fill="none" stroke="#E4E8F2" strokeWidth="12" />
+              <circle cx="40" cy="40" r="30" fill="none" stroke="#0EA875" strokeWidth="12"
+                strokeDasharray={`${d.is_off_day ? 0 : pDash} ${188.5 - (d.is_off_day ? 0 : pDash)}`}
+                strokeDashoffset="0" transform="rotate(-90 40 40)" />
+              <circle cx="40" cy="40" r="30" fill="none" stroke="#E8334A" strokeWidth="12"
+                strokeDasharray={`${d.is_off_day ? 0 : aDash} ${188.5 - (d.is_off_day ? 0 : aDash)}`}
+                strokeDashoffset={`${-(d.is_off_day ? 0 : pDash)}`} transform="rotate(-90 40 40)" />
+              <text x="40" y="37" textAnchor="middle" fontSize="13" fontWeight="800" fill="#0D1117" fontFamily="var(--font-mono)">{s.total_teachers}</text>
+              <text x="40" y="50" textAnchor="middle" fontSize="9" fill="#6B7594">teachers</text>
+            </svg>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {[
+                { c: "#0EA875", l: "Present", v: d.is_off_day ? "—" : s.present_today },
+                { c: "#E8334A", l: "Absent", v: d.is_off_day ? "—" : s.absent_today },
+                { c: "#5B4EE8", l: curLesson ? `Busy L${curLesson.lesson_number}` : "Busy", v: d.is_off_day ? "—" : s.busy_now },
+                { c: "#0EA875", l: curLesson ? `Free L${curLesson.lesson_number}` : "Free", v: d.is_off_day ? "—" : s.free_now },
+              ].map(x => (
+                <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 3, background: x.c, flexShrink: 0 }} />
+                  <span style={{ fontSize: "0.75rem", color: "var(--slate-500)", fontWeight: 500 }}>{x.l}</span>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--slate-900)", marginLeft: "auto", fontFamily: "var(--font-mono)" }}>{x.v}</span>
                 </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 16px", fontSize: "0.68rem" }}>
-                <span><span style={{ color: "var(--color-success)", fontWeight: 700 }}>●</span> Present <strong>{d.is_off_day ? "—" : s.present_today}</strong></span>
-                <span><span style={{ color: "var(--color-danger)", fontWeight: 700 }}>●</span> Absent <strong>{d.is_off_day ? "—" : s.absent_today}</strong></span>
-                <span><span style={{ color: "var(--color-brand)", fontWeight: 700 }}>●</span> Busy {currentLessonLabel ? `L${currentLessonLabel}` : ""} <strong>{d.is_off_day ? "—" : s.busy_now}</strong></span>
-                <span><span style={{ color: "#22c55e", fontWeight: 700 }}>●</span> Free {currentLessonLabel ? `L${currentLessonLabel}` : ""} <strong>{d.is_off_day ? "—" : s.free_now}</strong></span>
-              </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* ── MIDDLE: Substitutions Today + History ── */}
-        <div className="card anim-card" style={{ padding: "1rem", animationDelay: "350ms" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        {/* ── Substitutions ── */}
+        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
-              <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--text-primary)" }}>
-                {showHistory ? "Substitution History" : "Substitutions today"}
-              </div>
-              <div style={{ fontSize: "0.62rem", color: "var(--text-muted)" }}>
-                {showHistory ? "Last 30 days" : "Assigned coverage for absent teachers"}
-              </div>
+              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>{showHistory ? "Substitution History" : "Substitutions today"}</div>
+              <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>{showHistory ? "Last 30 days" : "Assigned coverage"}</div>
             </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <button onClick={() => setShowHistory(!showHistory)}
-                className="btn" style={{ fontSize: "0.58rem", padding: "2px 8px", fontWeight: 700 }}>
-                {showHistory ? "Today" : "📅 History"}
-              </button>
-              <span style={{
-                padding: "2px 10px", borderRadius: "var(--r-pill, 999px)",
-                background: "var(--color-success-bg, var(--success-50))", border: "1px solid var(--success-200, #bbf7d0)",
-                fontSize: "0.6rem", fontWeight: 700, color: "var(--color-success)",
-              }}>{subsToday.length} assigned</span>
-            </div>
+            <span style={{ fontSize: "0.68rem", fontWeight: 700, background: "#FEF0E8", color: "#8A3200", padding: "3px 9px", borderRadius: 20 }}>{subs.length} assigned</span>
           </div>
 
           {showHistory ? (
             <div style={{ maxHeight: 280, overflowY: "auto" }}>
-              {subHistory.length === 0 ? (
-                <div style={{ color: "var(--text-muted)", fontSize: "0.78rem", padding: "1.5rem 0", textAlign: "center" }}>
-                  No substitutions in the last 30 days
-                </div>
-              ) : subHistory.map((h) => (
-                <div key={h.date} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "0.4rem 0",
-                  borderBottom: "1px solid var(--border-subtle, var(--slate-100))",
-                }}>
-                  <div style={{
-                    width: 30, height: 30, borderRadius: 6, flexShrink: 0,
-                    background: h.date === d.date ? "var(--color-brand-light, var(--primary-50))" : "var(--slate-50)",
-                    border: h.date === d.date ? "1px solid var(--primary-200)" : "1px solid var(--slate-200)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "0.55rem", fontWeight: 700, fontFamily: "var(--font-mono)",
-                    color: h.date === d.date ? "var(--color-brand)" : "var(--text-muted)",
-                  }}>{new Date(h.date + "T00:00:00").getDate()}</div>
+              {subHist.length === 0 ? (
+                <div style={{ padding: "2rem", textAlign: "center", color: "var(--slate-400)", fontSize: "0.78rem" }}>No history</div>
+              ) : subHist.map(h => (
+                <div key={h.date} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 18px", borderBottom: "1px solid var(--slate-50)" }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--text-primary)" }}>{fmtHistDate(h.date)}</div>
-                    <div style={{ fontSize: "0.6rem", color: "var(--text-muted)" }}>
-                      {h.absences} absent · {h.subs} substitution{h.subs !== 1 ? "s" : ""}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    {h.absences > 0 && <span style={{ padding: "1px 6px", borderRadius: "var(--r-pill, 999px)", background: "var(--danger-50)", fontSize: "0.55rem", fontWeight: 700, color: "var(--danger-600)" }}>{h.absences}A</span>}
-                    {h.subs > 0 && <span style={{ padding: "1px 6px", borderRadius: "var(--r-pill, 999px)", background: "var(--primary-50)", fontSize: "0.55rem", fontWeight: 700, color: "var(--primary-600)" }}>{h.subs}S</span>}
+                    <div style={{ fontWeight: 600, fontSize: "0.72rem" }}>{new Date(h.date + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", weekday: "short" })}</div>
+                    <div style={{ fontSize: "0.6rem", color: "var(--slate-400)" }}>{h.absences} absent · {h.subs} sub{h.subs !== 1 ? "s" : ""}</div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {subsToday.length === 0 ? (
-                <div style={{ color: "var(--text-muted)", fontSize: "0.78rem", padding: "1.5rem 0", textAlign: "center" }}>
-                  No substitutions assigned yet
-                </div>
-              ) : subsToday.map((sub, i) => (
-                <div key={sub.id} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "0.5rem 0",
-                  borderBottom: i < subsToday.length - 1 ? "1px solid var(--border-subtle, var(--slate-100))" : "none",
-                }}>
+            <div>
+              {subs.length === 0 ? (
+                <div style={{ padding: "2rem", textAlign: "center", color: "var(--slate-400)", fontSize: "0.78rem" }}>No substitutions assigned</div>
+              ) : subs.map((sub, i) => (
+                <div key={sub.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 18px", borderBottom: i < subs.length - 1 ? "1px solid var(--slate-50)" : "none" }}>
                   <div style={{
-                    width: 32, height: 32, borderRadius: "50%",
-                    background: avatarColor(i), color: "#fff",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "0.6rem", fontWeight: 700, flexShrink: 0,
+                    width: 30, height: 30, borderRadius: "50%", background: av(i),
+                    fontSize: "0.6rem", fontWeight: 700, color: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                   }}>{sub.sub_teacher_initials}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: "0.78rem", color: "var(--text-primary)" }}>{sub.sub_teacher_name}</div>
-                    <div style={{ fontSize: "0.62rem", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      Covering {sub.absent_teacher_name} · {sub.subject_name} · {sub.class_name}
+                    <div style={{ fontSize: "0.78rem", fontWeight: 600 }}>{sub.sub_teacher_name}</div>
+                    <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 2 }}>
+                      Covering <strong>{sub.absent_teacher_name}</strong> · {sub.subject_name} · {sub.class_name}
                     </div>
                   </div>
                   <span style={{
-                    padding: "2px 8px", borderRadius: "var(--r-pill, 999px)",
-                    background: sub.is_override ? "var(--color-danger-bg, var(--danger-50))" : "var(--color-brand-light, var(--primary-50))",
-                    border: sub.is_override ? "1px solid var(--danger-200)" : "1px solid var(--primary-200, #c7d2fe)",
-                    fontSize: "0.58rem", fontWeight: 700,
-                    color: sub.is_override ? "var(--color-danger)" : "var(--color-brand)",
+                    fontFamily: "var(--font-mono)", fontSize: "0.6rem", fontWeight: 700,
+                    background: "#ECEAFD", color: "#3D32B0", padding: "2px 7px", borderRadius: 4,
                   }}>L{sub.period_index + 1}</span>
                 </div>
               ))}
-            </div>
-          )}
-
-          {!showHistory && uncoveredCount > 0 && (
-            <div style={{
-              marginTop: 10, padding: "6px 10px", borderRadius: "var(--r-md, var(--radius-md))",
-              background: "var(--color-warning-bg, var(--warning-50))", border: "1px solid var(--warning-200, #fde68a)",
-              fontSize: "0.65rem", fontWeight: 600, color: "var(--color-warning)",
-            }}>
-              🟡 {uncoveredCount} lesson{uncoveredCount !== 1 ? "s" : ""} still unassigned — <Link to={`/project/${pid}/substitutions`} style={{ fontWeight: 700 }}>Assign Now</Link>
+              {uncovered > 0 && (
+                <div style={{ padding: "10px 18px", background: "#FDEAED", display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#E8334A" }} />
+                  <span style={{ fontSize: "0.68rem", color: "#8A1526", fontWeight: 600 }}>
+                    {uncovered} period{uncovered !== 1 ? "s" : ""} still unassigned
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* ── RIGHT: Recent Activity ── */}
-        <div className="card anim-card" style={{ padding: "1rem", animationDelay: "400ms" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        {/* ── Activity Feed ── */}
+        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
-              <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--text-primary)" }}>Recent activity</div>
-              <div style={{ fontSize: "0.62rem", color: "var(--text-muted)" }}>Live updates</div>
+              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Recent activity</div>
+              <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Live updates</div>
             </div>
             <span className="live-indicator" />
           </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {subsToday.map((sub) => (
-              <div key={`sub-${sub.id}`} style={{ display: "flex", gap: 10, fontSize: "0.72rem" }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--color-success)", flexShrink: 0, marginTop: 5 }} />
+          <div>
+            {subs.map(sub => (
+              <div key={`s${sub.id}`} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 18px", borderBottom: "1px solid var(--slate-50)" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#0EA875", flexShrink: 0, marginTop: 3 }} />
+                  <div style={{ width: 1, background: "var(--slate-200)", flex: 1, minHeight: 14 }} />
+                </div>
                 <div>
-                  <div><strong>{sub.sub_teacher_name}</strong> assigned L{sub.period_index + 1} sub for {sub.absent_teacher_name}</div>
-                  <div style={{ fontSize: "0.6rem", color: "var(--text-muted)" }}>Today</div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--slate-600)", lineHeight: 1.5 }}>
+                    <strong style={{ color: "var(--slate-900)" }}>{sub.sub_teacher_name}</strong> assigned L{sub.period_index + 1} for {sub.absent_teacher_name}
+                  </div>
+                  <div style={{ fontSize: "0.62rem", color: "var(--slate-400)", marginTop: 2, fontFamily: "var(--font-mono)" }}>Today</div>
                 </div>
               </div>
             ))}
-            {absentTeachers.map((a) => (
-              <div key={`abs-${a.id}`} style={{ display: "flex", gap: 10, fontSize: "0.72rem" }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--color-sub, #F97316)", flexShrink: 0, marginTop: 5 }} />
+            {absent.map(a => (
+              <div key={`a${a.id}`} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 18px", borderBottom: "1px solid var(--slate-50)" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#E8334A", flexShrink: 0, marginTop: 3 }} />
+                  <div style={{ width: 1, background: "var(--slate-200)", flex: 1, minHeight: 14 }} />
+                </div>
                 <div>
-                  <div><strong>{a.teacher_name}</strong> marked absent · {a.reason || "No reason"}</div>
-                  <div style={{ fontSize: "0.6rem", color: "var(--text-muted)" }}>Today</div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--slate-600)", lineHeight: 1.5 }}>
+                    <strong style={{ color: "var(--slate-900)" }}>{a.teacher_name}</strong> marked absent · {a.reason || "No reason"}
+                  </div>
+                  <div style={{ fontSize: "0.62rem", color: "var(--slate-400)", marginTop: 2, fontFamily: "var(--font-mono)" }}>Today</div>
                 </div>
               </div>
             ))}
-            {subsToday.length === 0 && absentTeachers.length === 0 && (
-              <div style={{ color: "var(--text-muted)", fontSize: "0.78rem", padding: "1rem 0", textAlign: "center" }}>
-                No activity today yet
-              </div>
+            {subs.length === 0 && absent.length === 0 && (
+              <div style={{ padding: "2rem", textAlign: "center", color: "var(--slate-400)", fontSize: "0.78rem" }}>No activity today</div>
             )}
           </div>
         </div>
