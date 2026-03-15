@@ -12,7 +12,11 @@ from backend.models.teacher_model import Teacher
 from backend.models.lesson_model import Lesson
 from backend.models.timetable_model import TimetableEntry
 from backend.models.substitution_model import TeacherAbsence, Substitution
-from backend.services.workload_service import get_free_teachers
+from backend.models.project import Subject
+from backend.models.class_model import SchoolClass
+from backend.models.room_model import Room
+from backend.services.workload_service import get_free_teachers, get_teacher_workload
+from backend.services.week_utils import get_or_create_week, resolve_week_number
 
 
 router = APIRouter()
@@ -61,12 +65,14 @@ def mark_absent(
             absence = TeacherAbsence(
                 project_id=project_id, teacher_id=tid,
                 date=target_date, reason=data.reason,
+                week_number=resolve_week_number(target_date),
             )
             db.add(absence)
             created.append(tid)
     db.commit()
 
     # Return the absent teachers' scheduled slots for that day
+    # Join Subject, Class, Room to return names for the UI
     slots = (
         db.query(
             TimetableEntry.id.label("entry_id"),
@@ -76,8 +82,14 @@ def mark_absent(
             Lesson.teacher_id,
             Lesson.subject_id,
             Lesson.class_id,
+            Subject.name.label("subject_name"),
+            SchoolClass.name.label("class_name"),
+            Room.name.label("room_name"),
         )
         .join(Lesson, TimetableEntry.lesson_id == Lesson.id)
+        .outerjoin(Subject, Lesson.subject_id == Subject.id)
+        .outerjoin(SchoolClass, Lesson.class_id == SchoolClass.id)
+        .outerjoin(Room, TimetableEntry.room_id == Room.id)
         .filter(
             TimetableEntry.project_id == project_id,
             TimetableEntry.day_index == day_index,
@@ -101,6 +113,9 @@ def mark_absent(
                 "teacher_id": s.teacher_id,
                 "subject_id": s.subject_id,
                 "class_id": s.class_id,
+                "subject_name": s.subject_name or "",
+                "class_name": s.class_name or "",
+                "room_name": s.room_name or "",
             }
             for s in slots
         ],
@@ -137,12 +152,16 @@ def assign_substitute(
     """Assign a substitute teacher for a specific period."""
     target_date = date.fromisoformat(data.date)
     day_index = target_date.weekday()
+    wk_number = resolve_week_number(target_date)
 
     # Verify both teachers exist
     absent = db.query(Teacher).filter(Teacher.id == data.absent_teacher_id, Teacher.project_id == project_id).first()
     sub = db.query(Teacher).filter(Teacher.id == data.sub_teacher_id, Teacher.project_id == project_id).first()
     if not absent or not sub:
         raise HTTPException(404, "Teacher not found")
+
+    # Ensure academic week exists
+    get_or_create_week(db, project_id, target_date)
 
     # Check if substitution already exists for this slot
     existing = db.query(Substitution).filter(
@@ -155,12 +174,15 @@ def assign_substitute(
         # Update existing
         existing.sub_teacher_id = data.sub_teacher_id
         existing.notes = data.notes
+        existing.week_number = wk_number
         db.commit()
-        return {"ok": True, "id": existing.id, "message": "Substitution updated"}
+        workload = get_teacher_workload(db, project_id, data.sub_teacher_id)
+        return {"ok": True, "id": existing.id, "message": "Substitution updated", "sub_workload": workload}
 
     substitution = Substitution(
         project_id=project_id,
         date=target_date,
+        week_number=wk_number,
         day_index=day_index,
         period_index=data.period_index,
         absent_teacher_id=data.absent_teacher_id,
@@ -172,7 +194,8 @@ def assign_substitute(
     db.add(substitution)
     db.commit()
     db.refresh(substitution)
-    return {"ok": True, "id": substitution.id, "message": "Substitution assigned"}
+    workload = get_teacher_workload(db, project_id, data.sub_teacher_id)
+    return {"ok": True, "id": substitution.id, "message": "Substitution assigned", "sub_workload": workload}
 
 
 # ─── List Substitutions ──────────────────────────────────────────────────────

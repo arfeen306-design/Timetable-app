@@ -12,6 +12,9 @@ function fmtDate(d: string) { return new Date(d + "T00:00:00").toLocaleDateStrin
 
 type Teacher = { id: number; first_name: string; last_name: string; code: string };
 
+const AVATAR_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#22c55e"];
+function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
+
 function Initials({ name, color }: { name: string; color: string }) {
   const init = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
   return (
@@ -23,9 +26,6 @@ function Initials({ name, color }: { name: string; color: string }) {
     }}>{init}</div>
   );
 }
-
-const AVATAR_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#22c55e"];
-function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 
 export default function SubstitutionPage() {
   const { projectId } = useParams();
@@ -99,7 +99,7 @@ export default function SubstitutionPage() {
   for (const s of absentSlots) { (slotsByTeacher[s.teacher_id] ??= []).push(s); }
 
   return (
-    <div style={{ maxWidth: 700, margin: "0 auto" }}>
+    <div style={{ maxWidth: 740, margin: "0 auto" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
         <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800, color: "var(--slate-900)" }}>Substitution Manager</h1>
@@ -110,16 +110,12 @@ export default function SubstitutionPage() {
         }}>{fmtDate(date)}</div>
       </div>
 
-      {msg && (
-        <div className={msg.startsWith("✅") ? "alert alert-success" : "alert alert-error"}>{msg}</div>
-      )}
+      {msg && <div className={msg.startsWith("✅") ? "alert alert-success" : "alert alert-error"}>{msg}</div>}
 
       {/* ── Absent Today ── */}
-      <div style={{ marginBottom: "1.25rem" }}>
-        <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>ABSENT TODAY</div>
-
-        {/* Absent tags */}
-        <div className="card" style={{ padding: "0.75rem 1rem" }}>
+      <div style={{ marginBottom: "1rem" }}>
+        <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>ABSENT TODAY</div>
+        <div className="card" style={{ padding: "0.65rem 1rem" }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
             {absences.map(a => (
               <span key={a.id} style={{
@@ -135,27 +131,16 @@ export default function SubstitutionPage() {
               </span>
             ))}
             {absences.length === 0 && <span style={{ color: "var(--slate-400)", fontSize: "0.82rem" }}>No absences recorded</span>}
-
-            {/* Add teacher button */}
-            <button onClick={() => {}} style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: "4px 10px", borderRadius: "var(--radius-full)",
-              border: "1.5px dashed var(--slate-300)", background: "none",
-              fontSize: "0.78rem", fontWeight: 600, color: "var(--slate-500)",
-              cursor: "pointer",
-            }}>+ Add teacher</button>
           </div>
         </div>
       </div>
 
-      {/* ── Mark Absent Form (collapsed by default, attached to "+ Add teacher") ── */}
+      {/* ── Mark Absent Form ── */}
       <div className="card" style={{ marginBottom: "1.25rem" }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", marginBottom: "0.75rem" }}>
           <div>
             <label style={{ fontSize: "0.72rem", fontWeight: 600 }}>Date</label>
-            <input type="date" value={date} onChange={e => { setDate(e.target.value); setAbsentSlots([]); }}
-              style={{ maxWidth: 160 }}
-            />
+            <input type="date" value={date} onChange={e => { setDate(e.target.value); setAbsentSlots([]); }} style={{ maxWidth: 160 }} />
           </div>
           <div style={{ flex: 1, minWidth: 160 }}>
             <label style={{ fontSize: "0.72rem", fontWeight: 600 }}>Reason</label>
@@ -163,8 +148,7 @@ export default function SubstitutionPage() {
           </div>
         </div>
 
-        {/* Teacher multi-select */}
-        <div style={{ maxHeight: 180, overflowY: "auto", border: "1px solid var(--slate-200)", borderRadius: "var(--radius-md)", padding: 4, marginBottom: 8 }}>
+        <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid var(--slate-200)", borderRadius: "var(--radius-md)", padding: 4, marginBottom: 8 }}>
           {teachers.map(t => {
             const checked = selectedAbsent.includes(t.id);
             const alreadyAbsent = absences.some(a => a.teacher_id === t.id);
@@ -186,8 +170,7 @@ export default function SubstitutionPage() {
           })}
         </div>
 
-        <button onClick={handleMarkAbsent} disabled={loading || !selectedAbsent.length} className="btn btn-danger"
-          style={{ fontSize: "0.82rem" }}>
+        <button onClick={handleMarkAbsent} disabled={loading || !selectedAbsent.length} className="btn btn-danger" style={{ fontSize: "0.82rem" }}>
           {loading ? "⏳ Processing…" : `Mark ${selectedAbsent.length} Teacher(s) Absent`}
         </button>
       </div>
@@ -195,7 +178,7 @@ export default function SubstitutionPage() {
       {/* ── Periods to Cover ── */}
       {Object.entries(slotsByTeacher).map(([tId, slots]) => (
         <div key={tId} style={{ marginBottom: "1.25rem" }}>
-          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
+          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>
             PERIODS TO COVER — {teacherName(Number(tId)).toUpperCase()}
           </div>
 
@@ -210,24 +193,24 @@ export default function SubstitutionPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {/* Period badge */}
                   <div style={{
-                    width: 34, height: 34, borderRadius: "50%",
+                    width: 36, height: 36, borderRadius: "50%",
                     background: assigned ? "var(--success-50)" : "var(--primary-50)",
                     color: assigned ? "var(--success-600)" : "var(--primary-600)",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "0.72rem", fontWeight: 700, fontFamily: "var(--font-mono)", flexShrink: 0,
+                    fontSize: "0.75rem", fontWeight: 700, fontFamily: "var(--font-mono)", flexShrink: 0,
                   }}>P{slot.period_index + 1}</div>
 
-                  {/* Slot info */}
+                  {/* Slot info — now with subject, class, room */}
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--slate-900)" }}>
-                      Lesson {slot.period_index + 1}
+                      {slot.subject_name || "Lesson"} · {slot.class_name || `Class`}
                     </div>
                     <div style={{ fontSize: "0.72rem", color: "var(--slate-400)" }}>
-                      {teacherName(Number(tId))} is absent
+                      {slot.room_name ? `${slot.room_name} · ` : ""}{teacherName(Number(tId))} is absent
                     </div>
                   </div>
 
-                  {/* Status */}
+                  {/* Status badge */}
                   {assigned ? (
                     <span style={{
                       padding: "3px 10px", borderRadius: "var(--radius-full)",
@@ -251,41 +234,80 @@ export default function SubstitutionPage() {
                   )}
                 </div>
 
-                {/* ── Free teacher cards ── */}
+                {/* ── Free teacher candidates ── */}
                 {isExpanded && (
-                  <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ marginTop: 12 }}>
+                    {/* Ranking hint */}
+                    <div style={{ fontSize: "0.65rem", color: "var(--slate-400)", marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--primary-500)", display: "inline-block" }} />
+                      Ranked by: fewest periods today, then fewest subs this week
+                    </div>
+
                     {freeTeachers.length === 0 ? (
                       <div style={{ color: "var(--slate-400)", fontSize: "0.82rem", padding: "0.5rem 0" }}>No free teachers available for this period.</div>
-                    ) : freeTeachers.map(ft => {
-                      const pct = ft.utilization_pct;
-                      const barColor = pct > 100 ? "var(--danger-500)" : pct > 85 ? "var(--warning-500)" : "var(--success-500)";
-                      return (
-                        <div key={ft.teacher_id} style={{
-                          display: "flex", alignItems: "center", gap: 12,
-                          padding: "0.6rem 0.75rem", borderRadius: "var(--radius-md)",
-                          border: "1px solid var(--slate-200)", background: "var(--slate-50)",
-                        }}>
-                          <Initials name={ft.teacher_name} color={avatarColor(ft.teacher_id)} />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--slate-900)" }}>{ft.teacher_name}</div>
-                            <div style={{ fontSize: "0.68rem", color: "var(--slate-400)" }}>Free P{slot.period_index + 1}</div>
-                          </div>
-                          {/* Workload bar */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 160 }}>
-                            <span style={{ fontSize: "0.65rem", color: "var(--slate-400)", fontWeight: 600, whiteSpace: "nowrap" }}>Workload</span>
-                            <div style={{ flex: 1, height: 6, background: "var(--slate-200)", borderRadius: 3, overflow: "hidden", minWidth: 60 }}>
-                              <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", background: barColor, borderRadius: 3, transition: "width 0.3s" }} />
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {freeTeachers.map(ft => {
+                          const pct = ft.utilization_pct;
+                          const barColor = pct > 100 ? "var(--danger-500)" : pct > 85 ? "var(--warning-500)" : "var(--primary-500)";
+                          return (
+                            <div key={ft.teacher_id} style={{
+                              display: "flex", alignItems: "center", gap: 12,
+                              padding: "0.6rem 0.75rem", borderRadius: "var(--radius-md)",
+                              border: ft.best_fit ? "1.5px solid var(--primary-300)" : "1px solid var(--slate-200)",
+                              background: ft.best_fit ? "var(--primary-50)" : "var(--slate-50)",
+                            }}>
+                              <Initials name={ft.teacher_name} color={avatarColor(ft.teacher_id)} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                  <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--slate-900)" }}>{ft.teacher_name}</span>
+                                  {ft.best_fit && (
+                                    <span style={{
+                                      padding: "1px 8px", borderRadius: "var(--radius-full)",
+                                      background: "var(--primary-500)", color: "#fff",
+                                      fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.03em",
+                                    }}>Best fit</span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                  <span>{ft.periods_today} periods today</span>
+                                  <span>·</span>
+                                  <span>free P{slot.period_index + 1}</span>
+                                </div>
+                              </div>
+
+                              {/* Workload mini bar */}
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, minWidth: 120 }}>
+                                <div style={{ fontSize: "0.62rem", color: "var(--slate-400)", fontWeight: 600, whiteSpace: "nowrap" }}>
+                                  This week {ft.scheduled} + {ft.subs_this_week} subs = {ft.total}
+                                </div>
+                                <div style={{ width: "100%", height: 5, background: "var(--slate-200)", borderRadius: 3, overflow: "hidden" }}>
+                                  <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", background: barColor, borderRadius: 3, transition: "width 0.3s" }} />
+                                </div>
+                              </div>
+
+                              {/* Periods today + subs badges */}
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, minWidth: 80 }}>
+                                <span style={{
+                                  padding: "1px 8px", borderRadius: "var(--radius-full)",
+                                  background: ft.periods_today <= 2 ? "var(--success-50)" : ft.periods_today <= 4 ? "var(--warning-50)" : "var(--danger-50)",
+                                  color: ft.periods_today <= 2 ? "var(--success-600)" : ft.periods_today <= 4 ? "var(--warning-600)" : "var(--danger-600)",
+                                  fontSize: "0.62rem", fontWeight: 700, whiteSpace: "nowrap",
+                                }}>{ft.periods_today} periods today</span>
+                                <span style={{ fontSize: "0.62rem", color: "var(--slate-400)", whiteSpace: "nowrap" }}>
+                                  {ft.subs_this_week} sub{ft.subs_this_week !== 1 ? "s" : ""} this week
+                                </span>
+                              </div>
+
+                              <button onClick={() => handleAssign(slot.period_index, Number(tId), ft.teacher_id, slot.lesson_id, slot.room_id)}
+                                className="btn" style={{ padding: "0.35rem 1rem", fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap" }}>
+                                Assign
+                              </button>
                             </div>
-                            <span style={{ fontSize: "0.68rem", fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--slate-600)", whiteSpace: "nowrap" }}>{ft.total}/{ft.max}</span>
-                          </div>
-                          <span style={{ fontSize: "0.68rem", color: "var(--slate-400)", whiteSpace: "nowrap" }}>{ft.substitutions} subs taken</span>
-                          <button onClick={() => handleAssign(slot.period_index, Number(tId), ft.teacher_id, slot.lesson_id, slot.room_id)}
-                            className="btn" style={{ padding: "0.3rem 0.8rem", fontSize: "0.75rem", fontWeight: 700 }}>
-                            Assign
-                          </button>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -294,10 +316,10 @@ export default function SubstitutionPage() {
         </div>
       ))}
 
-      {/* ── Today's assigned subs summary ── */}
+      {/* ── Assigned subs summary ── */}
       {subs.length > 0 && (
         <div style={{ marginTop: "1rem" }}>
-          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
+          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>
             ASSIGNED SUBSTITUTIONS
           </div>
           {subs.map(s => (

@@ -404,6 +404,22 @@ export type WorkloadEntry = {
   scheduled: number; substitutions: number; total: number; max: number; utilization_pct: number;
 };
 
+export type FreeTeacher = WorkloadEntry & {
+  periods_today: number;
+  subs_this_week: number;
+  best_fit: boolean;
+};
+
+export type YearlyWeek = {
+  week_number: number; start_date: string;
+  scheduled: number; substitutions: number; total: number; max: number;
+};
+
+export type YearlyWorkload = {
+  teacher_id: number; teacher_name: string; max: number;
+  weeks: YearlyWeek[];
+};
+
 export function getWorkloadOverview(projectId: number, week?: string) {
   const qs = week ? `?week=${week}` : "";
   return api<WorkloadEntry[]>(`/api/projects/${projectId}/workload/overview${qs}`);
@@ -414,13 +430,16 @@ export function getTeacherWorkload(projectId: number, teacherId: number, week?: 
   return api<WorkloadEntry>(`/api/projects/${projectId}/workload/${teacherId}${qs}`);
 }
 
+export function getYearlyWorkload(projectId: number, teacherId: number) {
+  return api<YearlyWorkload>(`/api/projects/${projectId}/workload/${teacherId}/yearly`);
+}
+
 // ─── Substitutions ──────────────────────────────────────────────────────────
 export type AbsentSlot = {
   entry_id: number; period_index: number; room_id: number | null;
   lesson_id: number; teacher_id: number; subject_id: number; class_id: number;
+  subject_name: string; class_name: string; room_name: string;
 };
-
-export type FreeTeacher = WorkloadEntry;
 
 export type SubstitutionRecord = {
   id: number; period_index: number;
@@ -450,7 +469,7 @@ export function assignSubstitute(projectId: number, data: {
   date: string; period_index: number; absent_teacher_id: number;
   sub_teacher_id: number; lesson_id: number; room_id?: number | null; notes?: string;
 }) {
-  return api<{ ok: boolean; id: number; message: string }>(
+  return api<{ ok: boolean; id: number; message: string; sub_workload: WorkloadEntry }>(
     `/api/projects/${projectId}/substitutions/assign`,
     { method: "POST", body: JSON.stringify(data) }
   );
@@ -471,3 +490,4 @@ export function deleteSubstitution(projectId: number, subId: number) {
 export function removeAbsence(projectId: number, absenceId: number) {
   return api<{ ok: boolean }>(`/api/projects/${projectId}/substitutions/absence/${absenceId}`, { method: "DELETE" });
 }
+

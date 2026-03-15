@@ -140,7 +140,12 @@ def get_free_teachers(
 ) -> List[dict]:
     """Find teachers who are NOT scheduled at a given day+period and not absent.
 
-    Returns list with workload context so the UI can show load info.
+    Ranked by fairness:
+      1. periods_today ASC   — lightest day first
+      2. subs_this_week ASC  — fewest subs taken first
+      3. total ASC           — lightest overall first
+
+    First result gets best_fit: true.
     """
     day_index = target_date.weekday()  # 0=Mon .. 4=Fri
 
@@ -174,12 +179,25 @@ def get_free_teachers(
             Teacher.id.notin_(sub_busy),
             Teacher.id.notin_(absent_ids) if absent_ids else True,
         )
-        .order_by(Teacher.first_name)
         .all()
     )
 
-    # Annotate with workload
-    week_start, week_end = _week_range(week_str)
+    # ── Annotation queries ──
+
+    # 1. periods_today: count of each teacher's timetable slots for THIS day
+    periods_today_q = (
+        db.query(Lesson.teacher_id, func.count(TimetableEntry.id).label("cnt"))
+        .join(TimetableEntry, TimetableEntry.lesson_id == Lesson.id)
+        .filter(
+            TimetableEntry.project_id == project_id,
+            TimetableEntry.day_index == day_index,
+        )
+        .group_by(Lesson.teacher_id)
+        .all()
+    )
+    periods_today_map = {r.teacher_id: r.cnt for r in periods_today_q}
+
+    # 2. Weekly workload: scheduled lessons (full week)
     scheduled_q = (
         db.query(Lesson.teacher_id, func.count(TimetableEntry.id).label("cnt"))
         .join(TimetableEntry, TimetableEntry.lesson_id == Lesson.id)
@@ -189,6 +207,8 @@ def get_free_teachers(
     )
     scheduled_map = {r.teacher_id: r.cnt for r in scheduled_q}
 
+    # 3. subs_this_week
+    week_start, week_end = _week_range(week_str)
     subs_q = (
         db.query(Substitution.sub_teacher_id, func.count(Substitution.id).label("cnt"))
         .filter(
@@ -201,12 +221,14 @@ def get_free_teachers(
     )
     subs_map = {r.sub_teacher_id: r.cnt for r in subs_q}
 
+    # ── Build result with annotations ──
     result = []
     for t in free:
         s = scheduled_map.get(t.id, 0)
         sub = subs_map.get(t.id, 0)
         total = s + sub
         max_pw = t.max_periods_week or 30
+        pt = periods_today_map.get(t.id, 0)
         result.append({
             "teacher_id": t.id,
             "teacher_name": f"{t.first_name or ''} {t.last_name or ''}".strip(),
@@ -216,5 +238,17 @@ def get_free_teachers(
             "total": total,
             "max": max_pw,
             "utilization_pct": round((total / max_pw * 100) if max_pw else 0, 1),
+            "periods_today": pt,
+            "subs_this_week": sub,
+            "best_fit": False,
         })
+
+    # ── Fairness sort ──
+    result.sort(key=lambda x: (x["periods_today"], x["subs_this_week"], x["total"]))
+
+    # Mark first as best fit
+    if result:
+        result[0]["best_fit"] = True
+
     return result
+

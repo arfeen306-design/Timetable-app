@@ -14,6 +14,7 @@ class TeacherAbsence(Base):
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
+    week_number = Column(Integer, nullable=True, index=True)  # academic week number
     reason = Column(String(500), nullable=False, default="")
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
@@ -26,6 +27,7 @@ class Substitution(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
+    week_number = Column(Integer, nullable=True, index=True)  # academic week number
     day_index = Column(Integer, nullable=False)  # 0=Mon .. 6=Sun
     period_index = Column(Integer, nullable=False)
     absent_teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False)
