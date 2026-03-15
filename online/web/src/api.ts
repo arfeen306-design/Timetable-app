@@ -544,6 +544,85 @@ export function exportWorkloadPDF(projectId: number, week?: string) {
   window.open(`/api/projects/${projectId}/workload/export-pdf${qs}`, "_blank");
 }
 
+// ─── Exam Duties ────────────────────────────────────────────────────────────
+export type ExamDutyConfig = {
+  id: number | null;
+  project_id: number;
+  total_exam_rooms: number;
+  duty_duration_minutes: number;
+  invigilators_per_room: number;
+  exempt_teacher_ids: number[];
+};
+
+export type ExamSession = {
+  id: number;
+  project_id: number;
+  subject_id: number;
+  subject_name: string;
+  subject_color: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  room_ids: number[];
+  slot_count: number;
+  slots_needed: number;
+};
+
+export type ExamSlot = {
+  id: number;
+  session_id: number;
+  teacher_id: number;
+  room_id: number | null;
+  duty_start: string;
+  duty_end: string;
+  is_override: boolean;
+  teacher_name: string;
+  room_name: string;
+};
+
+export type TeacherExamSummary = {
+  teacher_id: number;
+  teacher_name: string;
+  sessions_assigned: number;
+  duty_minutes_total: number;
+  exempt: boolean;
+  excluded_subjects: { id: number; name: string }[];
+};
+
+export function getExamDutyConfig(projectId: number) {
+  return api<ExamDutyConfig>(`/api/projects/${projectId}/exam-duties/config`);
+}
+export function saveExamDutyConfig(projectId: number, data: Omit<ExamDutyConfig, "id" | "project_id">) {
+  return api<ExamDutyConfig>(`/api/projects/${projectId}/exam-duties/config`, { method: "POST", body: JSON.stringify(data) });
+}
+export function listExamSessions(projectId: number) {
+  return api<ExamSession[]>(`/api/projects/${projectId}/exam-duties/sessions`);
+}
+export function createExamSession(projectId: number, data: { subject_id: number; date: string; start_time: string; end_time: string; room_ids: number[] }) {
+  return api<ExamSession>(`/api/projects/${projectId}/exam-duties/sessions`, { method: "POST", body: JSON.stringify(data) });
+}
+export function deleteExamSession(projectId: number, sessionId: number) {
+  return api(`/api/projects/${projectId}/exam-duties/sessions/${sessionId}`, { method: "DELETE" });
+}
+export function listExamSlots(projectId: number, sessionId: number) {
+  return api<ExamSlot[]>(`/api/projects/${projectId}/exam-duties/sessions/${sessionId}/slots`);
+}
+export function assignExamSlot(projectId: number, sessionId: number, data: { teacher_id: number; room_id?: number; is_override?: boolean }) {
+  return api<ExamSlot>(`/api/projects/${projectId}/exam-duties/sessions/${sessionId}/slots`, { method: "POST", body: JSON.stringify(data) });
+}
+export function removeExamSlot(projectId: number, sessionId: number, slotId: number) {
+  return api(`/api/projects/${projectId}/exam-duties/sessions/${sessionId}/slots/${slotId}`, { method: "DELETE" });
+}
+export function autoAssignExamDuties(projectId: number, sessionId: number) {
+  return api<{ assigned: { room_id: number; teacher_id: number; teacher_name: string }[]; unassigned_rooms: number[]; warnings: string[] }>(
+    `/api/projects/${projectId}/exam-duties/sessions/${sessionId}/auto-assign`,
+    { method: "POST" }
+  );
+}
+export function getTeacherExamSummary(projectId: number, teacherId: number) {
+  return api<TeacherExamSummary>(`/api/projects/${projectId}/exam-duties/teacher-summary/${teacherId}`);
+}
+
 // ─── Duty Roster ────────────────────────────────────────────────────────────
 export type DutyEntry = {
   id: number;

@@ -37,6 +37,7 @@ const NAV_GROUPS = [
       { num: 13, label: "Substitution",   icon: "🔄", path: "/project/:projectId/substitutions",  segment: "substitutions",  badge: "New" },
       { num: 14, label: "Duty Roster",    icon: "🛡️", path: "/project/:projectId/duty-roster",    segment: "duty-roster",    badge: "New" },
       { num: 15, label: "Committees",     icon: "👥", path: "/project/:projectId/committees",     segment: "committees",     badge: "New" },
+      { num: 16, label: "Exam Duties",    icon: "📝", path: "/project/:projectId/exam-duties",    segment: "exam-duties",    badge: "New" },
     ],
   },
 ];
@@ -45,7 +46,7 @@ function getActiveNum(pathname: string): number {
   if (pathname === "/") return 1;
   const map: [string, number][] = [
     ["/dashboard", 1], ["/academic-year", 2], ["/substitutions", 13], ["/workload", 12],
-    ["/duty-roster", 14], ["/committees", 15],
+    ["/duty-roster", 14], ["/committees", 15], ["/exam-duties", 16],
     ["/export", 11], ["/review", 11], ["/generate", 10],
     ["/constraints", 9], ["/lessons", 8], ["/teachers", 7],
     ["/rooms", 6], ["/classes", 5], ["/subjects", 4], ["/settings", 3],
