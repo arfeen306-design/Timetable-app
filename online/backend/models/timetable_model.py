@@ -28,8 +28,8 @@ class TimetableEntry(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
-    run_id = Column(Integer, ForeignKey("timetable_runs.id", ondelete="SET NULL"), nullable=True)
-    lesson_id = Column(Integer, ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False)
+    run_id = Column(Integer, ForeignKey("timetable_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    lesson_id = Column(Integer, ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True)
     day_index = Column(Integer, nullable=False)
     period_index = Column(Integer, nullable=False)
     room_id = Column(Integer, ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True)

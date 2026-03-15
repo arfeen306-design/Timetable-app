@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import * as api from "../../api";
 import { useToast } from "../../context/ToastContext";
 
@@ -17,7 +17,7 @@ interface Props {
   onNext: () => void;
 }
 
-export default function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNext }: Props) {
+function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNext }: Props) {
   const toast = useToast();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -251,3 +251,6 @@ export default function LessonsTab({ pid, lessons, subjects, classes, teachers, 
     </div>
   );
 }
+
+// React.memo prevents re-renders when ProjectEditor re-fetches unrelated data (e.g. rooms list changes)
+export default React.memo(LessonsTab);

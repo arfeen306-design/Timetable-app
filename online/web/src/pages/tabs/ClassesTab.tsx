@@ -14,7 +14,7 @@ interface Props {
   onNext: () => void;
 }
 
-export default function ClassesTab({ pid, classes, teachers, rooms, onChange, onNext }: Props) {
+function ClassesTab({ pid, classes, teachers, rooms, onChange, onNext }: Props) {
   const toast = useToast();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -246,3 +246,6 @@ export default function ClassesTab({ pid, classes, teachers, rooms, onChange, on
     </div>
   );
 }
+
+// React.memo prevents re-renders when ProjectEditor re-fetches unrelated data (e.g. teachers list changes)
+export default React.memo(ClassesTab);
