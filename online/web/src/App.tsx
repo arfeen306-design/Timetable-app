@@ -20,9 +20,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function RedirectToDashboard() {
+function RedirectToSettings() {
   const { projectId } = useParams();
-  return <Navigate to={`/project/${projectId}/dashboard`} replace />;
+  return <Navigate to={`/project/${projectId}/settings`} replace />;
 }
 
 export default function App() {
@@ -39,7 +39,7 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="project/:projectId" element={<RedirectToDashboard />} />
+        <Route path="project/:projectId" element={<RedirectToSettings />} />
         <Route path="project/:projectId/dashboard" element={<ProjectDashboard />} />
         <Route path="project/:projectId/settings" element={<ProjectEditor />} />
         <Route path="project/:projectId/subjects" element={<ProjectEditor />} />

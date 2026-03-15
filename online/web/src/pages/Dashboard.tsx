@@ -26,12 +26,7 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Auto-redirect to first project's dashboard if projects exist
-  useEffect(() => {
-    if (!loading && projects.length > 0) {
-      navigate(`/project/${projects[0].id}/dashboard`, { replace: true });
-    }
-  }, [loading, projects, navigate]);
+  // No auto-redirect — let the user choose which project to open
 
   async function handleLoadDemo() {
     setError(""); setDemoLoading(true);
