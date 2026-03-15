@@ -107,14 +107,28 @@ def delete_project(
     project = get_by_id_and_school(db, project_id, school_id) if school_id else None
     if not project:
         raise HTTPException(404, "Project not found")
+
+    # Delete in dependency order — use correct table names and savepoints
     for table in [
-        "timetable_entries", "timetable_runs", "constraints",
-        "lessons", "subjects", "teachers", "classes", "rooms", "school_settings",
+        "timetable_entries",
+        "timetable_runs",
+        "time_constraints",
+        "lesson_allowed_rooms",
+        "lessons",
+        "teacher_subjects",
+        "subjects",
+        "teachers",
+        "school_classes",
+        "rooms",
+        "school_settings",
     ]:
         try:
+            sp = db.begin_nested()
             db.execute(text(f"DELETE FROM {table} WHERE project_id = :pid"), {"pid": project_id})
+            sp.commit()
         except Exception:
-            pass
+            sp.rollback()
+
     db.delete(project)
     db.commit()
     return {"ok": True, "message": f"Project '{project.name}' deleted."}
