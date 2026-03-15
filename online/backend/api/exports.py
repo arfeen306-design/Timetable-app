@@ -234,7 +234,6 @@ def export_excel(
             # Day rows — each day uses its OWN slot sequence
             for d in range(days):
                 is_fri = d == fri_day_idx and fri_cols
-                use_cols = fri_cols if is_fri else cols
 
                 # Friday times row BEFORE friday data
                 if is_fri:
@@ -253,33 +252,70 @@ def export_excel(
                 ws.cell(row, 1, DAY_SHORT[d]).font = Font(bold=True)
                 ws.cell(row, 1).alignment = cell_align
                 ws.cell(row, 1).border = thin
-                for ci, col in enumerate(use_cols):
-                    cell = ws.cell(row, ci + 2)
-                    cell.border = thin
-                    cell.alignment = cell_align
-                    if col["type"] == "break":
-                        cell.fill = gray_fill
-                        cell.value = col["label"].lower()
-                        cell.font = Font(italic=True, size=8, color="64748B")
-                    elif col["type"] == "zero":
-                        cell.fill = PatternFill("solid", fgColor="EBF8FF")
-                        cell.font = Font(italic=True, size=8, color="2B6CB0")
-                    else:
-                        e = lookup.get((d, col["period_index"]))
-                        if e:
-                            code = e.get("subject_code") or e.get("subject_name", "")
-                            lbl = e.get(label_key, "")
-                            room = e.get("room_name", "")
-                            text = code
-                            if lbl: text += f"\n{lbl}"
-                            if room: text += f"\n{room}"
-                            cell.value = text
-                            color = (e.get("subject_color") or "#4A90D9").lstrip("#")
-                            try:
-                                ri, gi, bi = int(color[:2],16), int(color[2:4],16), int(color[4:6],16)
-                                lr, lg, lb = min(ri+60,255), min(gi+60,255), min(bi+60,255)
-                                cell.fill = PatternFill("solid", fgColor=f"{lr:02X}{lg:02X}{lb:02X}")
-                            except: pass
+
+                if is_fri:
+                    # On Friday: iterate REGULAR cols for column positions,
+                    # but blank out regular-day break columns and map period data from fri_cols.
+                    fri_ci = 0
+                    for ci, reg_col in enumerate(cols):
+                        cell = ws.cell(row, ci + 2)
+                        cell.border = thin
+                        cell.alignment = cell_align
+                        if reg_col["type"] == "break":
+                            # Regular-day break column — leave blank on Friday
+                            cell.value = ""
+                        else:
+                            # Advance past any Friday breaks
+                            while fri_ci < len(fri_cols) and fri_cols[fri_ci]["type"] == "break":
+                                fri_ci += 1
+                            if fri_ci < len(fri_cols):
+                                fc = fri_cols[fri_ci]
+                                if fc["type"] == "period":
+                                    e = lookup.get((d, fc["period_index"]))
+                                    if e:
+                                        code = e.get("subject_code") or e.get("subject_name", "")
+                                        lbl = e.get(label_key, "")
+                                        room = e.get("room_name", "")
+                                        text = code
+                                        if lbl: text += f"\n{lbl}"
+                                        if room: text += f"\n{room}"
+                                        cell.value = text
+                                        color = (e.get("subject_color") or "#4A90D9").lstrip("#")
+                                        try:
+                                            ri, gi, bi = int(color[:2],16), int(color[2:4],16), int(color[4:6],16)
+                                            lr, lg, lb = min(ri+60,255), min(gi+60,255), min(bi+60,255)
+                                            cell.fill = PatternFill("solid", fgColor=f"{lr:02X}{lg:02X}{lb:02X}")
+                                        except: pass
+                                fri_ci += 1
+                else:
+                    # Regular day — use cols directly
+                    for ci, col in enumerate(cols):
+                        cell = ws.cell(row, ci + 2)
+                        cell.border = thin
+                        cell.alignment = cell_align
+                        if col["type"] == "break":
+                            cell.fill = gray_fill
+                            cell.value = col["label"].lower()
+                            cell.font = Font(italic=True, size=8, color="64748B")
+                        elif col["type"] == "zero":
+                            cell.fill = PatternFill("solid", fgColor="EBF8FF")
+                            cell.font = Font(italic=True, size=8, color="2B6CB0")
+                        else:
+                            e = lookup.get((d, col["period_index"]))
+                            if e:
+                                code = e.get("subject_code") or e.get("subject_name", "")
+                                lbl = e.get(label_key, "")
+                                room = e.get("room_name", "")
+                                text = code
+                                if lbl: text += f"\n{lbl}"
+                                if room: text += f"\n{room}"
+                                cell.value = text
+                                color = (e.get("subject_color") or "#4A90D9").lstrip("#")
+                                try:
+                                    ri, gi, bi = int(color[:2],16), int(color[2:4],16), int(color[4:6],16)
+                                    lr, lg, lb = min(ri+60,255), min(gi+60,255), min(bi+60,255)
+                                    cell.fill = PatternFill("solid", fgColor=f"{lr:02X}{lg:02X}{lb:02X}")
+                                except: pass
                 row += 1
 
             row += 1  # gap between entities
@@ -387,51 +423,94 @@ def export_csv(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _build_pdf_table(entries_group, cols, days, fri_day_idx, fri_cols, label_key):
-    """Build a table data array for one entity."""
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.units import mm
-
+    """Build a table data array for one entity.
+    Break columns from regular days are BLANKED on Friday rows (and vice versa),
+    so breaks only appear on the days that actually have them.
+    """
     lookup = {(e["day_index"], e["period_index"]): e for e in entries_group}
+
+    # Build a unified header from regular cols (this determines column count)
     header = ["Day"] + [f"{c['label']}\n{c['sub']}" for c in cols]
     header_len = len(header)
     data = [header]
 
+    # Build a mapping: col_index -> column type for regular days
+    reg_break_cols = set()  # 0-based col indices (into cols list) that are regular breaks
+    for ci, c in enumerate(cols):
+        if c["type"] == "break":
+            reg_break_cols.add(ci)
+
     for d in range(days):
         is_fri = d == fri_day_idx and fri_cols
-        use_cols = fri_cols if is_fri else cols
 
-        # Friday times row BEFORE friday data
         if is_fri:
+            # Friday uses its own column sequence.
+            # First add a Friday times header row.
             fri_row = [f"{DAY_SHORT[d]} times"]
             for fc in fri_cols:
                 fri_row.append(f"{fc['label']}\n{fc['sub']}")
-            # Pad to header length
             while len(fri_row) < header_len:
                 fri_row.append("")
             data.append(fri_row)
 
-        row = [DAY_SHORT[d]]
-        for c in use_cols:
-            if c["type"] == "break":
-                row.append(c["label"].lower())
-            elif c["type"] == "zero":
-                row.append("")
-            else:
-                e = lookup.get((d, c["period_index"]))
-                if e:
-                    code = e.get("subject_code") or e.get("subject_name", "")
-                    lbl = e.get(label_key, "")
-                    room = e.get("room_name", "")
-                    t = code
-                    if lbl: t += f"\n{lbl}"
-                    if room: t += f"\n{room}"
-                    row.append(t)
-                else:
+            # Now build the Friday data row, using fri_cols for content.
+            # Regular-day break columns should be BLANK on this row.
+            row = [DAY_SHORT[d]]
+            fri_ci = 0
+            for ci, reg_col in enumerate(cols):
+                if reg_col["type"] == "break":
+                    # This is a regular-day break column — blank it on Friday
                     row.append("")
-        # Pad to header length
-        while len(row) < header_len:
-            row.append("")
-        data.append(row)
+                else:
+                    # Find matching content from fri_cols
+                    # Advance fri_ci past any friday breaks, writing them
+                    while fri_ci < len(fri_cols) and fri_cols[fri_ci]["type"] == "break":
+                        fri_ci += 1  # skip friday breaks (they don't match regular columns)
+                    if fri_ci < len(fri_cols):
+                        fc = fri_cols[fri_ci]
+                        if fc["type"] == "period" or fc["type"] == "zero":
+                            e = lookup.get((d, fc["period_index"])) if fc["type"] == "period" else None
+                            if e:
+                                code = e.get("subject_code") or e.get("subject_name", "")
+                                lbl = e.get(label_key, "")
+                                room = e.get("room_name", "")
+                                t = code
+                                if lbl: t += f"\n{lbl}"
+                                if room: t += f"\n{room}"
+                                row.append(t)
+                            else:
+                                row.append("")
+                        else:
+                            row.append("")
+                        fri_ci += 1
+                    else:
+                        row.append("")
+            while len(row) < header_len:
+                row.append("")
+            data.append(row)
+        else:
+            # Regular day — use cols directly
+            row = [DAY_SHORT[d]]
+            for c in cols:
+                if c["type"] == "break":
+                    row.append(c["label"].lower())
+                elif c["type"] == "zero":
+                    row.append("")
+                else:
+                    e = lookup.get((d, c["period_index"]))
+                    if e:
+                        code = e.get("subject_code") or e.get("subject_name", "")
+                        lbl = e.get(label_key, "")
+                        room = e.get("room_name", "")
+                        t = code
+                        if lbl: t += f"\n{lbl}"
+                        if room: t += f"\n{room}"
+                        row.append(t)
+                    else:
+                        row.append("")
+            while len(row) < header_len:
+                row.append("")
+            data.append(row)
 
     return data
 
@@ -539,6 +618,11 @@ def export_pdf_current(
 
     elements.append(Paragraph(school_name, ParagraphStyle("T", parent=styles["Title"], fontSize=16, spaceAfter=2)))
     elements.append(Paragraph(title, ParagraphStyle("S", parent=styles["Heading2"], fontSize=13, spaceAfter=4)))
+    # Add workload badge for teacher views
+    if teacher_id:
+        lesson_count = len(filtered)
+        badge_s = ParagraphStyle("Badge", fontName="Helvetica", fontSize=9, textColor=colors.HexColor("#475569"))
+        elements.append(Paragraph(f"Weekly load: {lesson_count} lessons/week", badge_s))
     elements.append(Spacer(1, 3))
 
     max_data_cols = max(len(cols), len(fri_cols) if fri_cols else 0)
@@ -630,6 +714,7 @@ def export_pdf_all_teachers(
 ):
     try:
         from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
         from reportlab.lib.units import mm
         from reportlab.platypus import SimpleDocTemplate, Table, Paragraph, Spacer, PageBreak
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -664,9 +749,20 @@ def export_pdf_all_teachers(
     col_w = (page_w - day_w) / max(max_data_cols, 1)
     has_fri = fri_cols is not None and fri_day_idx < days
 
+    # Compute workload per teacher
+    teacher_lesson_count: dict[str, int] = {}
+    for e in entries:
+        tn_key = e.get("teacher_name", "?")
+        teacher_lesson_count[tn_key] = teacher_lesson_count.get(tn_key, 0) + 1
+
+    badge_s = ParagraphStyle("Badge", fontName="Helvetica", fontSize=9, textColor=colors.HexColor("#475569"))
+
     for idx, tn in enumerate(sorted(by_teacher.keys())):
         elements.append(Paragraph(school_name, title_s))
         elements.append(Paragraph(f"Teacher: {tn}", sub_s))
+        # Workload badge
+        lesson_count = teacher_lesson_count.get(tn, 0)
+        elements.append(Paragraph(f"Weekly load: {lesson_count} lessons/week", badge_s))
         elements.append(Spacer(1, 3))
         data = _build_pdf_table(by_teacher[tn], cols, days, fri_day_idx, fri_cols, "class_name")
         tbl = Table(data, colWidths=[day_w] + [col_w] * max_data_cols, repeatRows=1)
