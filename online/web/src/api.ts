@@ -338,3 +338,31 @@ export function downloadExport(projectId: number, format: "excel" | "pdf" | "csv
     URL.revokeObjectURL(url);
   });
 }
+
+// PDF export with specific view
+export function downloadPdfView(projectId: number, params: { class_id?: number; teacher_id?: number; room_id?: number }, filename: string) {
+  const qs = new URLSearchParams();
+  if (params.class_id) qs.set("class_id", String(params.class_id));
+  if (params.teacher_id) qs.set("teacher_id", String(params.teacher_id));
+  if (params.room_id) qs.set("room_id", String(params.room_id));
+  return apiBlob(`/api/projects/${projectId}/exports/pdf?${qs.toString()}`).then((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+// PDF all classes / all teachers
+export function downloadPdfAll(projectId: number, type: "all-classes" | "all-teachers", filename: string) {
+  return apiBlob(`/api/projects/${projectId}/exports/pdf/${type}`).then((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}

@@ -420,7 +420,10 @@ export default function Review() {
 
       {/* ═══ Export ═══ */}
       <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "1.25rem 1.5rem", marginBottom: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-        <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Export</h3>
+        <h3 style={{ margin: "0 0 0.5rem", fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Export</h3>
+        <p style={{ fontSize: "0.78rem", color: "#94a3b8", margin: "0 0 0.75rem" }}>
+          Excel &amp; CSV: all classes + all teachers in one file. PDF: current view only.
+        </p>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <button type="button" className="btn btn-primary" disabled={noRun || exporting === "excel"} onClick={() => handleExport("excel")} style={{ background: "#22c55e", borderColor: "#22c55e" }}>
             {exporting === "excel" ? "⏳ Exporting…" : "📊 Export to Excel"}
@@ -428,24 +431,67 @@ export default function Review() {
           <button type="button" className="btn" disabled={noRun || exporting === "csv"} onClick={() => handleExport("csv")}>
             {exporting === "csv" ? "⏳ Exporting…" : "📄 Export to CSV"}
           </button>
-          <button type="button" className="btn" disabled={noRun || exporting === "pdf"} onClick={() => handleExport("pdf")}>
-            {exporting === "pdf" ? "⏳ Exporting…" : "📑 Export to PDF"}
+          <button type="button" className="btn" disabled={noRun || exporting === "pdf-view"} onClick={async () => {
+            setExporting("pdf-view");
+            try {
+              const params: { class_id?: number; teacher_id?: number; room_id?: number } = {};
+              if (view === "class") params.class_id = classId;
+              else if (view === "teacher") params.teacher_id = teacherId;
+              else params.room_id = roomId;
+              await api.downloadPdfView(pid, params, `timetable_${view}.pdf`);
+              toast("success", "PDF downloaded.");
+            } catch (err) { toast("error", err instanceof Error ? err.message : "PDF failed"); }
+            finally { setExporting(null); }
+          }}>
+            {exporting === "pdf-view" ? "⏳ Exporting…" : `📑 PDF (current ${view})`}
           </button>
         </div>
       </div>
 
-      {/* ═══ Communication ═══ */}
+      {/* ═══ Communication — email / WhatsApp ═══ */}
       <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "1.25rem 1.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-        <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Communication — email / WhatsApp ready</h3>
-        <div style={{ marginBottom: "1rem" }}>
-          <p style={{ fontSize: "0.85rem", color: "#475569", margin: "0 0 0.5rem" }}><strong>Teacher timetables:</strong> {teachers.length} teachers.</p>
-          <button type="button" className="btn" disabled={noRun || teachers.length === 0} onClick={() => handleExport("excel")}>Export all teacher timetables…</button>
-        </div>
-        <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "1rem" }}>
-          <p style={{ fontSize: "0.85rem", color: "#475569", margin: "0 0 0.5rem" }}><strong>Class timetables:</strong> {classes.filter(c => c.class_teacher_id).length} classes with assigned teachers.</p>
-          <button type="button" className="btn" disabled={noRun || classes.length === 0} onClick={() => handleExport("excel")}>Export class timetables for class teachers…</button>
+        <h3 style={{ margin: "0 0 0.5rem", fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Communication — email / WhatsApp ready</h3>
+        <p style={{ fontSize: "0.78rem", color: "#94a3b8", margin: "0 0 0.75rem" }}>
+          Download separate PDF files for all teachers or all classes — one per page.
+        </p>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 250, background: "#f8fafc", borderRadius: 8, padding: "1rem", border: "1px solid #e2e8f0" }}>
+            <p style={{ fontSize: "0.85rem", color: "#475569", margin: "0 0 0.5rem", fontWeight: 600 }}>
+              👨‍🏫 Teacher Timetables ({teachers.length})
+            </p>
+            <button type="button" className="btn" disabled={noRun || exporting === "pdf-teachers" || teachers.length === 0}
+              onClick={async () => {
+                setExporting("pdf-teachers");
+                try {
+                  await api.downloadPdfAll(pid, "all-teachers", "all_teacher_timetables.pdf");
+                  toast("success", "All teacher timetables downloaded.");
+                } catch (err) { toast("error", err instanceof Error ? err.message : "Export failed"); }
+                finally { setExporting(null); }
+              }}
+              style={{ width: "100%" }}>
+              {exporting === "pdf-teachers" ? "⏳ Exporting…" : "📑 Export all teacher timetables (PDF)"}
+            </button>
+          </div>
+          <div style={{ flex: 1, minWidth: 250, background: "#f8fafc", borderRadius: 8, padding: "1rem", border: "1px solid #e2e8f0" }}>
+            <p style={{ fontSize: "0.85rem", color: "#475569", margin: "0 0 0.5rem", fontWeight: 600 }}>
+              🏫 Class Timetables ({classes.length})
+            </p>
+            <button type="button" className="btn" disabled={noRun || exporting === "pdf-classes" || classes.length === 0}
+              onClick={async () => {
+                setExporting("pdf-classes");
+                try {
+                  await api.downloadPdfAll(pid, "all-classes", "all_class_timetables.pdf");
+                  toast("success", "All class timetables downloaded.");
+                } catch (err) { toast("error", err instanceof Error ? err.message : "Export failed"); }
+                finally { setExporting(null); }
+              }}
+              style={{ width: "100%" }}>
+              {exporting === "pdf-classes" ? "⏳ Exporting…" : "📑 Export all class timetables (PDF)"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
