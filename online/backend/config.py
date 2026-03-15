@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     storage_path: str = "./storage"
     storage_url_prefix: str = "/files"
 
+    # SMTP for email verification
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_pass: str = ""
+    smtp_from: str = ""
+    app_url: str = "http://localhost:5173"  # frontend URL for verification links
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
