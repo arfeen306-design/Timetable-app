@@ -75,7 +75,6 @@ interface DashboardData {
 const AVATAR_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#22c55e"];
 function avatarColor(i: number) { return AVATAR_COLORS[i % AVATAR_COLORS.length]; }
 
-/** Convert "HH:MM" → "h:mm AM/PM" */
 function formatTime12(t: string): string {
   if (!t) return "";
   const [hh, mm] = t.split(":").map(Number);
@@ -88,27 +87,32 @@ function fmtHistDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", weekday: "short" });
 }
 
-// Country flag emoji from ISO 3166-1 alpha-2
 function countryFlag(cc: string): string {
   if (!cc || cc.length !== 2) return "🌐";
   const base = 0x1F1E6;
   return String.fromCodePoint(base + cc.charCodeAt(0) - 65, base + cc.charCodeAt(1) - 65);
 }
 
+/* Null-safe default for arrays that may not exist in older API responses */
+const EMPTY_SLOTS: DashboardData["lesson_slots"] = [];
+const EMPTY_BREAKDOWN: DashboardData["class_breakdown"] = [];
+const EMPTY_UNASSIGNED: DashboardData["unassigned"] = [];
+const EMPTY_SUBS: DashboardData["substitutions_today"] = [];
+const EMPTY_CHART: DashboardData["workload_chart"] = [];
+const EMPTY_HISTORY: DashboardData["substitution_history"] = [];
+const EMPTY_ABSENT: DashboardData["absent_teachers"] = [];
+
 export default function ProjectDashboard() {
   const { projectId } = useParams();
   const pid = Number(projectId);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Client-side live clock
   const [clientTime, setClientTime] = useState(() => new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }));
   const [tz, setTz] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [countryCode, setCountryCode] = useState("");
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
-    // Live clock — update every second
     const timer = setInterval(() => {
       setClientTime(new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }));
     }, 1000);
@@ -116,14 +120,13 @@ export default function ProjectDashboard() {
   }, []);
 
   useEffect(() => {
-    // Detect country from IP
     fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(3000) })
       .then(r => r.json())
       .then(d => {
         if (d.country_code) setCountryCode(d.country_code);
         if (d.timezone) setTz(d.timezone);
       })
-      .catch(() => { /* fallback to browser tz */ });
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -148,10 +151,18 @@ export default function ProjectDashboard() {
   if (!data) return <div className="empty-state"><div className="empty-state-title">No data</div></div>;
 
   const d = data;
-  const s = d.stats;
-  const uncoveredCount = d.unassigned.length;
-  const chartMax = Math.max(...d.workload_chart.map(w => w.total), 1);
-  const currentLessonLabel = d.lesson_slots.find(sl => sl.is_current && sl.type === "lesson")?.lesson_number;
+  const s = d.stats || {} as DashboardData["stats"];
+  const lessonSlots = d.lesson_slots || EMPTY_SLOTS;
+  const classBreakdown = d.class_breakdown || EMPTY_BREAKDOWN;
+  const unassigned = d.unassigned || EMPTY_UNASSIGNED;
+  const subsToday = d.substitutions_today || EMPTY_SUBS;
+  const workloadChart = d.workload_chart || EMPTY_CHART;
+  const subHistory = d.substitution_history || EMPTY_HISTORY;
+  const absentTeachers = d.absent_teachers || EMPTY_ABSENT;
+
+  const uncoveredCount = unassigned.length;
+  const chartMax = Math.max(...workloadChart.map(w => w.total), 1);
+  const currentLessonLabel = lessonSlots.find(sl => sl.is_current && sl.type === "lesson")?.lesson_number;
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -164,7 +175,6 @@ export default function ProjectDashboard() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {/* Live clock with country flag */}
           <div style={{
             padding: "0.35rem 0.75rem", borderRadius: "var(--r-md, var(--radius-md))",
             background: "var(--surface-card, #fff)", border: "1px solid var(--border-default, var(--slate-200))",
@@ -190,8 +200,8 @@ export default function ProjectDashboard() {
           <span style={{ fontSize: "1rem" }}>⚠</span>
           <span style={{ flex: 1 }}>
             <strong>{uncoveredCount} unassigned lesson{uncoveredCount !== 1 ? "s" : ""}</strong> — {
-              d.unassigned.slice(0, 3).map(u => `${u.teacher_name} (L${u.period_index + 1})`).join(", ")
-            }{d.unassigned.length > 3 ? ` + ${d.unassigned.length - 3} more` : ""} {uncoveredCount === 1 ? "has" : "have"} no substitute assigned yet
+              unassigned.slice(0, 3).map(u => `${u.teacher_name} (L${u.period_index + 1})`).join(", ")
+            }{unassigned.length > 3 ? ` + ${unassigned.length - 3} more` : ""} {uncoveredCount === 1 ? "has" : "have"} no substitute assigned yet
           </span>
           <Link to={`/project/${pid}/substitutions`} className="btn btn-danger" style={{ fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap", padding: "4px 10px" }}>
             Assign Now
@@ -265,17 +275,16 @@ export default function ProjectDashboard() {
           <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(6,182,212,0.08)" }} />
           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#0891B2", textTransform: "uppercase", letterSpacing: "0.06em" }}>TOTAL CLASSES</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>{s.total_classes}</div>
-          <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>Sections across {s.total_grades} grade{s.total_grades !== 1 ? "s" : ""}</div>
-          {/* Grade breakdown tooltip */}
-          {d.class_breakdown.length > 0 && (
+          <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>Sections across {s.total_grades || 0} grade{(s.total_grades || 0) !== 1 ? "s" : ""}</div>
+          {classBreakdown.length > 0 && (
             <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 3 }}>
-              {d.class_breakdown.slice(0, 4).map(g => (
+              {classBreakdown.slice(0, 4).map(g => (
                 <span key={g.grade} style={{ padding: "0px 6px", borderRadius: "var(--r-pill, 999px)", background: "#ecfeff", fontSize: "0.52rem", fontWeight: 700, color: "#0891B2" }}>
                   {g.grade}: {g.sections}
                 </span>
               ))}
-              {d.class_breakdown.length > 4 && (
-                <span style={{ fontSize: "0.52rem", fontWeight: 600, color: "var(--slate-400)" }}>+{d.class_breakdown.length - 4}</span>
+              {classBreakdown.length > 4 && (
+                <span style={{ fontSize: "0.52rem", fontWeight: 600, color: "var(--slate-400)" }}>+{classBreakdown.length - 4}</span>
               )}
             </div>
           )}
@@ -322,9 +331,8 @@ export default function ProjectDashboard() {
             </div>
           </div>
 
-          {/* Lesson bar */}
           <div style={{ display: "flex", gap: 2 }}>
-            {d.lesson_slots.map((slot, i) => {
+            {lessonSlots.map((slot, i) => {
               const isBreak = slot.type === "break";
               const isCurrent = slot.is_current;
               const isPast = slot.is_past;
@@ -355,9 +363,8 @@ export default function ProjectDashboard() {
             })}
           </div>
 
-          {/* Time labels */}
           <div style={{ display: "flex", gap: 2, marginTop: 3 }}>
-            {d.lesson_slots.filter(sl => sl.type === "lesson").map((slot) => (
+            {lessonSlots.filter(sl => sl.type === "lesson").map((slot) => (
               <div key={slot.lesson_number} style={{
                 flex: 1, textAlign: "center",
                 fontSize: "0.48rem", color: slot.is_current ? "var(--color-brand)" : "var(--text-muted)",
@@ -389,9 +396,9 @@ export default function ProjectDashboard() {
             </span>
           </div>
 
-          {d.workload_chart.length > 0 ? (
+          {workloadChart.length > 0 ? (
             <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 140, marginBottom: 8 }}>
-              {d.workload_chart.map((w, i) => {
+              {workloadChart.map((w, i) => {
                 const schedH = (w.scheduled / chartMax) * 130;
                 const subH = (w.substitutions / chartMax) * 130;
                 const isOver = w.utilization_pct > 100;
@@ -464,18 +471,17 @@ export default function ProjectDashboard() {
                 padding: "2px 10px", borderRadius: "var(--r-pill, 999px)",
                 background: "var(--color-success-bg, var(--success-50))", border: "1px solid var(--success-200, #bbf7d0)",
                 fontSize: "0.6rem", fontWeight: 700, color: "var(--color-success)",
-              }}>{d.substitutions_today.length} assigned</span>
+              }}>{subsToday.length} assigned</span>
             </div>
           </div>
 
           {showHistory ? (
-            /* ── History view ── */
             <div style={{ maxHeight: 280, overflowY: "auto" }}>
-              {d.substitution_history.length === 0 ? (
+              {subHistory.length === 0 ? (
                 <div style={{ color: "var(--text-muted)", fontSize: "0.78rem", padding: "1.5rem 0", textAlign: "center" }}>
                   No substitutions in the last 30 days
                 </div>
-              ) : d.substitution_history.map((h) => (
+              ) : subHistory.map((h) => (
                 <div key={h.date} style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "0.4rem 0",
@@ -503,17 +509,16 @@ export default function ProjectDashboard() {
               ))}
             </div>
           ) : (
-            /* ── Today's subs ── */
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {d.substitutions_today.length === 0 ? (
+              {subsToday.length === 0 ? (
                 <div style={{ color: "var(--text-muted)", fontSize: "0.78rem", padding: "1.5rem 0", textAlign: "center" }}>
                   No substitutions assigned yet
                 </div>
-              ) : d.substitutions_today.map((sub, i) => (
+              ) : subsToday.map((sub, i) => (
                 <div key={sub.id} style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "0.5rem 0",
-                  borderBottom: i < d.substitutions_today.length - 1 ? "1px solid var(--border-subtle, var(--slate-100))" : "none",
+                  borderBottom: i < subsToday.length - 1 ? "1px solid var(--border-subtle, var(--slate-100))" : "none",
                 }}>
                   <div style={{
                     width: 32, height: 32, borderRadius: "50%",
@@ -561,7 +566,7 @@ export default function ProjectDashboard() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {d.substitutions_today.map((sub) => (
+            {subsToday.map((sub) => (
               <div key={`sub-${sub.id}`} style={{ display: "flex", gap: 10, fontSize: "0.72rem" }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--color-success)", flexShrink: 0, marginTop: 5 }} />
                 <div>
@@ -570,7 +575,7 @@ export default function ProjectDashboard() {
                 </div>
               </div>
             ))}
-            {d.absent_teachers.map((a) => (
+            {absentTeachers.map((a) => (
               <div key={`abs-${a.id}`} style={{ display: "flex", gap: 10, fontSize: "0.72rem" }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--color-sub, #F97316)", flexShrink: 0, marginTop: 5 }} />
                 <div>
@@ -579,7 +584,7 @@ export default function ProjectDashboard() {
                 </div>
               </div>
             ))}
-            {d.substitutions_today.length === 0 && d.absent_teachers.length === 0 && (
+            {subsToday.length === 0 && absentTeachers.length === 0 && (
               <div style={{ color: "var(--text-muted)", fontSize: "0.78rem", padding: "1rem 0", textAlign: "center" }}>
                 No activity today yet
               </div>

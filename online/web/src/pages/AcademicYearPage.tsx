@@ -51,7 +51,7 @@ export default function AcademicYearPage() {
     }).catch(console.error).finally(() => setLoading(false));
 
     // Load projects list
-    fetch("/api/projects").then(r => r.json()).then(p => setProjects(p)).catch(console.error);
+    fetch("/api/projects").then(r => r.json()).then(p => setProjects(Array.isArray(p) ? p : (p.projects || p.data || []))).catch(console.error);
   }, [pid]);
 
   async function handleSave() {
