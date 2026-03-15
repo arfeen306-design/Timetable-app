@@ -233,6 +233,17 @@ export function bulkDeleteTeachers(projectId: number, ids: number[]) {
   return api<{ deleted: number; failed: number[] }>(`/api/projects/${projectId}/teachers/bulk`, { method: "DELETE", body: JSON.stringify({ ids }) });
 }
 
+export function getTeacherSubjects(projectId: number, teacherId: number) {
+  return api<number[]>(`/api/projects/${projectId}/teachers/${teacherId}/subjects`);
+}
+
+export function setTeacherSubjects(projectId: number, teacherId: number, subjectIds: number[]) {
+  return api(`/api/projects/${projectId}/teachers/${teacherId}/subjects`, {
+    method: "PUT",
+    body: JSON.stringify({ subject_ids: subjectIds }),
+  });
+}
+
 export async function importTeachersExcel(projectId: number, file: File) {
   const form = new FormData();
   form.append("file", file);

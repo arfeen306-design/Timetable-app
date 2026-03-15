@@ -73,7 +73,7 @@ export default function ProjectEditor() {
         <ClassroomsTab pid={pid} rooms={rooms} onChange={setRooms} onNext={() => navigateTab("teachers")} />
       )}
       {tab === "teachers" && (
-        <TeachersTab pid={pid} teachers={teachers} onChange={setTeachers} onNext={() => navigateTab("lessons")} />
+        <TeachersTab pid={pid} teachers={teachers} subjects={subjects} onChange={setTeachers} onNext={() => navigateTab("lessons")} />
       )}
       {tab === "lessons" && (
         <LessonsTab pid={pid} lessons={lessons} subjects={subjects} classes={classes} teachers={teachers} onChange={setLessons} onNext={() => navigateTab("constraints")} />
