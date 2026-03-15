@@ -10,9 +10,23 @@ interface DashboardData {
   week_number: number;
   date: string;
   date_formatted: string;
+  day_name: string;
   time: string;
+  is_off_day: boolean;
   current_period: number;
+  current_lesson_start: string;
+  current_lesson_end: string;
   num_periods: number;
+  lesson_slots: {
+    type: "lesson" | "break";
+    lesson_number?: number;
+    period_index?: number;
+    label: string;
+    start_time: string;
+    end_time: string;
+    is_current: boolean;
+    is_past: boolean;
+  }[];
   stats: {
     total_teachers: number;
     present_today: number;
@@ -57,6 +71,15 @@ interface DashboardData {
 
 const AVATAR_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#22c55e"];
 function avatarColor(i: number) { return AVATAR_COLORS[i % AVATAR_COLORS.length]; }
+
+/** Convert "HH:MM" → "h:mm AM/PM" */
+function formatTime12(t: string): string {
+  if (!t) return "";
+  const [hh, mm] = t.split(":").map(Number);
+  const ampm = hh >= 12 ? "PM" : "AM";
+  const h = hh % 12 || 12;
+  return `${h}:${String(mm).padStart(2, "0")} ${ampm}`;
+}
 
 export default function ProjectDashboard() {
   const { projectId } = useParams();
@@ -261,7 +284,7 @@ export default function ProjectDashboard() {
           <div style={{ position: "absolute", top: -8, right: -8, width: 48, height: 48, borderRadius: "50%", background: "rgba(99,102,241,0.08)" }} />
           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--color-brand, var(--primary-600))", textTransform: "uppercase", letterSpacing: "0.06em" }}>BUSY RIGHT NOW</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-primary, var(--slate-900))", lineHeight: 1.2, margin: "4px 0" }}>{s.busy_now}</div>
-          <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>in Period {d.current_period + 1}</div>
+          <div style={{ fontSize: "0.65rem", color: "var(--text-muted, var(--slate-400))" }}>in Lesson {(d.lesson_slots.find(s => s.is_current && s.type === "lesson")?.lesson_number) || (d.current_period + 1)}</div>
           <div style={{ display: "inline-block", marginTop: 4, padding: "1px 8px", borderRadius: "var(--r-pill, 999px)", background: "var(--color-brand-light, var(--primary-50))", fontSize: "0.6rem", fontWeight: 700, color: "var(--color-brand, var(--primary-600))" }}>{s.free_now} teachers free</div>
         </div>
 
@@ -284,33 +307,120 @@ export default function ProjectDashboard() {
         </div>
       </div>
 
-      {/* ═══ Live Period Bar ═══ */}
-      <div className="card anim-card" style={{ padding: "0.6rem 1rem", marginBottom: 16, animationDelay: "250ms" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className="live-indicator" />
-            <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--text-primary)" }}>
-              Live right now — Period {d.current_period + 1}
+      {/* ═══ Live Lesson Bar ═══ */}
+      {d.is_off_day ? (
+        <div className="card anim-card" style={{
+          padding: "0.8rem 1rem", marginBottom: 16, animationDelay: "250ms",
+          background: "linear-gradient(135deg, var(--surface-card, #fff) 0%, #fefce8 100%)",
+          border: "1px solid var(--warning-200, #fde68a)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: "1.4rem" }}>🏖️</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--text-primary)" }}>
+                {d.day_name} — Holiday
+              </div>
+              <div style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>
+                No lessons scheduled today. Enjoy your day off!
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="card anim-card" style={{ padding: "0.6rem 1rem", marginBottom: 16, animationDelay: "250ms" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {d.current_lesson_start ? (
+                <>
+                  <span className="live-indicator" />
+                  <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                    Live right now — Lesson {d.lesson_slots.find(s => s.is_current && s.type === "lesson")?.lesson_number || ""}
+                  </span>
+                  <span style={{
+                    padding: "2px 8px", borderRadius: "var(--r-pill, 999px)",
+                    background: "var(--color-brand-light, var(--primary-50))",
+                    border: "1px solid var(--primary-200, #c7d2fe)",
+                    fontSize: "0.65rem", fontWeight: 700, color: "var(--color-brand)",
+                    fontFamily: "var(--font-mono)",
+                  }}>
+                    {formatTime12(d.current_lesson_start)} – {formatTime12(d.current_lesson_end)}
+                  </span>
+                </>
+              ) : d.lesson_slots.find(s => s.is_current && s.type === "break") ? (
+                <>
+                  <span style={{ fontSize: "1rem" }}>☕</span>
+                  <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                    Break — {d.lesson_slots.find(s => s.is_current && s.type === "break")?.label}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>📚</span>
+                  <span style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                    {d.lesson_slots.every(s => s.is_past) ? "School day ended" : "School hasn't started yet"}
+                  </span>
+                </>
+              )}
+            </div>
+            <span style={{ fontSize: "0.68rem", color: "var(--text-muted, var(--slate-400))" }}>
+              {s.busy_now} busy · {s.free_now} free · {s.on_sub_now} on sub
             </span>
           </div>
-          <span style={{ fontSize: "0.68rem", color: "var(--text-muted, var(--slate-400))" }}>
-            {s.busy_now} busy · {s.free_now} free · {s.on_sub_now} on sub
-          </span>
+
+          {/* Lesson slot bar */}
+          <div style={{ display: "flex", gap: 2, height: 28, borderRadius: 6, overflow: "hidden" }}>
+            {d.lesson_slots.map((slot, i) => {
+              const isCurrent = slot.is_current;
+              const isPast = slot.is_past && !isCurrent;
+              const isBreak = slot.type === "break";
+
+              return (
+                <div key={i} title={`${slot.label}: ${slot.start_time} – ${slot.end_time}`} style={{
+                  flex: isBreak ? 0.4 : 1,
+                  borderRadius: 3,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "0.52rem", fontWeight: 700, fontFamily: "var(--font-mono)",
+                  cursor: "default",
+                  transition: "all 0.3s",
+                  position: "relative",
+                  background: isBreak
+                    ? (isCurrent ? "var(--warning-100, #fef3c7)" : isPast ? "var(--border-subtle, var(--slate-100))" : "var(--border-default, var(--slate-200))")
+                    : isCurrent
+                      ? "var(--color-brand, var(--primary-500))"
+                      : isPast
+                        ? "var(--color-brand-mid, var(--primary-300))"
+                        : "var(--border-default, var(--slate-200))",
+                  color: isCurrent && !isBreak ? "#fff" : isPast ? "var(--text-muted)" : "var(--text-secondary, var(--slate-500))",
+                  boxShadow: isCurrent && !isBreak ? "0 0 8px rgba(99,102,241,0.4)" : "none",
+                }}>
+                  {isBreak ? "☕" : `L${slot.lesson_number}`}
+                  {isCurrent && !isBreak && (
+                    <span style={{
+                      position: "absolute", top: 2, right: 2,
+                      width: 5, height: 5, borderRadius: "50%",
+                      background: "#fff",
+                      animation: "livePulse 1.5s infinite",
+                    }} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Time labels below bar */}
+          <div style={{ display: "flex", gap: 2, marginTop: 3 }}>
+            {d.lesson_slots.filter(s => s.type === "lesson").map((slot) => (
+              <div key={slot.lesson_number} style={{
+                flex: 1, textAlign: "center",
+                fontSize: "0.48rem", color: slot.is_current ? "var(--color-brand)" : "var(--text-muted)",
+                fontFamily: "var(--font-mono)", fontWeight: slot.is_current ? 700 : 400,
+              }}>
+                {slot.start_time}–{slot.end_time}
+              </div>
+            ))}
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 3, height: 8, borderRadius: 4, overflow: "hidden" }}>
-          {Array.from({ length: d.num_periods }, (_, i) => (
-            <div key={i} style={{
-              flex: 1, borderRadius: 2,
-              background: i === d.current_period
-                ? "var(--color-brand, var(--primary-500))"
-                : i < d.current_period
-                  ? "var(--color-brand-mid, var(--primary-300))"
-                  : "var(--border-default, var(--slate-200))",
-              transition: "background 0.3s",
-            }} />
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* ═══ Unassigned warning banner ═══ */}
       {uncoveredCount > 0 && (
@@ -398,8 +508,8 @@ export default function ProjectDashboard() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 16px", fontSize: "0.68rem" }}>
                 <span><span style={{ color: "var(--color-success)", fontWeight: 700 }}>●</span> Present <strong>{s.present_today}</strong></span>
                 <span><span style={{ color: "var(--color-danger)", fontWeight: 700 }}>●</span> Absent <strong>{s.absent_today}</strong></span>
-                <span><span style={{ color: "var(--color-brand)", fontWeight: 700 }}>●</span> Busy P{d.current_period + 1} <strong>{s.busy_now}</strong></span>
-                <span><span style={{ color: "#22c55e", fontWeight: 700 }}>●</span> Free P{d.current_period + 1} <strong>{s.free_now}</strong></span>
+                <span><span style={{ color: "var(--color-brand)", fontWeight: 700 }}>●</span> Busy L{(d.lesson_slots.find(s => s.is_current && s.type === "lesson")?.lesson_number) || (d.current_period + 1)} <strong>{s.busy_now}</strong></span>
+                <span><span style={{ color: "#22c55e", fontWeight: 700 }}>●</span> Free L{(d.lesson_slots.find(s => s.is_current && s.type === "lesson")?.lesson_number) || (d.current_period + 1)} <strong>{s.free_now}</strong></span>
               </div>
             </div>
           </div>

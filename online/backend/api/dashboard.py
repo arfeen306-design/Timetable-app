@@ -38,6 +38,79 @@ def get_dashboard(
     # Number of periods per day
     num_periods = settings.periods_per_day if settings and hasattr(settings, 'periods_per_day') else 8
 
+    # ── Weekend / Holiday detection ──
+    weekend_days_str = getattr(settings, 'weekend_days', '5,6') or '5,6'
+    # weekend_days uses 0=Sun, 1=Mon, ..., 6=Sat
+    # Python weekday(): 0=Mon, 1=Tue, ..., 6=Sun
+    # Convert: Python Sun(6)->0, Mon(0)->1, ..., Sat(5)->6
+    python_weekday = today.weekday()  # 0=Mon..6=Sun
+    settings_day = (python_weekday + 1) % 7  # 0=Sun, 1=Mon, ..., 6=Sat
+    weekend_set = set()
+    for wd in weekend_days_str.split(','):
+        try:
+            weekend_set.add(int(wd.strip()))
+        except ValueError:
+            pass
+    is_off_day = settings_day in weekend_set
+
+    # ── Generate real lesson slots from bell schedule ──
+    from backend.services.time_engine import generate_period_slots_for_day
+    lesson_slots = []
+    current_lesson_index = -1  # -1 means no lesson right now
+    current_lesson_start = ""
+    current_lesson_end = ""
+
+    if not is_off_day:
+        slots = generate_period_slots_for_day(
+            day_index=python_weekday,
+            school_start_time=getattr(settings, 'school_start_time', '08:00') or '08:00',
+            school_end_time=getattr(settings, 'school_end_time', '15:00') or '15:00',
+            period_duration_minutes=getattr(settings, 'period_duration_minutes', 45) or 45,
+            breaks_json=getattr(settings, 'breaks_json', '[]') or '[]',
+            friday_start_time=getattr(settings, 'friday_start_time', None),
+            friday_end_time=getattr(settings, 'friday_end_time', None),
+            is_friday=(python_weekday == 4),
+            is_saturday=(python_weekday == 5),
+            saturday_start_time=getattr(settings, 'saturday_start_time', None),
+            saturday_end_time=getattr(settings, 'saturday_end_time', None),
+        )
+
+        now_minutes = now.hour * 60 + now.minute
+        lesson_num = 0
+        for slot in slots:
+            # Parse slot times to minutes
+            sh, sm = slot.start_time.split(':')
+            eh, em = slot.end_time.split(':')
+            start_min = int(sh) * 60 + int(sm)
+            end_min = int(eh) * 60 + int(em)
+
+            if slot.is_break:
+                lesson_slots.append({
+                    "type": "break",
+                    "label": slot.break_name or "Break",
+                    "start_time": slot.start_time,
+                    "end_time": slot.end_time,
+                    "is_current": start_min <= now_minutes < end_min,
+                    "is_past": now_minutes >= end_min,
+                })
+            else:
+                lesson_num += 1
+                is_current = start_min <= now_minutes < end_min
+                lesson_slots.append({
+                    "type": "lesson",
+                    "lesson_number": lesson_num,
+                    "period_index": slot.period_index,
+                    "label": f"Lesson {lesson_num}",
+                    "start_time": slot.start_time,
+                    "end_time": slot.end_time,
+                    "is_current": is_current,
+                    "is_past": now_minutes >= end_min,
+                })
+                if is_current:
+                    current_lesson_index = slot.period_index
+                    current_lesson_start = slot.start_time
+                    current_lesson_end = slot.end_time
+
     # ── Teachers ──
     total_teachers = db.query(func.count(Teacher.id)).filter(Teacher.project_id == project_id).scalar() or 0
 
@@ -116,9 +189,7 @@ def get_dashboard(
                 })
 
     # ── Busy/free teachers right now ──
-    # Determine current period (rough estimate based on time)
-    current_hour = now.hour
-    current_period = max(0, min(current_hour - 8, num_periods - 1))  # Period 0 starts at 8am
+    current_period = current_lesson_index if current_lesson_index >= 0 else 0
 
     busy_now = (
         db.query(func.count(func.distinct(Lesson.teacher_id)))
@@ -175,6 +246,9 @@ def get_dashboard(
             "utilization_pct": w.get("utilization_pct", 0),
         })
 
+    # Day name for display
+    day_name = today.strftime("%A")
+
     return {
         "school_name": school_name,
         "academic_year": academic_year_name,
@@ -182,16 +256,21 @@ def get_dashboard(
         "week_number": week_number,
         "date": today.isoformat(),
         "date_formatted": today.strftime("%A %d %B %Y"),
+        "day_name": day_name,
         "time": now.strftime("%I:%M %p"),
+        "is_off_day": is_off_day,
         "current_period": current_period,
+        "current_lesson_start": current_lesson_start,
+        "current_lesson_end": current_lesson_end,
         "num_periods": num_periods,
+        "lesson_slots": lesson_slots,
         "stats": {
             "total_teachers": total_teachers,
             "present_today": present_count,
             "absent_today": absent_count,
-            "busy_now": busy_now,
-            "on_sub_now": on_sub_now,
-            "free_now": free_now,
+            "busy_now": busy_now if not is_off_day else 0,
+            "on_sub_now": on_sub_now if not is_off_day else 0,
+            "free_now": free_now if not is_off_day else total_teachers,
             "avg_workload": avg_workload,
             "over_max": over_max,
             "total_classes": total_classes,
