@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { getWorkloadOverview, getYearlyWorkload, type WorkloadEntry, type YearlyWorkload } from "../api";
+import { getWorkloadOverview, getYearlyWorkload, exportWorkloadPDF, type WorkloadEntry, type YearlyWorkload } from "../api";
 import YearlyWorkloadChart from "../components/YearlyWorkloadChart";
 
 function isoWeek(d: Date): string {
@@ -96,27 +96,28 @@ export default function WorkloadPage() {
             width: 30, height: 30, borderRadius: "var(--radius-md)", border: "1px solid var(--slate-200)",
             background: "#fff", cursor: "pointer", fontSize: "0.82rem", display: "flex", alignItems: "center", justifyContent: "center",
           }}>›</button>
+          <button onClick={() => exportWorkloadPDF(pid, week)} className="btn btn-secondary" style={{ fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap", marginLeft: 6 }}>Export PDF</button>
         </div>
       </div>
 
       {/* Stat cards */}
       {!loading && data.length > 0 && (
         <div className="stat-cards" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-          <div className="stat-card">
+          <div className="stat-card anim-card" style={{ animationDelay: "0ms" }}>
             <div className="stat-card-label">TEACHERS TRACKED</div>
             <div className="stat-card-value">{data.length}</div>
           </div>
-          <div className="stat-card">
+          <div className="stat-card anim-card" style={{ animationDelay: "50ms" }}>
             <div className="stat-card-label">TOTAL SUBSTITUTIONS</div>
             <div className="stat-card-value">{totalSubs}</div>
             {totalSubs > 0 && <div className="stat-card-badge stat-card-badge--warning">across absences</div>}
           </div>
-          <div className="stat-card">
+          <div className="stat-card anim-card" style={{ animationDelay: "100ms" }}>
             <div className="stat-card-label">OVER LIMIT</div>
             <div className="stat-card-value" style={{ color: overloaded ? "var(--danger-500)" : "var(--success-500)" }}>{overloaded}</div>
             {overloaded > 0 && <div className="stat-card-badge stat-card-badge--danger">needs attention</div>}
           </div>
-          <div className="stat-card">
+          <div className="stat-card anim-card" style={{ animationDelay: "150ms" }}>
             <div className="stat-card-label">AVG. TOTAL LOAD</div>
             <div className="stat-card-value">{avgLoad}</div>
             <div className="stat-card-badge stat-card-badge--success">within bounds</div>

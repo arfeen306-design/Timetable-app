@@ -7,12 +7,13 @@
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  font-family: var(--font-sans);
-  background: var(--content-bg);
-  color: var(--slate-800);
+  font-family: var(--font-body, var(--font-sans));
+  background: var(--surface-page, var(--content-bg));
+  color: var(--text-primary, var(--slate-800));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+code, .mono { font-family: var(--font-mono); }
 #root { min-height: 100vh; }
 a { color: var(--blue-500); text-decoration: none; font-weight: 500; }
 a:hover { text-decoration: underline; color: var(--blue-600); }
@@ -85,7 +86,7 @@ a:hover { text-decoration: underline; color: var(--blue-600); }
   background: var(--sidebar-active-bg);
   color: var(--sidebar-active-text);
   font-weight: 600;
-  border-left-color: var(--sidebar-active-pill);
+  border-left-color: var(--color-brand-mid, var(--sidebar-active-pill));
 }
 .sidebar-item.disabled {
   color: var(--slate-600);

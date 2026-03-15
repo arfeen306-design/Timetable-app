@@ -527,3 +527,7 @@ export function removeAbsence(projectId: number, absenceId: number) {
   return api<{ ok: boolean }>(`/api/projects/${projectId}/substitutions/absence/${absenceId}`, { method: "DELETE" });
 }
 
+export function exportWorkloadPDF(projectId: number, week?: string) {
+  const qs = week ? `?week=${week}` : "";
+  window.open(`/api/projects/${projectId}/workload/export-pdf${qs}`, "_blank");
+}
