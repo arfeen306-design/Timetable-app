@@ -72,6 +72,37 @@ export function createDemoProject() {
   return api<{ id: number; name: string; academic_year: string }>("/api/projects/demo", { method: "POST" });
 }
 
+export function deleteProject(id: number) {
+  return api<{ ok: boolean; message: string }>(`/api/projects/${id}`, { method: "DELETE" });
+}
+
+export function exportProject(id: number, filename: string) {
+  return apiBlob(`/api/projects/${id}/export`).then((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+export async function importProject(file: File) {
+  const token = getToken();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/projects/import", {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail));
+  }
+  return res.json() as Promise<{ id: number; name: string; academic_year: string }>;
+}
+
 // School settings
 export function getSchoolSettings(projectId: number) {
   return api<{

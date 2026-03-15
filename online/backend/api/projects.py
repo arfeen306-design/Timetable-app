@@ -1,10 +1,14 @@
-"""Project API: list, create, get, duplicate, update, delete."""
+"""Project API: list, create, get, delete, export/import."""
 from __future__ import annotations
-from fastapi import APIRouter, Depends, HTTPException
+import json
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from datetime import datetime
+import io
 
 from backend.auth.deps import get_current_user
 from backend.models.base import get_db
@@ -33,18 +37,20 @@ class ProjectResponse(BaseModel):
         from_attributes = True
 
 
+# ─── LIST ────────────────────────────────────────────────────────────────────
+
 @router.get("", response_model=list[ProjectResponse])
 def list_projects(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """List projects for the current school. School A cannot see School B's projects."""
     school_id = current_user.get("school_id")
     if school_id is None:
         return []
-    projects = list_by_school(db, school_id)
-    return [ProjectResponse.model_validate(p) for p in projects]
+    return [ProjectResponse.model_validate(p) for p in list_by_school(db, school_id)]
 
+
+# ─── CREATE ──────────────────────────────────────────────────────────────────
 
 @router.post("", response_model=ProjectResponse)
 def create_project_endpoint(
@@ -52,13 +58,14 @@ def create_project_endpoint(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a new project for the current school."""
     school_id = current_user.get("school_id")
     if school_id is None:
-        raise HTTPException(status_code=403, detail="User has no school; cannot create project")
+        raise HTTPException(403, "No school")
     p = create_project(db, school_id=school_id, name=data.name, academic_year=data.academic_year or "")
     return ProjectResponse.model_validate(p)
 
+
+# ─── DEMO ────────────────────────────────────────────────────────────────────
 
 @router.post("/demo", response_model=ProjectResponse)
 def create_demo_project_endpoint(
@@ -68,10 +75,12 @@ def create_demo_project_endpoint(
     from backend.services.demo_data import create_demo_project
     school_id = current_user.get("school_id")
     if school_id is None:
-        raise HTTPException(status_code=403, detail="User has no school; cannot create demo project")
+        raise HTTPException(403, "No school")
     p = create_demo_project(db, school_id)
     return ProjectResponse.model_validate(p)
 
+
+# ─── GET ONE ─────────────────────────────────────────────────────────────────
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(
@@ -79,11 +88,196 @@ def get_project(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get one project. Returns 404 if project does not belong to current school (access protection)."""
+    school_id = current_user.get("school_id")
+    project = get_by_id_and_school(db, project_id, school_id) if school_id else None
+    if not project:
+        raise HTTPException(404, "Project not found")
+    return ProjectResponse.model_validate(project)
+
+
+# ─── DELETE ──────────────────────────────────────────────────────────────────
+
+@router.delete("/{project_id}")
+def delete_project(
+    project_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    school_id = current_user.get("school_id")
+    project = get_by_id_and_school(db, project_id, school_id) if school_id else None
+    if not project:
+        raise HTTPException(404, "Project not found")
+    for table in [
+        "timetable_entries", "timetable_runs", "constraints",
+        "lessons", "subjects", "teachers", "classes", "rooms", "school_settings",
+    ]:
+        try:
+            db.execute(text(f"DELETE FROM {table} WHERE project_id = :pid"), {"pid": project_id})
+        except Exception:
+            pass
+    db.delete(project)
+    db.commit()
+    return {"ok": True, "message": f"Project '{project.name}' deleted."}
+
+
+# ─── EXPORT (download as .timetable.json) ───────────────────────────────────
+
+def _serialize(obj):
+    d = {}
+    for col in obj.__table__.columns:
+        val = getattr(obj, col.name)
+        if isinstance(val, datetime):
+            val = val.isoformat()
+        d[col.name] = val
+    return d
+
+
+@router.get("/{project_id}/export")
+def export_project(
+    project_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    school_id = current_user.get("school_id")
+    project = get_by_id_and_school(db, project_id, school_id) if school_id else None
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    from backend.repositories.school_settings_repo import get_by_project
+    from backend.repositories.class_repo import list_by_project
+    from backend.repositories.teacher_repo import list_by_project as list_teachers
+    from backend.repositories.room_repo import list_by_project as list_rooms
+    from backend.repositories.subject_repo import list_by_project as list_subjects
+    from backend.repositories.lesson_repo import list_by_project as list_lessons
+    from backend.repositories.constraint_repo import list_by_project as list_constraints
+
+    settings = get_by_project(db, project_id)
+    data = {
+        "format_version": 1,
+        "app": "SchoolTimetableGenerator",
+        "exported_at": datetime.utcnow().isoformat(),
+        "project": {"name": project.name, "academic_year": project.academic_year},
+        "settings": _serialize(settings) if settings else None,
+        "classes": [_serialize(c) for c in list_by_project(db, project_id)],
+        "teachers": [_serialize(t) for t in list_teachers(db, project_id)],
+        "rooms": [_serialize(r) for r in list_rooms(db, project_id)],
+        "subjects": [_serialize(s) for s in list_subjects(db, project_id)],
+        "lessons": [_serialize(l) for l in list_lessons(db, project_id)],
+        "constraints": [_serialize(c) for c in list_constraints(db, project_id)],
+    }
+
+    # Strip internal IDs
+    if data["settings"]:
+        for k in ("id", "project_id", "school_id"):
+            data["settings"].pop(k, None)
+    for key in ("classes", "teachers", "rooms", "subjects", "lessons", "constraints"):
+        for item in data[key]:
+            item.pop("project_id", None)
+
+    content = json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")
+    fname = f"{project.name.replace(' ', '_')}_{project.academic_year}.timetable.json"
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+# ─── IMPORT (upload .timetable.json) ────────────────────────────────────────
+
+@router.post("/import", response_model=ProjectResponse)
+async def import_project(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     school_id = current_user.get("school_id")
     if school_id is None:
-        raise HTTPException(status_code=404, detail="Project not found")
-    project = get_by_id_and_school(db, project_id=project_id, school_id=school_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(403, "No school")
+
+    try:
+        content = await file.read()
+        data = json.loads(content)
+    except Exception:
+        raise HTTPException(400, "Invalid JSON file")
+
+    if data.get("app") != "SchoolTimetableGenerator":
+        raise HTTPException(400, "Not a valid timetable project file")
+
+    proj_info = data.get("project", {})
+    project = create_project(
+        db, school_id=school_id,
+        name=f"{proj_info.get('name', 'Imported')} (imported)",
+        academic_year=proj_info.get("academic_year", ""),
+    )
+    pid = project.id
+
+    # Settings
+    if data.get("settings"):
+        from backend.repositories.school_settings_repo import create_or_update
+        s = data["settings"]
+        s.pop("id", None)
+        s["project_id"] = pid
+        create_or_update(db, pid, s)
+
+    # ID maps for relinking
+    old_class = {}
+    old_teacher = {}
+    old_room = {}
+    old_subject = {}
+
+    from backend.repositories.class_repo import create as create_class
+    for c in data.get("classes", []):
+        old_id = c.pop("id", None)
+        c.pop("class_teacher_id", None)
+        new = create_class(db, pid, c.get("name", ""), c.get("code", ""), c.get("grade_level", ""))
+        if old_id:
+            old_class[old_id] = new.id
+
+    from backend.repositories.teacher_repo import create as create_teacher
+    for t in data.get("teachers", []):
+        old_id = t.pop("id", None)
+        new = create_teacher(
+            db, pid, t.get("first_name", ""), t.get("last_name", ""),
+            code=t.get("code", ""), title=t.get("title", ""),
+            email=t.get("email"), max_periods=t.get("max_periods_per_day"),
+        )
+        if old_id:
+            old_teacher[old_id] = new.id
+
+    from backend.repositories.room_repo import create as create_room
+    for r in data.get("rooms", []):
+        old_id = r.pop("id", None)
+        new = create_room(db, pid, r.get("name", ""), r.get("code", ""), r.get("capacity"))
+        if old_id:
+            old_room[old_id] = new.id
+
+    from backend.repositories.subject_repo import create as create_subject
+    for s in data.get("subjects", []):
+        old_id = s.pop("id", None)
+        new = create_subject(db, pid, s.get("name", ""), s.get("code", ""), s.get("color"))
+        if old_id:
+            old_subject[old_id] = new.id
+
+    from backend.repositories.lesson_repo import create as create_lesson
+    for l in data.get("lessons", []):
+        l.pop("id", None)
+        nc = old_class.get(l.get("class_id"))
+        nt = old_teacher.get(l.get("teacher_id"))
+        ns = old_subject.get(l.get("subject_id"))
+        nr = old_room.get(l.get("room_id"))
+        if nc and nt and ns:
+            create_lesson(db, pid, nc, nt, ns, periods_per_week=l.get("periods_per_week", 1), room_id=nr)
+
+    from backend.repositories.constraint_repo import create as create_constraint
+    for c in data.get("constraints", []):
+        c.pop("id", None)
+        et = c.get("entity_type", "")
+        oid = c.get("entity_id")
+        nid = old_class.get(oid) if et == "class" else old_teacher.get(oid) if et == "teacher" else old_room.get(oid)
+        if nid:
+            create_constraint(db, pid, et, nid, c.get("day_index", 0), c.get("period_index", 0), c.get("is_hard", True))
+
+    db.commit()
+    db.refresh(project)
     return ProjectResponse.model_validate(project)

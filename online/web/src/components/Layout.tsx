@@ -71,8 +71,19 @@ export default function Layout() {
         <header className="topbar">
           <span className="topbar-spacer" />
           <span className="topbar-user">{user?.email}</span>
-          <button type="button" className="btn btn-topbar" onClick={logout}>
-            Logout
+          <button type="button" onClick={logout} title="Logout"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              padding: "0.3rem 0.75rem", borderRadius: 20,
+              background: "linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%)",
+              color: "#fecaca", border: "1px solid #7f1d1d",
+              fontSize: "0.72rem", fontWeight: 600, cursor: "pointer",
+              transition: "all 0.15s ease", letterSpacing: "0.02em",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, #b91c1c 0%, #991b1b 100%)"; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%)"; e.currentTarget.style.color = "#fecaca"; }}
+          >
+            <span style={{ fontSize: "0.82rem" }}>⏻</span> Sign out
           </button>
         </header>
         <main className="main-content">
