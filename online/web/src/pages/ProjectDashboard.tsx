@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../api";
+import { useLivePeriod } from "../hooks/useLivePeriod";
 
 /* ── Types ── */
 interface LiveTeacher {
@@ -95,22 +96,6 @@ export default function ProjectDashboard() {
     setLoading(true);
     const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     api<DashboardData>(`/api/projects/${pid}/dashboard?tz=${encodeURIComponent(clientTz)}`)
-      .then(raw => {
-        if (raw.lesson_slots?.length) {
-          const now = new Date();
-          const nowMin = now.getHours() * 60 + now.getMinutes();
-          let found = false;
-          for (const sl of raw.lesson_slots) {
-            const [sh, sm] = sl.start_time.split(":").map(Number);
-            const [eh, em] = sl.end_time.split(":").map(Number);
-            sl.is_current = nowMin >= sh * 60 + sm && nowMin < eh * 60 + em;
-            sl.is_past = nowMin >= eh * 60 + em;
-            if (sl.is_current && sl.type === "lesson") found = true;
-          }
-          if (!found) { raw.current_lesson_start = ""; raw.current_lesson_end = ""; }
-        }
-        return raw;
-      })
       .then(setData).catch(console.error).finally(() => setLoading(false));
   }, [pid]);
 
@@ -136,7 +121,9 @@ export default function ProjectDashboard() {
   const absent = d.absent_teachers || E_AT;
   const liveT = d.live_teachers || E_LT;
   const chartMax = Math.max(...wChart.map(w => w.total), 1);
-  const curLesson = slots.find(sl => sl.is_current && sl.type === "lesson");
+  // useLivePeriod ticks every 30 s — replaces the old one-shot slot mutation
+  const { currentSlot, currentIndex } = useLivePeriod(slots);
+  const curLesson = currentSlot?.type === "lesson" ? currentSlot : null;
   const uncovered = unassigned.length;
 
   /* ── Donut SVG calculation ── */
@@ -299,12 +286,12 @@ export default function ProjectDashboard() {
               <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#fff" }}>
                 Live right now {curLesson ? `— Lesson ${curLesson.lesson_number}` : ""}
               </span>
-              {d.current_lesson_start && (
+              {curLesson && (
                 <span style={{
                   background: "rgba(91,78,232,0.4)", color: "#C4BEFF",
                   fontSize: "0.68rem", fontWeight: 700, padding: "3px 10px",
                   borderRadius: 20, fontFamily: "var(--font-mono)",
-                }}>{fmt12(d.current_lesson_start)} – {fmt12(d.current_lesson_end)}</span>
+                }}>{fmt12(curLesson.start_time)} – {fmt12(curLesson.end_time)}</span>
               )}
             </div>
             <div style={{ fontSize: "0.68rem", color: "#4A5568", fontFamily: "var(--font-mono)" }}>
@@ -367,18 +354,23 @@ export default function ProjectDashboard() {
             /* Fallback: lesson slot bar if no live teachers */
             <div style={{ padding: "0 14px 14px", position: "relative" }}>
               <div style={{ display: "flex", gap: 2 }}>
-                {slots.map((sl, i) => (
-                  <div key={i} style={{
-                    flex: sl.type === "break" ? 0.3 : 1, height: sl.type === "break" ? 24 : 32,
-                    borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: sl.type === "break" ? "0.52rem" : "0.62rem", fontWeight: 700,
-                    background: sl.is_current ? "#5B4EE8" : sl.is_past ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
-                    color: sl.is_current ? "#fff" : sl.is_past ? "#4A5568" : "#6B7A99",
-                    border: sl.is_current ? "none" : "1px solid rgba(255,255,255,0.06)",
-                  }}>
-                    {sl.type === "break" ? "☕" : `L${sl.lesson_number}`}
-                  </div>
-                ))}
+                {slots.map((sl, i) => {
+                  const isCurrent = i === currentIndex;
+                  const [eh, em] = sl.end_time.split(":").map(Number);
+                  const isPast = (new Date().getHours() * 60 + new Date().getMinutes()) >= eh * 60 + em;
+                  return (
+                    <div key={i} style={{
+                      flex: sl.type === "break" ? 0.3 : 1, height: sl.type === "break" ? 24 : 32,
+                      borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: sl.type === "break" ? "0.52rem" : "0.62rem", fontWeight: 700,
+                      background: isCurrent ? "#5B4EE8" : isPast ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+                      color: isCurrent ? "#fff" : isPast ? "#4A5568" : "#6B7A99",
+                      border: isCurrent ? "none" : "1px solid rgba(255,255,255,0.06)",
+                    }}>
+                      {sl.type === "break" ? "☕" : `L${sl.lesson_number}`}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
