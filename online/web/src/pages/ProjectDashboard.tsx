@@ -132,7 +132,31 @@ export default function ProjectDashboard() {
   useEffect(() => {
     if (!pid) return;
     setLoading(true);
-    api<DashboardData>(`/api/projects/${pid}/dashboard`)
+    const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    api<DashboardData>(`/api/projects/${pid}/dashboard?tz=${encodeURIComponent(clientTz)}`)
+      .then(raw => {
+        // Re-compute is_current / is_past client-side using browser's real local time
+        if (raw.lesson_slots && raw.lesson_slots.length > 0) {
+          const now = new Date();
+          const nowMin = now.getHours() * 60 + now.getMinutes();
+          let foundCurrent = false;
+          for (const slot of raw.lesson_slots) {
+            const [sh, sm] = slot.start_time.split(":").map(Number);
+            const [eh, em] = slot.end_time.split(":").map(Number);
+            const startMin = sh * 60 + sm;
+            const endMin = eh * 60 + em;
+            slot.is_current = nowMin >= startMin && nowMin < endMin;
+            slot.is_past = nowMin >= endMin;
+            if (slot.is_current && slot.type === "lesson") foundCurrent = true;
+          }
+          // If no lesson is current (school is over or not started), clear the live bar
+          if (!foundCurrent) {
+            raw.current_lesson_start = "";
+            raw.current_lesson_end = "";
+          }
+        }
+        return raw;
+      })
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false));

@@ -1,10 +1,14 @@
 """Dashboard API — aggregated data for the project command center."""
 from __future__ import annotations
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 from fastapi import APIRouter, Depends, Path, Query, Request
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo  # Python 3.8 compat
 
 from backend.auth.project_scope import get_project_or_404
 from backend.models.base import get_db
@@ -23,13 +27,24 @@ def get_dashboard(
     request: Request,
     project_id: int = Path(...),
     dt: Optional[str] = Query(None, alias="date", description="YYYY-MM-DD, defaults to today"),
+    tz: Optional[str] = Query(None, description="Client timezone, e.g. Asia/Karachi"),
     project=Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
     """Main dashboard data aggregation — single call for the project command center."""
-    today = date.fromisoformat(dt) if dt else date.today()
+    # Use client timezone if provided, otherwise fall back to UTC
+    try:
+        user_tz = ZoneInfo(tz) if tz else None
+    except (KeyError, Exception):
+        user_tz = None
+
+    if user_tz:
+        now = datetime.now(user_tz)
+    else:
+        now = datetime.now()
+
+    today = date.fromisoformat(dt) if dt else now.date()
     day_index = today.weekday()  # 0=Mon .. 4=Fri
-    now = datetime.now()
 
     # ── School info ──
     from backend.repositories.school_settings_repo import get_by_project
