@@ -8,6 +8,7 @@ from typing import Optional, List
 from backend.auth.project_scope import get_project_or_404
 from backend.models.base import get_db
 from backend.models.project import Project
+from backend.models.teacher_model import Teacher
 from backend.repositories import teacher_repo
 from backend.services.excel_import_service import import_teachers_from_excel, ImportResult, RowError
 
@@ -73,6 +74,15 @@ class BulkResult(BaseModel):
     errors: List[dict]  # [{ "row": int, "message": str }]
 
 
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+
+
+class BulkDeleteResult(BaseModel):
+    deleted: int
+    failed: List[int]
+
+
 @router.post("/bulk", response_model=BulkResult)
 def bulk_create_teachers(
     data: TeacherBulkCreate,
@@ -103,6 +113,40 @@ def bulk_create_teachers(
         except Exception as e:
             errors.append({"row": i + 1, "message": str(e)})
     return BulkResult(created=created, errors=errors)
+
+
+@router.delete("/bulk", response_model=BulkDeleteResult)
+def bulk_delete_teachers(
+    data: BulkDeleteRequest,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    if not data.ids:
+        return BulkDeleteResult(deleted=0, failed=[])
+    # Security: 403 if any id belongs to a different project
+    foreign = (
+        db.query(Teacher)
+        .filter(Teacher.id.in_(data.ids), Teacher.project_id != project.id)
+        .first()
+    )
+    if foreign:
+        raise HTTPException(status_code=403, detail="One or more IDs do not belong to this project")
+    # Fetch only records that exist in this project
+    to_delete = (
+        db.query(Teacher)
+        .filter(Teacher.id.in_(data.ids), Teacher.project_id == project.id)
+        .all()
+    )
+    deleted_ids = {t.id for t in to_delete}
+    failed = [tid for tid in data.ids if tid not in deleted_ids]
+    try:
+        for t in to_delete:
+            db.delete(t)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Bulk delete failed")
+    return BulkDeleteResult(deleted=len(to_delete), failed=failed)
 
 
 class ImportExcelResult(BaseModel):

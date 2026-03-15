@@ -164,6 +164,10 @@ export function bulkCreateClasses(projectId: number, items: { grade: string; sec
   return api<{ created: number; errors: { row: number; message: string }[] }>(`/api/projects/${projectId}/classes/bulk`, { method: "POST", body: JSON.stringify({ items }) });
 }
 
+export function bulkDeleteClasses(projectId: number, ids: number[]) {
+  return api<{ deleted: number; failed: number[] }>(`/api/projects/${projectId}/classes/bulk`, { method: "DELETE", body: JSON.stringify({ ids }) });
+}
+
 export async function importClassesExcel(projectId: number, file: File) {
   const form = new FormData();
   form.append("file", file);
@@ -223,6 +227,10 @@ export function deleteTeacher(projectId: number, id: number) {
 
 export function bulkCreateTeachers(projectId: number, items: { first_name: string; last_name?: string; code?: string; title?: string; color?: string; max_periods_day?: number; max_periods_week?: number }[]) {
   return api<{ created: number; errors: { row: number; message: string }[] }>(`/api/projects/${projectId}/teachers/bulk`, { method: "POST", body: JSON.stringify({ items }) });
+}
+
+export function bulkDeleteTeachers(projectId: number, ids: number[]) {
+  return api<{ deleted: number; failed: number[] }>(`/api/projects/${projectId}/teachers/bulk`, { method: "DELETE", body: JSON.stringify({ ids }) });
 }
 
 export async function importTeachersExcel(projectId: number, file: File) {

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import * as api from "../../api";
 import { useToast } from "../../context/ToastContext";
 import { TITLE_OPTIONS } from "../../constants";
+import BulkDeleteModal from "../../components/BulkDeleteModal";
 
 type Teacher = Awaited<ReturnType<typeof api.listTeachers>>[0];
 
@@ -16,7 +17,9 @@ function TeachersTab({ pid, teachers, onChange, onNext }: Props) {
   const toast = useToast();
   const list = Array.isArray(teachers) ? teachers : [];
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [editTeacher, setEditTeacher] = useState<Teacher | null>(null);
   const importRef = React.createRef<HTMLInputElement>();
   const [importing, setImporting] = useState(false);
@@ -29,6 +32,19 @@ function TeachersTab({ pid, teachers, onChange, onNext }: Props) {
   const [fColor, setFColor] = useState("#E8725A");
   const [fMaxDay, setFMaxDay] = useState(6);
   const [fMaxWeek, setFMaxWeek] = useState(30);
+
+  function toggleCheck(id: number, e: React.ChangeEvent<HTMLInputElement>) {
+    e.stopPropagation();
+    setCheckedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll(e: React.ChangeEvent<HTMLInputElement>) {
+    setCheckedIds(e.target.checked ? new Set(list.map(t => t.id)) : new Set());
+  }
 
   function openAdd() {
     setEditTeacher(null);
@@ -76,6 +92,16 @@ function TeachersTab({ pid, teachers, onChange, onNext }: Props) {
     } catch (err) { toast("error", err instanceof Error ? err.message : "Delete failed"); }
   }
 
+  async function handleBulkDelete(ids: number[]) {
+    const result = await api.bulkDeleteTeachers(pid, ids);
+    onChange(list.filter(t => !ids.includes(t.id)));
+    setCheckedIds(new Set());
+    setBulkDeleteOpen(false);
+    const msg = `${result.deleted} teacher${result.deleted !== 1 ? "s" : ""} deleted.` +
+      (result.failed.length > 0 ? ` ${result.failed.length} could not be removed.` : "");
+    toast("success", msg);
+  }
+
   async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
     setImporting(true); setImportResult(null);
@@ -86,6 +112,12 @@ function TeachersTab({ pid, teachers, onChange, onNext }: Props) {
     } catch (err) { toast("error", err instanceof Error ? err.message : "Import failed"); }
     finally { setImporting(false); e.target.value = ""; }
   }
+
+  const allChecked = list.length > 0 && checkedIds.size === list.length;
+  const someChecked = checkedIds.size > 0 && !allChecked;
+  const checkedItems = list
+    .filter(t => checkedIds.has(t.id))
+    .map(t => ({ id: t.id, name: `${t.first_name} ${t.last_name}`.trim() }));
 
   return (
     <div className="card">
@@ -99,6 +131,11 @@ function TeachersTab({ pid, teachers, onChange, onNext }: Props) {
         <button type="button" className="btn" onClick={() => api.downloadTemplate("teachers")}>Download Template</button>
         <button type="button" className="btn" onClick={() => openEdit()} disabled={selectedId == null}>Edit</button>
         <button type="button" className="btn btn-danger" onClick={deleteSelected} disabled={selectedId == null}>Delete</button>
+        {checkedIds.size > 0 && (
+          <button type="button" className="btn btn-danger" onClick={() => setBulkDeleteOpen(true)}>
+            Delete selected ({checkedIds.size})
+          </button>
+        )}
       </div>
 
       {importResult && (
@@ -109,10 +146,27 @@ function TeachersTab({ pid, teachers, onChange, onNext }: Props) {
 
       {list.length === 0 && <p className="subheading" style={{ textAlign: "center" }}>No teachers added yet. Add at least one teacher before creating lessons.</p>}
       <table className="data-table">
-        <thead><tr><th style={{ width: 40 }}>#</th><th>Name</th><th>Code</th><th>Title</th><th style={{ width: 60 }}>Color</th><th>Max/Day</th><th>Max/Week</th></tr></thead>
+        <thead>
+          <tr>
+            <th style={{ width: 36 }}>
+              <input
+                type="checkbox"
+                checked={allChecked}
+                ref={el => { if (el) el.indeterminate = someChecked; }}
+                onChange={toggleAll}
+                title="Select all"
+              />
+            </th>
+            <th style={{ width: 40 }}>#</th>
+            <th>Name</th><th>Code</th><th>Title</th><th style={{ width: 60 }}>Color</th><th>Max/Day</th><th>Max/Week</th>
+          </tr>
+        </thead>
         <tbody>
           {list.map((t, i) => (
             <tr key={t.id} className={selectedId === t.id ? "selected" : ""} onClick={() => setSelectedId(t.id)} onDoubleClick={() => openEdit(t)}>
+              <td onClick={e => e.stopPropagation()}>
+                <input type="checkbox" checked={checkedIds.has(t.id)} onChange={e => toggleCheck(t.id, e)} />
+              </td>
               <td>{i + 1}</td><td>{t.first_name} {t.last_name}</td><td>{t.code}</td><td>{t.title}</td>
               <td><span className="color-swatch" style={{ backgroundColor: t.color || "#E8725A" }} /></td>
               <td>{t.max_periods_day}</td><td>{t.max_periods_week}</td>
@@ -147,6 +201,15 @@ function TeachersTab({ pid, teachers, onChange, onNext }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {bulkDeleteOpen && (
+        <BulkDeleteModal
+          items={checkedItems}
+          entityLabel="teacher"
+          onConfirm={handleBulkDelete}
+          onClose={() => setBulkDeleteOpen(false)}
+        />
       )}
     </div>
   );
