@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, createProject, createDemoProject, importProject, exportProject } from "../api";
+import { api } from "../api";
 
 /* ── Types ── */
 interface DashboardData {
@@ -87,17 +87,6 @@ export default function ProjectDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Quick action state
-  const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newYear, setNewYear] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [actionMsg, setActionMsg] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     if (!pid) return;
     setLoading(true);
@@ -106,51 +95,6 @@ export default function ProjectDashboard() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [pid]);
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newName.trim()) return;
-    setCreating(true); setActionMsg("");
-    try {
-      const p = await createProject({ name: newName.trim(), academic_year: newYear.trim() || new Date().getFullYear().toString() });
-      setShowCreate(false); setNewName(""); setNewYear("");
-      setActionMsg("✅ Project created! Redirecting…");
-      window.location.href = `/project/${p.id}/settings`;
-    } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Failed"}`); }
-    finally { setCreating(false); }
-  }
-
-  async function handleDemo() {
-    setDemoLoading(true); setActionMsg("");
-    try {
-      const p = await createDemoProject();
-      setActionMsg("✅ Demo project created! Redirecting…");
-      setTimeout(() => { window.location.href = `/project/${p.id}/dashboard`; }, 500);
-    } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Failed"}`); }
-    finally { setDemoLoading(false); }
-  }
-
-  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true); setActionMsg("");
-    try {
-      const p = await importProject(file);
-      setActionMsg(`✅ Imported "${p.name}"! Redirecting…`);
-      setTimeout(() => { window.location.href = `/project/${p.id}/dashboard`; }, 500);
-    } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Import failed"}`); }
-    finally { setImporting(false); if (fileRef.current) fileRef.current.value = ""; }
-  }
-
-  async function handleExport() {
-    setExporting(true); setActionMsg("");
-    try {
-      const name = data?.school_name?.replace(/\s/g, "_") || "project";
-      await exportProject(pid, `${name}_${data?.academic_year || "export"}.timetable.json`);
-      setActionMsg("✅ Project file downloaded!");
-    } catch (err) { setActionMsg(`❌ ${err instanceof Error ? err.message : "Export failed"}`); }
-    finally { setExporting(false); }
-  }
 
   if (loading) return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -190,54 +134,6 @@ export default function ProjectDashboard() {
         </div>
       </div>
 
-      {/* ═══ Quick Actions Bar ═══ */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <button className="btn btn-primary" onClick={() => setShowCreate(!showCreate)}
-          style={{ fontSize: "0.78rem", padding: "0.4rem 0.85rem" }}>
-          + New Timetable
-        </button>
-        <button className="btn" onClick={handleDemo} disabled={demoLoading}
-          style={{ fontSize: "0.78rem", padding: "0.4rem 0.85rem" }}>
-          {demoLoading ? "⏳ Loading…" : "🧪 Load Demo Data"}
-        </button>
-        <button className="btn" onClick={() => fileRef.current?.click()} disabled={importing}
-          style={{ fontSize: "0.78rem", padding: "0.4rem 0.85rem" }}>
-          {importing ? "⏳ Uploading…" : "📂 Upload Project"}
-        </button>
-        <button className="btn" onClick={handleExport} disabled={exporting}
-          style={{ fontSize: "0.78rem", padding: "0.4rem 0.85rem" }}>
-          {exporting ? "⏳…" : "💾 Save Project"}
-        </button>
-        <input ref={fileRef} type="file" accept=".json,.timetable.json" style={{ display: "none" }} onChange={handleImportFile} />
-        {actionMsg && (
-          <span style={{
-            fontSize: "0.72rem", fontWeight: 600, marginLeft: 4,
-            color: actionMsg.startsWith("✅") ? "var(--color-success)" : "var(--color-danger)",
-          }}>{actionMsg}</span>
-        )}
-      </div>
-
-      {/* ═══ Create Project Form (collapsible) ═══ */}
-      {showCreate && (
-        <div className="card" style={{ marginBottom: 12, padding: "0.85rem 1rem" }}>
-          <form onSubmit={handleCreate} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 160 }}>
-              <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", display: "block", marginBottom: 4 }}>School / Project Name</label>
-              <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. The City School" required
-                style={{ width: "100%", padding: "0.45rem 0.7rem", borderRadius: "var(--r-md, var(--radius-md))", border: "1px solid var(--border-default, var(--slate-300))", fontSize: "0.82rem", fontFamily: "inherit" }} />
-            </div>
-            <div style={{ minWidth: 120 }}>
-              <label style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", display: "block", marginBottom: 4 }}>Academic Year</label>
-              <input value={newYear} onChange={e => setNewYear(e.target.value)} placeholder="e.g. 2025-26"
-                style={{ width: "100%", padding: "0.45rem 0.7rem", borderRadius: "var(--r-md, var(--radius-md))", border: "1px solid var(--border-default, var(--slate-300))", fontSize: "0.82rem", fontFamily: "inherit" }} />
-            </div>
-            <button type="submit" className="btn btn-primary" disabled={creating} style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>
-              {creating ? "Creating…" : "Create & Open"}
-            </button>
-            <button type="button" className="btn" onClick={() => setShowCreate(false)} style={{ fontSize: "0.78rem" }}>Cancel</button>
-          </form>
-        </div>
-      )}
 
       {/* ═══ Unassigned alert ═══ */}
       {uncoveredCount > 0 && (

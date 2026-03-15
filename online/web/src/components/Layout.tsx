@@ -13,7 +13,7 @@ const NAV_GROUPS = [
   {
     label: "SETUP",
     items: [
-      { num: 2, label: "Academic Year",icon: "🗓️", path: "/project/:projectId/academic-year", segment: "academic-year" },
+      { num: 2, label: "New Timetable",icon: "🗓️", path: "/project/:projectId/academic-year", segment: "academic-year" },
       { num: 3, label: "School",      icon: "🏫", path: "/project/:projectId/settings",      segment: "settings" },
       { num: 4, label: "Subjects",     icon: "📚", path: "/project/:projectId/subjects",      segment: "subjects" },
       { num: 5, label: "Classes",      icon: "🎓", path: "/project/:projectId/classes",       segment: "classes" },
