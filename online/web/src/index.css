@@ -2,6 +2,7 @@
    GLOBAL STYLES — built on design tokens
    ═══════════════════════════════════════════════════════════════════════════ */
 @import './styles/tokens.css';
+@import './styles/animations.css';
 
 * { box-sizing: border-box; }
 body {

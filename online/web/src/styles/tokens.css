@@ -2,6 +2,7 @@
    DESIGN TOKENS — Single source of truth for all visual properties
    Import this file FIRST in index.css
    ═══════════════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
 
 :root {
   /* ── Typography ── */
@@ -40,25 +41,62 @@
   --blue-600: #2563eb;
   --blue-700: #1d4ed8;
 
+  /* ── Brand aliases ── */
+  --color-brand:        var(--primary-600);
+  --color-brand-light:  var(--primary-50);
+  --color-brand-mid:    var(--primary-400);
+  --color-brand-dark:   var(--primary-700);
+
+  /* ── Surfaces ── */
+  --surface-page:       #F8FAFC;
+  --surface-card:       #ffffff;
+  --surface-raised:     #F1F5F9;
+
+  /* ── Text ── */
+  --text-primary:       #0F172A;
+  --text-secondary:     #475569;
+  --text-muted:         #94A3B8;
+  --text-hint:          #CBD5E1;
+
+  /* ── Borders ── */
+  --border-subtle:      #F1F5F9;
+  --border-default:     #E2E8F0;
+  --border-strong:      #CBD5E1;
+
   /* ── Semantic colors ── */
   --success-50:  #f0fdf4;
   --success-100: #dcfce7;
+  --success-200: #bbf7d0;
   --success-500: #22c55e;
   --success-600: #16a34a;
   --success-700: #15803d;
 
   --warning-50:  #fffbeb;
   --warning-100: #fef3c7;
+  --warning-200: #fde68a;
   --warning-400: #fbbf24;
   --warning-500: #f59e0b;
   --warning-600: #d97706;
+  --warning-700: #b45309;
 
   --danger-50:  #fef2f2;
   --danger-100: #fee2e2;
+  --danger-200: #fecaca;
   --danger-400: #f87171;
   --danger-500: #ef4444;
   --danger-600: #dc2626;
   --danger-700: #b91c1c;
+
+  --color-sub:          #F97316;   /* substitution accent — orange */
+  --color-sub-bg:       #FFF7ED;
+
+  /* ── Subject cell colors (timetable) ── */
+  --subj-math-bg:       #EEF2FF;  --subj-math-text: #3730A3;
+  --subj-sci-bg:        #F0FDF4;  --subj-sci-text:  #166534;
+  --subj-eng-bg:        #FFF7ED;  --subj-eng-text:  #92400E;
+  --subj-hist-bg:       #FDF4FF;  --subj-hist-text: #6B21A8;
+  --subj-phy-bg:        #F0F9FF;  --subj-phy-text:  #075985;
+  --subj-sub-bg:        #FFF1F2;  --subj-sub-text:  #9F1239;
 
   /* ── Subject category colors (tint + accent) ── */
   --subj-math-tint:     #eef2ff;
@@ -122,6 +160,17 @@
   --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
   --duration-fast: 150ms;
   --duration-normal: 200ms;
+  --t-fast:   0.12s ease;
+  --t-normal: 0.2s ease;
+  --t-slow:   0.35s ease;
+}
+
+/* ── View transitions ── */
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
 }
 
 /* ── Skeleton loader animation ── */

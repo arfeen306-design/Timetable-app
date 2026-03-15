@@ -71,6 +71,7 @@ export default function SubstitutionPage() {
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const [removingChips, setRemovingChips] = useState<Set<number>>(new Set());
   // Confirmation step
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   // Override warning
@@ -184,8 +185,8 @@ export default function SubstitutionPage() {
         <div>
           <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800, color: "var(--slate-900)" }}>Substitution Manager</h1>
           {selectedWeek && (
-            <p style={{ margin: "2px 0 0", fontSize: "0.72rem", color: "var(--slate-400)" }}>
-              Academic Year {weeks.length > 0 ? "Active" : ""}
+            <p style={{ margin: "2px 0 0", fontSize: "0.72rem", color: "var(--slate-400)", display: "flex", alignItems: "center", gap: 6 }}>
+              <span className="live-indicator" /> Week {selectedWeek.week_number}
             </p>
           )}
         </div>
@@ -212,14 +213,25 @@ export default function SubstitutionPage() {
         <div className="card" style={{ padding: "0.65rem 1rem" }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
             {absences.map(a => (
-              <span key={a.id} style={{
+              <span key={a.id} className={removingChips.has(a.id) ? "chip-removing" : ""} style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
                 padding: "4px 10px 4px 8px", borderRadius: "var(--radius-full)",
                 background: "var(--danger-50)", border: "1px solid var(--danger-100)",
                 fontSize: "0.78rem", fontWeight: 600, color: "var(--danger-600)",
+                transformOrigin: "center left",
               }}>
                 {a.teacher_name}
-                <button onClick={async () => { await removeAbsence(pid, a.id); loadDayData(); }}
+                <button onClick={() => {
+                  const removed = a;
+                  setRemovingChips(prev => new Set(prev).add(a.id));
+                  setTimeout(() => {
+                    setAbsences(prev => prev.filter(x => x.id !== a.id));
+                    setRemovingChips(prev => { const s = new Set(prev); s.delete(a.id); return s; });
+                  }, 150);
+                  removeAbsence(pid, a.id).catch(() => {
+                    setAbsences(prev => [...prev, removed]);
+                  });
+                }}
                   style={{ background: "none", border: "none", color: "var(--danger-400)", cursor: "pointer", fontSize: "0.82rem", padding: 0, lineHeight: 1 }}
                   title="Remove absence">✕</button>
               </span>

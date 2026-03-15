@@ -13,28 +13,28 @@ const NAV_GROUPS = [
   {
     label: "SETUP",
     items: [
-      { num: 2, label: "School",      icon: "🏫", path: "/project/:projectId/settings",    segment: "settings" },
-      { num: 3, label: "Subjects",     icon: "📚", path: "/project/:projectId/subjects",    segment: "subjects" },
-      { num: 4, label: "Classes",      icon: "🎓", path: "/project/:projectId/classes",     segment: "classes" },
-      { num: 5, label: "Classrooms",   icon: "🚪", path: "/project/:projectId/rooms",       segment: "rooms" },
-      { num: 6, label: "Teachers",     icon: "👩‍🏫", path: "/project/:projectId/teachers",    segment: "teachers" },
-      { num: 7, label: "Lessons",      icon: "📋", path: "/project/:projectId/lessons",     segment: "lessons" },
-      { num: 8, label: "Constraints",  icon: "⚙️", path: "/project/:projectId/constraints", segment: "constraints" },
+      { num: 2, label: "Academic Year",icon: "🗓️", path: "/project/:projectId/academic-year", segment: "academic-year" },
+      { num: 3, label: "School",      icon: "🏫", path: "/project/:projectId/settings",      segment: "settings" },
+      { num: 4, label: "Subjects",     icon: "📚", path: "/project/:projectId/subjects",      segment: "subjects" },
+      { num: 5, label: "Classes",      icon: "🎓", path: "/project/:projectId/classes",       segment: "classes" },
+      { num: 6, label: "Classrooms",   icon: "🚪", path: "/project/:projectId/rooms",         segment: "rooms" },
+      { num: 7, label: "Teachers",     icon: "👩‍🏫", path: "/project/:projectId/teachers",      segment: "teachers" },
+      { num: 8, label: "Lessons",      icon: "📋", path: "/project/:projectId/lessons",       segment: "lessons" },
+      { num: 9, label: "Constraints",  icon: "⚙️", path: "/project/:projectId/constraints",   segment: "constraints" },
     ],
   },
   {
     label: "SCHEDULE",
     items: [
-      { num: 9,  label: "Generate",       icon: "⚡", path: "/project/:projectId/generate",       segment: "generate" },
-      { num: 10, label: "Review & Export", icon: "📊", path: "/project/:projectId/review",         segment: "review" },
+      { num: 10, label: "Generate",       icon: "⚡", path: "/project/:projectId/generate",       segment: "generate" },
+      { num: 11, label: "Review & Export", icon: "📊", path: "/project/:projectId/review",         segment: "review" },
     ],
   },
   {
     label: "DAILY OPS",
     items: [
-      { num: 11, label: "Workload",       icon: "📈", path: "/project/:projectId/workload",       segment: "workload",       badge: "New" },
-      { num: 12, label: "Substitution",   icon: "🔄", path: "/project/:projectId/substitutions",  segment: "substitutions",  badge: "New" },
-      { num: 13, label: "Academic Year",  icon: "🗓️", path: "/project/:projectId/academic-year", segment: "academic-year" },
+      { num: 12, label: "Workload",       icon: "📈", path: "/project/:projectId/workload",       segment: "workload",       badge: "New" },
+      { num: 13, label: "Substitution",   icon: "🔄", path: "/project/:projectId/substitutions",  segment: "substitutions",  badge: "New" },
     ],
   },
 ];
@@ -42,10 +42,10 @@ const NAV_GROUPS = [
 function getActiveNum(pathname: string): number {
   if (pathname === "/") return 1;
   const map: [string, number][] = [
-    ["/academic-year", 13], ["/substitutions", 12], ["/workload", 11],
-    ["/export", 10], ["/review", 10], ["/generate", 9],
-    ["/constraints", 8], ["/lessons", 7], ["/teachers", 6],
-    ["/rooms", 5], ["/classes", 4], ["/subjects", 3], ["/settings", 2],
+    ["/academic-year", 2], ["/substitutions", 13], ["/workload", 12],
+    ["/export", 11], ["/review", 11], ["/generate", 10],
+    ["/constraints", 9], ["/lessons", 8], ["/teachers", 7],
+    ["/rooms", 6], ["/classes", 5], ["/subjects", 4], ["/settings", 3],
   ];
   for (const [seg, num] of map) {
     if (pathname.includes(seg)) return num;

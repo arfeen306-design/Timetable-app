@@ -51,41 +51,33 @@ def create_academic_year(
     db.add(year)
     db.flush()
 
-    # Generate all week rows
+    # Generate all week rows in bulk (single INSERT instead of 40 individual ones)
     today = date.today()
     today_monday = today - timedelta(days=today.weekday())
 
+    # Clear any existing weeks for this year to avoid duplicates
+    db.query(AcademicWeek).filter(
+        AcademicWeek.project_id == project_id,
+        AcademicWeek.academic_year == data.name,
+    ).delete(synchronize_session=False)
+
+    week_rows = []
     for wn in range(1, data.total_weeks + 1):
         monday = start + timedelta(weeks=wn - 1)
         friday = monday + timedelta(days=4)
         label = data.week_1_label if wn == 1 and data.week_1_label else f"Week {wn}"
-        is_current = monday == today_monday
+        week_rows.append({
+            "project_id": project_id,
+            "academic_year_id": year.id,
+            "week_number": wn,
+            "label": label,
+            "start_date": monday,
+            "end_date": friday,
+            "academic_year": data.name,
+            "is_current": monday == today_monday,
+        })
 
-        # Check if week already exists
-        existing = db.query(AcademicWeek).filter(
-            AcademicWeek.project_id == project_id,
-            AcademicWeek.week_number == wn,
-            AcademicWeek.academic_year == data.name,
-        ).first()
-
-        if existing:
-            existing.academic_year_id = year.id
-            existing.label = label
-            existing.start_date = monday
-            existing.end_date = friday
-            existing.is_current = is_current
-        else:
-            week = AcademicWeek(
-                project_id=project_id,
-                academic_year_id=year.id,
-                week_number=wn,
-                label=label,
-                start_date=monday,
-                end_date=friday,
-                academic_year=data.name,
-                is_current=is_current,
-            )
-            db.add(week)
+    db.bulk_insert_mappings(AcademicWeek, week_rows)
 
     db.commit()
     db.refresh(year)
