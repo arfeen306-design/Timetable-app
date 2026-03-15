@@ -252,12 +252,14 @@ export default function Login() {
         @keyframes loginPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
         @keyframes loginFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
         @keyframes loginGradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        .login-split { display: flex; min-height: 100vh; }
+        html, body, #root { margin: 0; padding: 0; }
+        .login-split { display: flex; min-height: 100vh; width: 100vw; overflow: hidden; }
         .login-hero {
-          flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1.4rem; padding: 2rem 1.5rem;
+          flex: 1 1 55%; display: flex; flex-direction: column; justify-content: center; align-items: center;
+          gap: 1.2rem; padding: 2.5rem 2rem;
           background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #0f172a 100%);
           background-size: 200% 200%; animation: loginGradient 8s ease infinite;
-          position: relative; overflow: hidden;
+          position: relative; overflow: hidden; overflow-y: auto;
         }
         .login-hero::before {
           content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
@@ -266,8 +268,9 @@ export default function Login() {
           animation: loginPulse 6s ease-in-out infinite;
         }
         .login-form-side {
-          flex: 0 0 420px; display: flex; flex-direction: column; justify-content: center; padding: 2.5rem;
-          background: #fff; box-shadow: -8px 0 40px rgba(0,0,0,0.08);
+          flex: 0 0 45%; max-width: 480px; display: flex; flex-direction: column; justify-content: center;
+          padding: 3rem; background: #fff; box-shadow: -8px 0 40px rgba(0,0,0,0.08);
+          overflow-y: auto;
         }
         .login-input {
           width: 100%; padding: 0.65rem 0.85rem; border: 1.5px solid #e2e8f0; border-radius: 10px;
@@ -284,17 +287,25 @@ export default function Login() {
         .login-btn:disabled { opacity: 0.6; transform: none; box-shadow: none; }
         .login-toggle { background: none; border: none; color: #3b82f6; cursor: pointer; font-size: 0.82rem; font-weight: 600; padding: 0; font-family: inherit; }
         .login-toggle:hover { text-decoration: underline; }
-        @media (max-width: 860px) {
-          .login-split { flex-direction: column; }
-          .login-hero { flex: none; min-height: 35vh; padding: 1.5rem 1rem; }
-          .login-form-side { flex: 1; padding: 1.5rem; }
+
+        /* Tablet / iPad — hide hero, form-only minimalistic */
+        @media (max-width: 1024px) {
+          .login-hero { display: none; }
+          .login-form-side {
+            flex: 1; max-width: 100%; padding: 2rem;
+            background: linear-gradient(180deg, #f8fafc, #fff);
+          }
+        }
+        /* Mobile — tighter padding */
+        @media (max-width: 480px) {
+          .login-form-side { padding: 1.5rem 1.2rem; }
         }
       `}</style>
 
       <div className="login-split">
         {/* ─── Left Hero ─── */}
         <div className="login-hero">
-          <div style={{ position: "relative", zIndex: 1, maxWidth: 380, width: "100%" }}>
+          <div style={{ position: "relative", zIndex: 1, maxWidth: 440, width: "100%" }}>
             {/* Logo */}
             <div style={{ animation: "loginSlideUp 0.6s ease both", marginBottom: "1rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
