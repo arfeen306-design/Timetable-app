@@ -12,6 +12,8 @@ import Export from "./pages/Export";
 import WorkloadPage from "./pages/WorkloadPage";
 import SubstitutionPage from "./pages/SubstitutionPage";
 import AcademicYearPage from "./pages/AcademicYearPage";
+import DutyRosterPage from "./pages/DutyRoster";
+import CommitteesPage from "./pages/Committees";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -54,6 +56,8 @@ export default function App() {
         <Route path="project/:projectId/workload" element={<WorkloadPage />} />
         <Route path="project/:projectId/substitutions" element={<SubstitutionPage />} />
         <Route path="project/:projectId/academic-year" element={<AcademicYearPage />} />
+        <Route path="project/:projectId/duty-roster" element={<DutyRosterPage />} />
+        <Route path="project/:projectId/committees" element={<CommitteesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

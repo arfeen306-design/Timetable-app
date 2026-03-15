@@ -29,6 +29,8 @@ class Project(Base):
     time_constraints = relationship("TimeConstraint", back_populates="project", cascade="all, delete-orphan")
     timetable_runs = relationship("TimetableRun", back_populates="project", cascade="all, delete-orphan")
     timetable_entries = relationship("TimetableEntry", back_populates="project", cascade="all, delete-orphan")
+    duty_roster_entries = relationship("DutyRoster", back_populates="project", cascade="all, delete-orphan")
+    committees = relationship("Committee", back_populates="project", cascade="all, delete-orphan")
 
 
 class Subject(Base):

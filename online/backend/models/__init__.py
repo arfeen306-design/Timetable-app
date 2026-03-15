@@ -13,6 +13,7 @@ from backend.models.timetable_model import TimetableRun, TimetableEntry
 from backend.models.academic_year_model import AcademicYear
 from backend.models.academic_week_model import AcademicWeek
 from backend.models.substitution_model import TeacherAbsence, Substitution, TeacherWeekSub
+from backend.models.duty_roster_model import DutyRoster, Committee, CommitteeMember
 
 __all__ = [
     "Base", "get_db", "init_db",
@@ -23,4 +24,5 @@ __all__ = [
     "TimeConstraint", "TimetableRun", "TimetableEntry",
     "AcademicYear", "AcademicWeek",
     "TeacherAbsence", "Substitution", "TeacherWeekSub",
+    "DutyRoster", "Committee", "CommitteeMember",
 ]

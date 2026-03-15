@@ -543,3 +543,85 @@ export function exportWorkloadPDF(projectId: number, week?: string) {
   const qs = week ? `?week=${week}` : "";
   window.open(`/api/projects/${projectId}/workload/export-pdf${qs}`, "_blank");
 }
+
+// ─── Duty Roster ────────────────────────────────────────────────────────────
+export type DutyEntry = {
+  id: number;
+  project_id: number;
+  teacher_id: number;
+  duty_type: string;
+  day_of_week: number;
+  period_index: number;
+  notes: string | null;
+};
+
+export function listDutyRoster(projectId: number) {
+  return api<DutyEntry[]>(`/api/projects/${projectId}/duty-roster`);
+}
+
+export function createDutyEntry(
+  projectId: number,
+  data: { teacher_id: number; duty_type: string; day_of_week: number; period_index: number; notes?: string }
+) {
+  return api<DutyEntry>(`/api/projects/${projectId}/duty-roster`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updateDutyEntry(
+  projectId: number,
+  entryId: number,
+  data: Partial<{ teacher_id: number; duty_type: string; day_of_week: number; period_index: number; notes: string }>
+) {
+  return api<DutyEntry>(`/api/projects/${projectId}/duty-roster/${entryId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export function deleteDutyEntry(projectId: number, entryId: number) {
+  return api(`/api/projects/${projectId}/duty-roster/${entryId}`, { method: "DELETE" });
+}
+
+// ─── Committees ─────────────────────────────────────────────────────────────
+export type CommitteeMemberItem = { id: number; teacher_id: number; role: string };
+
+export type Committee = {
+  id: number;
+  project_id: number;
+  name: string;
+  description: string | null;
+  members: CommitteeMemberItem[];
+};
+
+export function listCommittees(projectId: number) {
+  return api<Committee[]>(`/api/projects/${projectId}/committees`);
+}
+
+export function createCommittee(projectId: number, data: { name: string; description?: string }) {
+  return api<Committee>(`/api/projects/${projectId}/committees`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updateCommittee(projectId: number, committeeId: number, data: Partial<{ name: string; description: string }>) {
+  return api<Committee>(`/api/projects/${projectId}/committees/${committeeId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export function deleteCommittee(projectId: number, committeeId: number) {
+  return api(`/api/projects/${projectId}/committees/${committeeId}`, { method: "DELETE" });
+}
+
+export function addCommitteeMember(projectId: number, committeeId: number, data: { teacher_id: number; role?: string }) {
+  return api<CommitteeMemberItem>(
+    `/api/projects/${projectId}/committees/${committeeId}/members`,
+    { method: "POST", body: JSON.stringify(data) }
+  );
+}
+
+export function updateMemberRole(projectId: number, committeeId: number, memberId: number, role: string) {
+  return api<CommitteeMemberItem>(
+    `/api/projects/${projectId}/committees/${committeeId}/members/${memberId}`,
+    { method: "PATCH", body: JSON.stringify({ role }) }
+  );
+}
+
+export function removeCommitteeMember(projectId: number, committeeId: number, memberId: number) {
+  return api(
+    `/api/projects/${projectId}/committees/${committeeId}/members/${memberId}`,
+    { method: "DELETE" }
+  );
+}
