@@ -1,0 +1,186 @@
+/* ── ShareSheet — bottom sheet on mobile, centered modal on desktop ── */
+.share-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.15s ease;
+}
+
+@media (min-width: 640px) {
+  .share-overlay {
+    align-items: center;
+  }
+}
+
+.share-sheet {
+  background: var(--surface-card, #fff);
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  max-width: 440px;
+  padding: 20px;
+  animation: slideUpSheet 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .share-sheet {
+    border-radius: 16px;
+    animation: scaleIn 0.15s ease;
+  }
+}
+
+.share-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.share-file-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.share-file-icon {
+  font-size: 24px;
+}
+
+.share-filename {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #0F172A);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-filesize {
+  font-size: 11px;
+  color: var(--text-muted, #94A3B8);
+}
+
+.share-close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: var(--text-muted, #94A3B8);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+.share-close:hover {
+  background: var(--surface-raised, #F1F5F9);
+  color: var(--text-primary, #0F172A);
+}
+
+.share-divider {
+  height: 1px;
+  background: var(--border-default, #E2E8F0);
+  margin: 14px 0;
+}
+
+.share-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.share-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-default, #E2E8F0);
+  border-radius: 10px;
+  background: var(--surface-card, #fff);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #0F172A);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  font-family: inherit;
+}
+
+.share-action-btn:hover {
+  background: var(--surface-raised, #F1F5F9);
+  border-color: var(--border-strong, #CBD5E1);
+}
+
+.share-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.share-action-icon {
+  font-size: 18px;
+}
+
+.share-email:hover { border-color: var(--primary-400, #818cf8); }
+.share-whatsapp:hover { border-color: #25D366; }
+
+.share-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.share-link-icon {
+  font-size: 16px;
+}
+
+.share-link-text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-secondary, #475569);
+}
+
+.share-copy-btn {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-default, #E2E8F0);
+  background: var(--surface-card, #fff);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-600, #4f46e5);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  font-family: inherit;
+}
+
+.share-copy-btn:hover {
+  background: var(--primary-50, #eef2ff);
+}
+
+.share-copy-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.share-link-note {
+  font-size: 11px;
+  color: var(--text-muted, #94A3B8);
+  margin-top: 6px;
+  padding-left: 24px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

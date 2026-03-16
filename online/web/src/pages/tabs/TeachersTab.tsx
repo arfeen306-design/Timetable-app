@@ -6,6 +6,31 @@ import BulkDeleteModal from "../../components/BulkDeleteModal";
 
 type Teacher = Awaited<ReturnType<typeof api.listTeachers>>[0];
 type Subject = Awaited<ReturnType<typeof api.listSubjects>>[0];
+type SchoolClass = api.SchoolClass;
+
+const COLOR_PALETTE = ['#4F46E5','#0891B2','#16A34A','#D97706','#DC2626','#7C3AED','#0F766E','#B45309','#9333EA','#0369A1','#15803D','#C2410C'];
+
+function nextAvailableColor(usedColors: string[]): string {
+  const available = COLOR_PALETTE.find(c => !usedColors.includes(c));
+  return available || COLOR_PALETTE[usedColors.length % COLOR_PALETTE.length];
+}
+
+function generateCode(name: string, existingCodes: string[]): string {
+  const parts = name.trim().split(/\s+/);
+  const initials = parts.map(p => p[0]?.toUpperCase() || "").join("");
+  if (!initials) return "";
+  if (!existingCodes.includes(initials)) return initials;
+  // Try adding more letters
+  if (parts.length > 1) {
+    const longer = parts[0][0].toUpperCase() + parts[parts.length - 1].slice(0, 2).toUpperCase();
+    if (!existingCodes.includes(longer)) return longer;
+  }
+  for (let i = 1; i <= 99; i++) {
+    const candidate = initials + i;
+    if (!existingCodes.includes(candidate)) return candidate;
+  }
+  return initials + Date.now();
+}
 
 interface Props {
   pid: number;
@@ -34,14 +59,15 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
   const [teacherSubjectIds, setTeacherSubjectIds] = useState<Map<number, number[]>>(new Map());
 
   // Teacher form fields
-  const [fFirst, setFFirst] = useState("");
-  const [fLast, setFLast] = useState("");
+  const [fName, setFName] = useState("");
   const [fCode, setFCode] = useState("");
+  const [fCodeEditable, setFCodeEditable] = useState(false);
   const [fTitle, setFTitle] = useState("Mr.");
   const [fColor, setFColor] = useState("#E8725A");
-  const [fMaxDay, setFMaxDay] = useState(6);
-  const [fMaxWeek, setFMaxWeek] = useState(30);
+  const [fSubjectId, setFSubjectId] = useState<number | null>(null);
   const [fSubjects, setFSubjects] = useState<number[]>([]);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [fClassIds, setFClassIds] = useState<number[]>([]);
 
   // Exam duty summary (lazy-loaded per teacher on select)
   const [examSummary, setExamSummary] = useState<api.TeacherExamSummary | null>(null);
@@ -49,6 +75,11 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
 
   // Subject lookup by id
   const subjectMap = new Map(subjects.map(s => [s.id, s]));
+
+  // ── Load classes on mount ──
+  useEffect(() => {
+    api.listClasses(pid).then(setClasses).catch(() => setClasses([]));
+  }, [pid]);
 
   // ── Load subject assignments for all teachers on mount / when teacher list changes ──
 
@@ -99,8 +130,10 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
 
   function openAdd() {
     setEditTeacher(null);
-    setFFirst(""); setFLast(""); setFCode(""); setFTitle("Mr."); setFColor("#E8725A");
-    setFMaxDay(6); setFMaxWeek(30); setFSubjects([]);
+    setFName(""); setFCode(""); setFCodeEditable(false); setFTitle("Mr.");
+    const usedColors = list.map(t => t.color).filter(Boolean) as string[];
+    setFColor(nextAvailableColor(usedColors));
+    setFSubjectId(null); setFSubjects([]); setFClassIds([]);
     setModalOpen(true);
   }
 
@@ -108,33 +141,50 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     const teacher = t || list.find(x => x.id === selectedId);
     if (!teacher) return;
     setEditTeacher(teacher);
-    setFFirst(teacher.first_name); setFLast(teacher.last_name); setFCode(teacher.code);
+    setFName(`${teacher.first_name} ${teacher.last_name}`.trim());
+    setFCode(teacher.code); setFCodeEditable(false);
     setFTitle(teacher.title); setFColor(teacher.color || "#E8725A");
-    setFMaxDay(teacher.max_periods_day); setFMaxWeek(teacher.max_periods_week);
-    setFSubjects(teacherSubjectIds.get(teacher.id) || []);
+    const assignedSubjectIds = teacherSubjectIds.get(teacher.id) || [];
+    setFSubjects(assignedSubjectIds);
+    setFSubjectId(assignedSubjectIds.length > 0 ? assignedSubjectIds[0] : null);
+    setFClassIds([]);
     setModalOpen(true);
   }
 
   // ── Save (create / update) ──
 
+  function handleNameBlur() {
+    if (!fCodeEditable && fName.trim()) {
+      const existingCodes = list
+        .filter(t => !editTeacher || t.id !== editTeacher.id)
+        .map(t => t.code);
+      setFCode(generateCode(fName, existingCodes));
+    }
+  }
+
   async function saveTeacher() {
-    if (!fFirst.trim()) return;
+    if (!fName.trim()) return;
+    const nameParts = fName.trim().split(/\s+/);
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(" ");
+    // Sync fSubjects from fSubjectId for the subject assignment API
+    const subjectsToSave = fSubjectId != null ? [fSubjectId] : fSubjects;
     const data = {
-      first_name: fFirst.trim(), last_name: fLast.trim(), code: fCode.trim(),
-      title: fTitle, color: fColor, max_periods_day: fMaxDay, max_periods_week: fMaxWeek,
+      first_name: firstName, last_name: lastName, code: fCode.trim(),
+      title: fTitle, color: fColor, max_periods_day: 6, max_periods_week: 30,
     };
     try {
       if (editTeacher) {
         await api.updateTeacher(pid, editTeacher.id, data);
-        await api.setTeacherSubjects(pid, editTeacher.id, fSubjects);
+        await api.setTeacherSubjects(pid, editTeacher.id, subjectsToSave);
         onChange(list.map(t => t.id === editTeacher.id ? { ...t, ...data } : t));
-        setTeacherSubjectIds(prev => new Map(prev).set(editTeacher.id, fSubjects));
+        setTeacherSubjectIds(prev => new Map(prev).set(editTeacher.id, subjectsToSave));
         toast("success", "Teacher updated.");
       } else {
         const created = await api.createTeacher(pid, data);
-        await api.setTeacherSubjects(pid, created.id, fSubjects);
+        await api.setTeacherSubjects(pid, created.id, subjectsToSave);
         onChange([...list, { ...created, ...data } as Teacher]);
-        setTeacherSubjectIds(prev => new Map(prev).set(created.id, fSubjects));
+        setTeacherSubjectIds(prev => new Map(prev).set(created.id, subjectsToSave));
         toast("success", "Teacher added.");
       }
       setModalOpen(false);
@@ -378,48 +428,131 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
           <div className="modal-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 540 }}>
             <h3 style={{ marginTop: 0 }}>{editTeacher ? "Edit Teacher" : "New Teacher"}</h3>
             <div className="modal-form">
-              <div className="modal-field"><label className="modal-label required">First Name:</label><input value={fFirst} onChange={e => setFFirst(e.target.value)} placeholder="e.g., Ali" autoFocus /></div>
-              <div className="modal-field"><label className="modal-label">Last Name:</label><input value={fLast} onChange={e => setFLast(e.target.value)} placeholder="e.g., Khan" /></div>
-              <div className="modal-field"><label className="modal-label">Code:</label><input value={fCode} onChange={e => setFCode(e.target.value)} placeholder="e.g., AK" maxLength={6} /></div>
+              {/* ── Teacher Name ── */}
               <div className="modal-field">
-                <label className="modal-label">Title:</label>
-                <select value={fTitle} onChange={e => setFTitle(e.target.value)}>{TITLE_OPTIONS.map(t => <option key={t}>{t}</option>)}</select>
+                <label className="modal-label required">Teacher Name:</label>
+                <input
+                  value={fName}
+                  onChange={e => setFName(e.target.value)}
+                  onBlur={handleNameBlur}
+                  placeholder="e.g., Ahmed Ali"
+                  autoFocus
+                />
               </div>
-              <div className="modal-field"><label className="modal-label">Color:</label><input type="color" value={fColor} onChange={e => setFColor(e.target.value)} style={{ width: 48, height: 32, padding: 0 }} /></div>
-              <div className="modal-field"><label className="modal-label">Max Periods/Day:</label><input type="number" min={1} max={15} value={fMaxDay} onChange={e => setFMaxDay(Number(e.target.value))} style={{ width: 80 }} /></div>
-              <div className="modal-field"><label className="modal-label">Max Periods/Week:</label><input type="number" min={1} max={60} value={fMaxWeek} onChange={e => setFMaxWeek(Number(e.target.value))} style={{ width: 80 }} /></div>
 
-              {/* ── Subject assignment ── */}
+              {/* ── Auto-generated Code (read-only chip) ── */}
+              <div className="modal-field" style={{ alignItems: "center" }}>
+                <label className="modal-label">Code:</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {fCodeEditable ? (
+                    <input
+                      value={fCode}
+                      onChange={e => setFCode(e.target.value)}
+                      maxLength={6}
+                      style={{ width: 80 }}
+                    />
+                  ) : (
+                    <span style={{
+                      display: "inline-block", background: "var(--primary-100)", color: "var(--primary-700)",
+                      fontWeight: 700, fontSize: "0.82rem", padding: "3px 10px",
+                      borderRadius: "var(--radius-sm)", minWidth: 30, textAlign: "center",
+                    }}>
+                      {fCode || "—"}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setFCodeEditable(!fCodeEditable)}
+                    style={{
+                      fontSize: "0.72rem", padding: "2px 8px", cursor: "pointer",
+                      background: "transparent", border: "1px solid var(--slate-300)",
+                      borderRadius: "var(--radius-sm)", color: "var(--primary-600)",
+                    }}
+                  >
+                    {fCodeEditable ? "Auto" : "Edit"}
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Subject (single select, searchable dropdown) ── */}
               {subjects.length > 0 && (
+                <div className="modal-field">
+                  <label className="modal-label required">Subject:</label>
+                  <select
+                    value={fSubjectId ?? ""}
+                    onChange={e => {
+                      const val = e.target.value ? Number(e.target.value) : null;
+                      setFSubjectId(val);
+                      if (val != null) setFSubjects([val]);
+                      else setFSubjects([]);
+                    }}
+                  >
+                    <option value="">— Select subject —</option>
+                    {subjects.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* ── Assign Grades (multi-select checkboxes) ── */}
+              {classes.length > 0 && (
                 <div className="modal-field" style={{ alignItems: "flex-start" }}>
-                  <label className="modal-label" style={{ paddingTop: 4 }}>Subjects:</label>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                    {subjects.map(s => {
-                      const assigned = fSubjects.includes(s.id);
+                  <label className="modal-label" style={{ paddingTop: 4 }}>Assign Grades:</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 140, overflowY: "auto" }}>
+                    {classes.map(cls => {
+                      const checked = fClassIds.includes(cls.id);
                       return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          title={s.name}
-                          onClick={() => setFSubjects(prev =>
-                            prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id]
-                          )}
+                        <label
+                          key={cls.id}
                           style={{
-                            fontSize: "0.72rem", fontWeight: 700, padding: "3px 9px",
-                            borderRadius: "var(--radius-sm)", cursor: "pointer",
-                            border: `1.5px solid ${assigned ? s.color : "var(--slate-300)"}`,
-                            background: assigned ? s.color : "transparent",
-                            color: assigned ? "#fff" : "var(--slate-600)",
-                            transition: "all 0.12s",
+                            display: "flex", alignItems: "center", gap: 4,
+                            fontSize: "0.78rem", cursor: "pointer",
+                            padding: "2px 8px", borderRadius: "var(--radius-sm)",
+                            border: `1px solid ${checked ? "var(--primary-400)" : "var(--slate-200)"}`,
+                            background: checked ? "var(--primary-50)" : "transparent",
                           }}
                         >
-                          {s.code || s.name.slice(0, 6)}
-                        </button>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => setFClassIds(prev =>
+                              prev.includes(cls.id) ? prev.filter(id => id !== cls.id) : [...prev, cls.id]
+                            )}
+                            style={{ margin: 0 }}
+                          />
+                          {cls.name}
+                        </label>
                       );
                     })}
                   </div>
                 </div>
               )}
+
+              {/* ── Title ── */}
+              <div className="modal-field">
+                <label className="modal-label">Title:</label>
+                <select value={fTitle} onChange={e => setFTitle(e.target.value)}>
+                  {TITLE_OPTIONS.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+
+              {/* ── Auto-generated Color (click swatch to cycle) ── */}
+              <div className="modal-field" style={{ alignItems: "center" }}>
+                <label className="modal-label">Color:</label>
+                <div
+                  title="Click to cycle color"
+                  onClick={() => {
+                    const idx = COLOR_PALETTE.indexOf(fColor);
+                    setFColor(COLOR_PALETTE[(idx + 1) % COLOR_PALETTE.length]);
+                  }}
+                  style={{
+                    width: 32, height: 32, borderRadius: "var(--radius-sm)",
+                    backgroundColor: fColor, cursor: "pointer",
+                    border: "2px solid var(--slate-300)", transition: "background-color 0.15s",
+                  }}
+                />
+              </div>
             </div>
             <div className="modal-actions">
               <button type="button" className="btn" onClick={() => setModalOpen(false)}>Cancel</button>

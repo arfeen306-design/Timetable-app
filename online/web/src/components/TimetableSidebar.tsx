@@ -9,10 +9,10 @@ interface SidebarItem {
 
 const SETUP_ITEMS: SidebarItem[] = [
   { segment: "settings",    label: "School",        icon: "🏫" },
+  { segment: "teachers",    label: "Teachers",       icon: "👩‍🏫" },
   { segment: "subjects",    label: "Subjects",       icon: "📚" },
   { segment: "classes",     label: "Classes",        icon: "🎓" },
   { segment: "rooms",       label: "Classrooms",     icon: "🚪" },
-  { segment: "teachers",    label: "Teachers",       icon: "👩‍🏫" },
   { segment: "lessons",     label: "Lessons",        icon: "📋" },
   { segment: "constraints", label: "Constraints",    icon: "⚙️" },
 ];

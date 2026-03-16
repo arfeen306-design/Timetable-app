@@ -43,6 +43,14 @@ interface DashboardData {
   live_teachers: LiveTeacher[];
 }
 
+interface TodoTask {
+  id: string;
+  title: string;
+  due_date: string;
+  priority: "high" | "medium" | "low";
+  completed: boolean;
+}
+
 /* ── Helpers ── */
 function fmt12(t: string) {
   if (!t) return "";
@@ -80,6 +88,37 @@ export default function ProjectDashboard() {
   // timezone handled via ipapi
   const [cc, setCc] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+
+  /* ── To-Do state ── */
+  const todoKey = `schedulr_tasks_${pid}`;
+  const [tasks, setTasks] = useState<TodoTask[]>(() => {
+    try { return JSON.parse(localStorage.getItem(`schedulr_tasks_${pid}`) || "[]"); } catch { return []; }
+  });
+  const [todoFilter, setTodoFilter] = useState<"today" | "week" | "month">("today");
+  const [newTitle, setNewTitle] = useState("");
+  const [newDue, setNewDue] = useState("");
+  const [newPriority, setNewPriority] = useState<"high" | "medium" | "low">("medium");
+
+  const saveTasks = (t: TodoTask[]) => { setTasks(t); localStorage.setItem(todoKey, JSON.stringify(t)); };
+  const addTask = () => {
+    if (!newTitle.trim()) return;
+    const t: TodoTask = { id: String(Date.now()), title: newTitle.trim(), due_date: newDue || new Date().toISOString().slice(0, 10), priority: newPriority, completed: false };
+    saveTasks([...tasks, t]);
+    setNewTitle(""); setNewDue(""); setNewPriority("medium");
+  };
+  const toggleTask = (id: string) => saveTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  const deleteTask = (id: string) => saveTasks(tasks.filter(t => t.id !== id));
+
+  const filteredTasks = tasks.filter(t => {
+    const d2 = new Date(t.due_date + "T00:00");
+    const now = new Date(); now.setHours(0,0,0,0);
+    if (todoFilter === "today") return d2.toDateString() === now.toDateString();
+    if (todoFilter === "week") {
+      const end = new Date(now); end.setDate(end.getDate() + (7 - end.getDay()));
+      return d2 >= now && d2 <= end;
+    }
+    /* month */ return d2.getMonth() === now.getMonth() && d2.getFullYear() === now.getFullYear();
+  });
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })), 1000);
@@ -164,16 +203,6 @@ export default function ProjectDashboard() {
             </svg>
             {showHistory ? "Close" : "History"}
           </button>
-          <Link to={`/project/${pid}/export`} style={{
-            fontSize: "0.72rem", padding: "5px 12px", borderRadius: 6,
-            background: "#5B4EE8", color: "#fff", textDecoration: "none", fontWeight: 700,
-            display: "flex", alignItems: "center", gap: 5,
-          }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Export PDF
-          </Link>
         </div>
       </div>
 
@@ -591,6 +620,203 @@ export default function ProjectDashboard() {
             {subs.length === 0 && absent.length === 0 && (
               <div style={{ padding: "2rem", textAlign: "center", color: "var(--slate-400)", fontSize: "0.78rem" }}>No activity today</div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ WIDGETS ROW ═══ */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14 }}>
+
+        {/* ── Google Calendar Placeholder ── */}
+        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
+            <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Google Calendar</div>
+            <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>View upcoming events for the next 7 days</div>
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "28px 18px", gap: 14 }}>
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <rect x="6" y="10" width="36" height="32" rx="4" stroke="var(--slate-300)" strokeWidth="2" fill="none" />
+              <path d="M6 18h36" stroke="var(--slate-300)" strokeWidth="2" />
+              <rect x="14" y="6" width="2" height="8" rx="1" fill="var(--slate-300)" />
+              <rect x="32" y="6" width="2" height="8" rx="1" fill="var(--slate-300)" />
+              <rect x="14" y="24" width="6" height="4" rx="1" fill="#4285F4" />
+              <rect x="24" y="24" width="6" height="4" rx="1" fill="#0EA875" />
+              <rect x="14" y="32" width="6" height="4" rx="1" fill="#E8A020" />
+              <rect x="24" y="32" width="6" height="4" rx="1" fill="#E8334A" />
+            </svg>
+            <div style={{ fontSize: "0.75rem", color: "var(--slate-400)", textAlign: "center", lineHeight: 1.5 }}>
+              Connect your Google Calendar to see upcoming school events, meetings, and deadlines.
+            </div>
+            <button className="btn" style={{
+              fontSize: "0.72rem", fontWeight: 700, padding: "8px 20px",
+              background: "#4285F4", color: "#fff", border: "none", borderRadius: 8,
+              display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" />
+              </svg>
+              Connect Google Calendar
+            </button>
+            <div style={{ fontSize: "0.6rem", color: "var(--slate-300)" }}>OAuth integration coming soon</div>
+          </div>
+        </div>
+
+        {/* ── To-Do Widget ── */}
+        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
+            <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>To-Do</div>
+            <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>{tasks.filter(t => !t.completed).length} pending tasks</div>
+          </div>
+
+          {/* Filter tabs */}
+          <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--slate-100)" }}>
+            {(["today", "week", "month"] as const).map(f => (
+              <button key={f} onClick={() => setTodoFilter(f)} style={{
+                flex: 1, padding: "8px 0", border: "none", background: todoFilter === f ? "var(--slate-50)" : "transparent",
+                fontSize: "0.68rem", fontWeight: todoFilter === f ? 700 : 500,
+                color: todoFilter === f ? "#5B4EE8" : "var(--slate-400)",
+                borderBottom: todoFilter === f ? "2px solid #5B4EE8" : "2px solid transparent",
+                cursor: "pointer", textTransform: "capitalize",
+              }}>
+                {f === "today" ? "Today" : f === "week" ? "This Week" : "This Month"}
+              </button>
+            ))}
+          </div>
+
+          {/* Add task form */}
+          <div style={{ display: "flex", gap: 6, padding: "10px 14px", borderBottom: "1px solid var(--slate-50)", flexWrap: "wrap" }}>
+            <input
+              value={newTitle} onChange={e => setNewTitle(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addTask()}
+              placeholder="Task title..."
+              style={{
+                flex: 1, minWidth: 100, fontSize: "0.72rem", padding: "6px 10px", borderRadius: 6,
+                border: "1px solid var(--slate-200)", outline: "none", color: "var(--slate-900)",
+                background: "var(--slate-50)",
+              }}
+            />
+            <input
+              type="date" value={newDue} onChange={e => setNewDue(e.target.value)}
+              style={{
+                fontSize: "0.68rem", padding: "6px 8px", borderRadius: 6,
+                border: "1px solid var(--slate-200)", outline: "none", color: "var(--slate-600)",
+                background: "var(--slate-50)", width: 110,
+              }}
+            />
+            <select
+              value={newPriority} onChange={e => setNewPriority(e.target.value as "high" | "medium" | "low")}
+              style={{
+                fontSize: "0.68rem", padding: "6px 8px", borderRadius: 6,
+                border: "1px solid var(--slate-200)", outline: "none", color: "var(--slate-600)",
+                background: "var(--slate-50)",
+              }}
+            >
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <button onClick={addTask} style={{
+              fontSize: "0.68rem", fontWeight: 700, padding: "6px 14px", borderRadius: 6,
+              background: "#5B4EE8", color: "#fff", border: "none", cursor: "pointer",
+            }}>Add</button>
+          </div>
+
+          {/* Task list */}
+          <div style={{ flex: 1, maxHeight: 220, overflowY: "auto" }}>
+            {filteredTasks.length === 0 ? (
+              <div style={{ padding: "2rem", textAlign: "center", color: "var(--slate-400)", fontSize: "0.75rem" }}>
+                No tasks for {todoFilter === "today" ? "today" : todoFilter === "week" ? "this week" : "this month"}
+              </div>
+            ) : filteredTasks.map(t => (
+              <div key={t.id} style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "8px 14px",
+                borderBottom: "1px solid var(--slate-50)",
+                opacity: t.completed ? 0.5 : 1,
+              }}>
+                <div
+                  onClick={() => toggleTask(t.id)}
+                  style={{
+                    width: 16, height: 16, borderRadius: 4, flexShrink: 0, cursor: "pointer",
+                    border: t.completed ? "none" : "2px solid var(--slate-300)",
+                    background: t.completed ? "#0EA875" : "transparent",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  {t.completed && (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: "0.75rem", fontWeight: 600, color: "var(--slate-900)",
+                    textDecoration: t.completed ? "line-through" : "none",
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>{t.title}</div>
+                  <div style={{ fontSize: "0.6rem", color: "var(--slate-400)", marginTop: 1, fontFamily: "var(--font-mono)" }}>
+                    {t.due_date}
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: "0.55rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                  background: t.priority === "high" ? "#FDEAED" : t.priority === "medium" ? "#FEF3DC" : "#E8FAF4",
+                  color: t.priority === "high" ? "#E8334A" : t.priority === "medium" ? "#8A5A00" : "#076644",
+                }}>{t.priority}</span>
+                <button onClick={() => deleteTask(t.id)} style={{
+                  background: "none", border: "none", cursor: "pointer", padding: 2,
+                  color: "var(--slate-300)", fontSize: "0.75rem", lineHeight: 1,
+                }} title="Delete task">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Performance Pie Chart ── */}
+        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
+            <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Performance</div>
+            <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Teacher presence overview</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 18px 16px", gap: 14 }}>
+            <svg width="140" height="140" viewBox="0 0 140 140">
+              <circle cx="70" cy="70" r="52" fill="none" stroke="#E4E8F2" strokeWidth="18" />
+              <circle cx="70" cy="70" r="52" fill="none" stroke="#0EA875" strokeWidth="18"
+                strokeDasharray={`${(s.present_today / (s.total_teachers || 1)) * 326.7} ${326.7 - (s.present_today / (s.total_teachers || 1)) * 326.7}`}
+                strokeDashoffset="0" transform="rotate(-90 70 70)" strokeLinecap="round" />
+              <circle cx="70" cy="70" r="52" fill="none" stroke="#E8334A" strokeWidth="18"
+                strokeDasharray={`${(s.absent_today / (s.total_teachers || 1)) * 326.7} ${326.7 - (s.absent_today / (s.total_teachers || 1)) * 326.7}`}
+                strokeDashoffset={`${-((s.present_today / (s.total_teachers || 1)) * 326.7)}`}
+                transform="rotate(-90 70 70)" strokeLinecap="round" />
+              <text x="70" y="65" textAnchor="middle" fontSize="22" fontWeight="800" fill="#0D1117" fontFamily="var(--font-mono)">{s.total_teachers}</text>
+              <text x="70" y="82" textAnchor="middle" fontSize="10" fill="#6B7594">teachers</text>
+            </svg>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+              {[
+                { c: "#0EA875", l: "Present", v: d.is_off_day ? "—" : s.present_today, pct: d.is_off_day ? "—" : `${Math.round((s.present_today / (s.total_teachers || 1)) * 100)}%` },
+                { c: "#E8334A", l: "Absent", v: d.is_off_day ? "—" : s.absent_today, pct: d.is_off_day ? "—" : `${Math.round((s.absent_today / (s.total_teachers || 1)) * 100)}%` },
+              ].map(x => (
+                <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 8px" }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 3, background: x.c, flexShrink: 0 }} />
+                  <span style={{ fontSize: "0.75rem", color: "var(--slate-500)", fontWeight: 500 }}>{x.l}</span>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--slate-900)", marginLeft: "auto", fontFamily: "var(--font-mono)" }}>{x.v}</span>
+                  <span style={{ fontSize: "0.62rem", fontWeight: 600, color: "var(--slate-400)", fontFamily: "var(--font-mono)", width: 32, textAlign: "right" }}>{x.pct}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{
+              marginTop: 4, padding: "8px 14px", background: "var(--slate-50)", borderRadius: 8, width: "100%",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <span style={{ fontSize: "0.68rem", color: "var(--slate-400)", fontWeight: 500 }}>Total scheduled lessons</span>
+              <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "#5B4EE8", fontFamily: "var(--font-mono)" }}>{s.total_lessons}</span>
+            </div>
           </div>
         </div>
       </div>

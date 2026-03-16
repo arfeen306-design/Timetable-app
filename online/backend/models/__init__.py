@@ -16,6 +16,7 @@ from backend.models.substitution_model import TeacherAbsence, Substitution, Teac
 from backend.models.duty_roster_model import DutyRoster, Committee, CommitteeMember
 from backend.models.exam_duties_model import ExamSession, ExamDutyConfig, ExamDutySlot
 from backend.models.duty_area_model import DutyArea, DutyRosterRow
+from backend.models.task_model import Task, ShareLink
 
 __all__ = [
     "Base", "get_db", "init_db",
@@ -29,4 +30,5 @@ __all__ = [
     "DutyRoster", "Committee", "CommitteeMember",
     "ExamSession", "ExamDutyConfig", "ExamDutySlot",
     "DutyArea", "DutyRosterRow",
+    "Task", "ShareLink",
 ]

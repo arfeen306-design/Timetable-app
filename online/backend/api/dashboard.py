@@ -469,3 +469,38 @@ def get_dashboard(
         ],
         "live_teachers": live_teachers,
     }
+
+
+@router.get("/stats")
+def get_dashboard_stats(
+    project_id: int = Path(...),
+    project=Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    """Lightweight stats endpoint for dashboard widgets."""
+    total_teachers = db.query(func.count(Teacher.id)).filter(Teacher.project_id == project_id).scalar() or 0
+    total_classes = db.query(func.count(SchoolClass.id)).filter(SchoolClass.project_id == project_id).scalar() or 0
+    total_lessons = db.query(func.count(Lesson.id)).filter(Lesson.project_id == project_id).scalar() or 0
+
+    today = date.today()
+    absent_today = (
+        db.query(func.count(TeacherAbsence.id))
+        .filter(TeacherAbsence.project_id == project_id, TeacherAbsence.date == today)
+        .scalar() or 0
+    )
+    present_today = max(total_teachers - absent_today, 0)
+
+    subs_today = (
+        db.query(func.count(Substitution.id))
+        .filter(Substitution.project_id == project_id, Substitution.date == today)
+        .scalar() or 0
+    )
+
+    return {
+        "total_teachers": total_teachers,
+        "present_today": present_today,
+        "absent_today": absent_today,
+        "total_classes": total_classes,
+        "total_lessons": total_lessons,
+        "substitutions_today": subs_today,
+    }

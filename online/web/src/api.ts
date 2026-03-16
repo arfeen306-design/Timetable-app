@@ -851,3 +851,60 @@ export function removeCommitteeMember(projectId: number, committeeId: number, me
     { method: "DELETE" }
   );
 }
+
+// ─── Tasks ───────────────────────────────────────────────────────────────────
+export interface TaskItem {
+  id: number;
+  title: string;
+  due_date: string | null;
+  priority: string;
+  completed: boolean;
+  created_at: string | null;
+}
+
+export function listTasks(projectId: number) {
+  return api<TaskItem[]>(`/api/projects/${projectId}/tasks`);
+}
+
+export function createTask(projectId: number, data: { title: string; due_date?: string; priority?: string }) {
+  return api<TaskItem>(`/api/projects/${projectId}/tasks`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updateTask(projectId: number, taskId: number, data: Partial<{ title: string; due_date: string; priority: string; completed: boolean }>) {
+  return api<TaskItem>(`/api/projects/${projectId}/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export function deleteTask(projectId: number, taskId: number) {
+  return api<{ ok: boolean }>(`/api/projects/${projectId}/tasks/${taskId}`, { method: "DELETE" });
+}
+
+// ─── Dashboard Stats ─────────────────────────────────────────────────────────
+export interface DashboardStats {
+  total_teachers: number;
+  present_today: number;
+  absent_today: number;
+  total_classes: number;
+  total_lessons: number;
+  substitutions_today: number;
+}
+
+export function getDashboardStats(projectId: number) {
+  return api<DashboardStats>(`/api/projects/${projectId}/dashboard/stats`);
+}
+
+// ─── Share ───────────────────────────────────────────────────────────────────
+export async function uploadPdfForSharing(blob: Blob, filename: string): Promise<{ url: string; uid: string; expires_at: string }> {
+  const token = getToken();
+  const form = new FormData();
+  form.append("file", blob, filename);
+  const res = await fetch("/api/share/upload-pdf", {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail));
+  }
+  return res.json();
+}
