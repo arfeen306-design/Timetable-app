@@ -122,72 +122,6 @@ def create_duty_entry(
     return entry
 
 
-@router.get("/{entry_id}", response_model=DutyRosterResponse)
-def get_duty_entry(
-    entry_id: int,
-    project: Project = Depends(get_project_or_404),
-    db: Session = Depends(get_db),
-):
-    entry = (
-        db.query(DutyRoster)
-        .filter(DutyRoster.id == entry_id, DutyRoster.project_id == project.id)
-        .first()
-    )
-    if not entry:
-        raise HTTPException(status_code=404, detail="Duty entry not found")
-    return entry
-
-
-@router.patch("/{entry_id}", response_model=DutyRosterResponse)
-def update_duty_entry(
-    entry_id: int,
-    data: DutyRosterUpdate,
-    project: Project = Depends(get_project_or_404),
-    db: Session = Depends(get_db),
-):
-    entry = (
-        db.query(DutyRoster)
-        .filter(DutyRoster.id == entry_id, DutyRoster.project_id == project.id)
-        .first()
-    )
-    if not entry:
-        raise HTTPException(status_code=404, detail="Duty entry not found")
-
-    patch = data.model_dump(exclude_unset=True)
-
-    # Recompute conflict with the merged values
-    check_duty_conflict(
-        db,
-        project.id,
-        patch.get("teacher_id",   entry.teacher_id),
-        patch.get("day_of_week",  entry.day_of_week),
-        patch.get("period_index", entry.period_index),
-        exclude_id=entry_id,
-    )
-
-    for key, val in patch.items():
-        setattr(entry, key, val)
-    db.commit()
-    db.refresh(entry)
-    return entry
-
-
-@router.delete("/{entry_id}", status_code=204)
-def delete_duty_entry(
-    entry_id: int,
-    project: Project = Depends(get_project_or_404),
-    db: Session = Depends(get_db),
-):
-    entry = (
-        db.query(DutyRoster)
-        .filter(DutyRoster.id == entry_id, DutyRoster.project_id == project.id)
-        .first()
-    )
-    if not entry:
-        raise HTTPException(status_code=404, detail="Duty entry not found")
-    db.delete(entry)
-    db.commit()
-
 class DutyAreaCreate(BaseModel):
     name: str
     color: str = "#4F46E5"
@@ -534,3 +468,69 @@ def export_duty_roster_pdf(
     fname = f"duty_roster_{project.name or project.id}.pdf"
     return StreamingResponse(buf, media_type="application/pdf",
                              headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+# ── Legacy single-entry endpoints (MUST be last — /{entry_id} is a wildcard) ──
+
+@router.get("/{entry_id}", response_model=DutyRosterResponse)
+def get_duty_entry(
+    entry_id: int,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    entry = (
+        db.query(DutyRoster)
+        .filter(DutyRoster.id == entry_id, DutyRoster.project_id == project.id)
+        .first()
+    )
+    if not entry:
+        raise HTTPException(status_code=404, detail="Duty entry not found")
+    return entry
+
+
+@router.patch("/{entry_id}", response_model=DutyRosterResponse)
+def update_duty_entry(
+    entry_id: int,
+    data: DutyRosterUpdate,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    entry = (
+        db.query(DutyRoster)
+        .filter(DutyRoster.id == entry_id, DutyRoster.project_id == project.id)
+        .first()
+    )
+    if not entry:
+        raise HTTPException(status_code=404, detail="Duty entry not found")
+
+    patch = data.model_dump(exclude_unset=True)
+    check_duty_conflict(
+        db,
+        project.id,
+        patch.get("teacher_id",   entry.teacher_id),
+        patch.get("day_of_week",  entry.day_of_week),
+        patch.get("period_index", entry.period_index),
+        exclude_id=entry_id,
+    )
+    for key, val in patch.items():
+        setattr(entry, key, val)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+@router.delete("/{entry_id}", status_code=204)
+def delete_duty_entry(
+    entry_id: int,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    entry = (
+        db.query(DutyRoster)
+        .filter(DutyRoster.id == entry_id, DutyRoster.project_id == project.id)
+        .first()
+    )
+    if not entry:
+        raise HTTPException(status_code=404, detail="Duty entry not found")
+    db.delete(entry)
+    db.commit()
