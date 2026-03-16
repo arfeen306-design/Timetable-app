@@ -666,6 +666,56 @@ export function exportCommitteesPdf(projectId: number): Promise<void> {
   });
 }
 
+// ─── Date Sheet Upload ───────────────────────────────────────────────────────
+export interface ParsedExamRow {
+  date_str:   string;
+  subject:    string;
+  start_time: string;
+  end_time:   string;
+  confidence: number;
+  warning:    string | null;
+  raw_text:   string;
+}
+
+export interface ParsedDateSheet {
+  rows:         ParsedExamRow[];
+  total_found:  number;
+  warnings:     string[];
+  file_type:    string;
+  parser_notes: string;
+}
+
+export async function uploadDateSheet(projectId: number, file: File): Promise<ParsedDateSheet> {
+  const token = getToken();
+  const form  = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/api/projects/${projectId}/exam-duties/parse-date-sheet`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (res.status === 401) {
+    localStorage.removeItem("timetable_token");
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail));
+  }
+  return res.json();
+}
+
+export function confirmDateSheet(
+  projectId: number,
+  rows: Pick<ParsedExamRow, "date_str" | "subject" | "start_time" | "end_time">[]
+) {
+  return api<{ created: number; skipped: number; errors: string[] }>(
+    `/api/projects/${projectId}/exam-duties/confirm-date-sheet`,
+    { method: "POST", body: JSON.stringify(rows) }
+  );
+}
+
 // ─── Duty Roster ────────────────────────────────────────────────────────────
 export type DutyEntry = {
   id: number;

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import * as api from "../api";
 import { useToast } from "../context/ToastContext";
@@ -150,12 +150,242 @@ function SetupTab({ pid, teachers }: { pid: number; teachers: Teacher[] }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// DATE SHEET UPLOAD COMPONENT
+// ══════════════════════════════════════════════════════════════════════════════
+
+function DateSheetUpload({ pid, onConfirmed }: { pid: number; onConfirmed: () => void }) {
+  const toast = useToast();
+  const inputRef                        = useRef<HTMLInputElement>(null);
+  const [dragging,   setDragging]       = useState(false);
+  const [uploading,  setUploading]      = useState(false);
+  const [preview,    setPreview]        = useState<api.ParsedDateSheet | null>(null);
+  const [editedRows, setEditedRows]     = useState<api.ParsedExamRow[]>([]);
+  const [confirming, setConfirming]     = useState(false);
+  const [result,     setResult]         = useState<{ created: number; skipped: number } | null>(null);
+  const [uploadErr,  setUploadErr]      = useState<string | null>(null);
+
+  async function handleFile(file: File) {
+    const allowed = ["pdf", "xlsx", "xls", "csv", "docx", "doc"];
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!allowed.includes(ext)) {
+      setUploadErr("Unsupported file type. Upload PDF, Excel (.xlsx / .csv), or Word (.docx).");
+      return;
+    }
+    setUploading(true); setUploadErr(null); setPreview(null); setResult(null);
+    try {
+      const data = await api.uploadDateSheet(pid, file);
+      setPreview(data);
+      setEditedRows(data.rows);
+    } catch (e) {
+      setUploadErr(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleConfirm() {
+    if (!editedRows.length) return;
+    setConfirming(true);
+    try {
+      const res = await api.confirmDateSheet(pid, editedRows);
+      setResult({ created: res.created, skipped: res.skipped });
+      if (res.errors.length) res.errors.forEach(e => toast("error", e));
+      setPreview(null); setEditedRows([]);
+      onConfirmed();
+    } catch (e) {
+      setUploadErr(e instanceof Error ? e.message : "Failed to save sessions.");
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  const updateRow = (idx: number, patch: Partial<api.ParsedExamRow>) =>
+    setEditedRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r));
+  const removeRow = (idx: number) =>
+    setEditedRows(prev => prev.filter((_, i) => i !== idx));
+
+  return (
+    <div style={{ marginBottom: "1rem" }}>
+      {/* Drop zone */}
+      {!preview && !result && (
+        <div
+          style={{
+            border: `2px dashed ${dragging ? "var(--primary-400)" : "var(--slate-300)"}`,
+            borderRadius: "var(--radius-lg)", padding: "28px 20px", textAlign: "center",
+            cursor: uploading ? "wait" : "pointer", opacity: uploading ? 0.7 : 1,
+            background: dragging ? "var(--primary-50)" : "var(--slate-50)",
+            transition: "all 0.15s",
+          }}
+          onClick={() => !uploading && inputRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+        >
+          <input ref={inputRef} type="file" accept=".pdf,.xlsx,.xls,.csv,.docx,.doc"
+            style={{ display: "none" }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+          />
+          {uploading ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+              <div style={{
+                width: 24, height: 24, border: "3px solid var(--slate-200)",
+                borderTopColor: "var(--primary-500)", borderRadius: "50%",
+                animation: "spin 0.8s linear infinite",
+              }} />
+              <span style={{ fontSize: "0.82rem", color: "var(--slate-500)" }}>Parsing document…</span>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: "1.5rem", marginBottom: 8 }}>📎</div>
+              <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--slate-700)" }}>Upload Date Sheet</div>
+              <div style={{ fontSize: "0.78rem", color: "var(--slate-500)", marginTop: 3 }}>Drag & drop or click to browse</div>
+              <div style={{
+                fontSize: "0.7rem", color: "var(--slate-400)", marginTop: 8,
+                display: "inline-block", padding: "2px 10px",
+                border: "1px solid var(--slate-200)", borderRadius: "var(--radius-full)",
+              }}>PDF · Excel (.xlsx / .csv) · Word (.docx)</div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Upload error */}
+      {uploadErr && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", marginTop: 8,
+          background: "var(--danger-50)", color: "var(--danger-600)",
+          borderRadius: "var(--radius-md)", fontSize: "0.8rem",
+        }}>
+          <span>⚠ {uploadErr}</span>
+          <button type="button" onClick={() => setUploadErr(null)}
+            style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "auto", fontSize: "1rem", color: "var(--danger-400)" }}>×</button>
+        </div>
+      )}
+
+      {/* Success banner */}
+      {result && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, padding: "9px 12px",
+          background: "var(--success-50)", color: "var(--success-700)",
+          borderRadius: "var(--radius-md)", fontSize: "0.82rem",
+        }}>
+          <span>✓ <strong>{result.created}</strong> paper{result.created !== 1 ? "s" : ""} added to date sheet.
+            {result.skipped > 0 ? ` ${result.skipped} duplicate${result.skipped !== 1 ? "s" : ""} skipped.` : ""}
+          </span>
+          <button type="button" className="btn" style={{ marginLeft: "auto", fontSize: "0.72rem", padding: "2px 8px" }}
+            onClick={() => setResult(null)}>Upload another</button>
+        </div>
+      )}
+
+      {/* Preview table */}
+      {preview && editedRows.length > 0 && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.6rem", flexWrap: "wrap", gap: 8 }}>
+            <div>
+              <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{editedRows.length} paper{editedRows.length !== 1 ? "s" : ""} found</span>
+              <span style={{ marginLeft: 8, fontSize: "0.72rem", color: "var(--slate-400)" }}>{preview.file_type} · {preview.parser_notes}</span>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button type="button" className="btn" style={{ fontSize: "0.75rem" }}
+                onClick={() => { setPreview(null); setEditedRows([]); }}>Clear</button>
+              <button type="button" className="btn btn-primary" style={{ fontSize: "0.75rem" }}
+                onClick={handleConfirm} disabled={confirming}>
+                {confirming ? "Saving…" : `Confirm all ${editedRows.length} papers`}
+              </button>
+            </div>
+          </div>
+
+          {preview.warnings.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              {preview.warnings.map((w, i) => (
+                <div key={i} style={{ fontSize: "0.75rem", color: "var(--warning-600)", padding: "2px 0" }}>⚠ {w}</div>
+              ))}
+            </div>
+          )}
+
+          <table className="data-table" style={{ fontSize: "0.8rem" }}>
+            <thead>
+              <tr>
+                <th style={{ width: 28 }}></th>
+                <th>Date</th><th>Subject</th><th>Start</th><th>End</th>
+                <th style={{ width: 32 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {editedRows.map((row, idx) => (
+                <tr key={idx} style={{ background: row.confidence < 0.8 ? "#FFFBF0" : undefined }}>
+                  <td style={{ textAlign: "center", fontSize: "0.85rem" }}>
+                    {row.confidence >= 0.8 ? "✓" : <span style={{ color: "var(--warning-500)" }}>⚠</span>}
+                  </td>
+                  <td>
+                    <input type="date" value={row.date_str}
+                      onChange={e => updateRow(idx, { date_str: e.target.value })}
+                      style={{ border: "1px solid var(--slate-200)", borderRadius: 4, padding: "3px 5px", fontSize: "0.78rem", fontFamily: "var(--font-mono)" }}
+                    />
+                  </td>
+                  <td>
+                    <input type="text" value={row.subject} placeholder="Subject name"
+                      onChange={e => updateRow(idx, { subject: e.target.value })}
+                      style={{ border: "1px solid var(--slate-200)", borderRadius: 4, padding: "3px 6px", fontSize: "0.78rem", minWidth: 120 }}
+                    />
+                    {row.warning && <div style={{ fontSize: "0.65rem", color: "var(--warning-600)" }}>{row.warning}</div>}
+                  </td>
+                  <td>
+                    <input type="time" value={row.start_time}
+                      onChange={e => updateRow(idx, { start_time: e.target.value })}
+                      style={{ border: "1px solid var(--slate-200)", borderRadius: 4, padding: "3px 5px", fontSize: "0.78rem", fontFamily: "var(--font-mono)" }}
+                    />
+                  </td>
+                  <td>
+                    <input type="time" value={row.end_time}
+                      onChange={e => updateRow(idx, { end_time: e.target.value })}
+                      style={{ border: "1px solid var(--slate-200)", borderRadius: 4, padding: "3px 5px", fontSize: "0.78rem", fontFamily: "var(--font-mono)" }}
+                    />
+                  </td>
+                  <td>
+                    <button type="button"
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger-400)", fontSize: "1rem", padding: "0 4px" }}
+                      onClick={() => removeRow(idx)}>×</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Empty parse */}
+      {preview && editedRows.length === 0 && (
+        <div style={{ textAlign: "center", padding: "20px", background: "var(--slate-50)", borderRadius: "var(--radius-lg)", marginTop: 8 }}>
+          <div style={{ fontSize: "0.88rem", fontWeight: 600, marginBottom: 6 }}>No exam papers detected</div>
+          <div style={{ fontSize: "0.8rem", color: "var(--slate-500)", marginBottom: 10 }}>
+            The parser could not find date/subject/time data in this file.<br/>
+            Image-based (scanned) PDFs are not supported — try an Excel version.
+          </div>
+          <button type="button" className="btn" style={{ fontSize: "0.78rem" }}
+            onClick={() => setPreview(null)}>Try another file</button>
+        </div>
+      )}
+
+      {/* Divider */}
+      {!preview && !result && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "12px 0", color: "var(--slate-400)", fontSize: "0.75rem" }}>
+          <div style={{ flex: 1, height: 1, background: "var(--slate-200)" }} />
+          or add manually
+          <div style={{ flex: 1, height: 1, background: "var(--slate-200)" }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // DATE SHEET TAB
 // ══════════════════════════════════════════════════════════════════════════════
 
 function DateSheetTab({
   pid, sessions, subjects, rooms,
-  onCreated, onDeleted,
+  onCreated, onDeleted, onRefetch,
 }: {
   pid: number;
   sessions: ExamSession[];
@@ -163,6 +393,7 @@ function DateSheetTab({
   rooms: Room[];
   onCreated: (s: ExamSession) => void;
   onDeleted: (id: number) => void;
+  onRefetch: () => void;
 }) {
   const toast = useToast();
   const [showAdd,    setShowAdd]    = useState(false);
@@ -233,6 +464,8 @@ function DateSheetTab({
 
   return (
     <div>
+      <DateSheetUpload pid={pid} onConfirmed={onRefetch} />
+
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.75rem" }}>
         <button type="button" className="btn btn-primary" style={{ fontSize: "0.82rem" }} onClick={() => openAddModal()}>
           + Add Paper
@@ -741,6 +974,13 @@ export default function ExamDutiesPage() {
     }).finally(() => setLoading(false));
   }, [pid, toast]);
 
+  async function refetchSessions() {
+    try {
+      const sess = await api.listExamSessions(pid);
+      setSessions(sess);
+    } catch { /* silent — user will see stale data */ }
+  }
+
   async function handleExportPdf() {
     setExporting(true);
     try {
@@ -808,6 +1048,7 @@ export default function ExamDutiesPage() {
             }]);
           }}
           onDeleted={id => setSessions(prev => prev.filter(s => s.id !== id))}
+          onRefetch={refetchSessions}
         />
       )}
       {tab === "assignments" && (
