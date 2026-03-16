@@ -19,7 +19,7 @@ interface Tab {
 const TABS: Tab[] = [
   {
     id:           "zynca",
-    label:        "Zynca",
+    label:        "Myzynca",
     icon:         "🛡",
     pathSegments: ["/zynca"],
     segment:      "zynca",

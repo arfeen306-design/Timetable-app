@@ -18,9 +18,9 @@
   --slate-500: #64748b;
   --slate-600: #475569;
   --slate-700: #334155;
-  --slate-800: #1e293b;
-  --slate-900: #0f172a;
-  --slate-950: #020617;
+  --slate-800: #1B2838;
+  --slate-900: #131E2E;
+  --slate-950: #0C1520;
 
   /* ── Primary (Indigo-Blue) ── */
   --primary-50:  #eef2ff;
@@ -143,12 +143,12 @@
 
   /* ── Sidebar ── */
   --sidebar-w:     240px;
-  --sidebar-bg:    var(--slate-900);
-  --sidebar-text:  var(--slate-400);
-  --sidebar-hover: rgba(255,255,255,0.06);
-  --sidebar-active-bg:   rgba(99,102,241,0.15);
-  --sidebar-active-text: var(--primary-400);
-  --sidebar-active-pill: var(--primary-500);
+  --sidebar-bg:    #131E2E;
+  --sidebar-text:  #8899AA;
+  --sidebar-hover: rgba(255,255,255,0.08);
+  --sidebar-active-bg:   rgba(56,132,255,0.15);
+  --sidebar-active-text: #60A5FA;
+  --sidebar-active-pill: #3B82F6;
 
   /* ── Layout ── */
   --topbar-h:     48px;
@@ -170,9 +170,9 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 [data-theme="dark"] {
   /* ── Surfaces ── */
-  --surface-page:       #0B1120;
-  --surface-card:       #151D2E;
-  --surface-raised:     #1C2639;
+  --surface-page:       #0E1926;
+  --surface-card:       #162232;
+  --surface-raised:     #1C2B3D;
 
   /* ── Text ── */
   --text-primary:       #E2E8F0;
@@ -207,11 +207,11 @@
   --card-border:  rgba(255,255,255,0.06);
 
   /* ── Slate overrides for dark ── */
-  --slate-50:  #0F172A;
-  --slate-100: #1E293B;
-  --slate-200: #2D3A4F;
-  --slate-800: #E2E8F0;
-  --slate-900: #F1F5F9;
+  --slate-50:  #131E2E;
+  --slate-100: #1B2838;
+  --slate-200: #2A3B50;
+  --slate-800: #E8EDF2;
+  --slate-900: #F4F6F9;
 
   /* ── Skeleton ── */
   color-scheme: dark;

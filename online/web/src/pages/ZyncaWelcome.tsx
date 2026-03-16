@@ -80,7 +80,7 @@ export default function ZyncaWelcome() {
             <path d="M30 2L4 16v20c0 18 12 28 26 32 14-4 26-14 26-32V16L30 2z"
               stroke="var(--zynca-shield-stroke, #6366F1)" strokeWidth="3" fill="var(--zynca-shield-fill, rgba(99,102,241,0.08))" />
             <text x="30" y="46" textAnchor="middle" fontSize="26" fontWeight="800"
-              fill="var(--zynca-shield-stroke, #6366F1)" fontFamily="'Sora', sans-serif">Z</text>
+              fill="var(--zynca-shield-stroke, #6366F1)" fontFamily="'Sora', sans-serif">M</text>
           </svg>
         </div>
 
