@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
-import Layout from "./components/Layout";
+import AppShell from "./components/AppShell";
 import Login from "./pages/Login";
 import VerifyEmail from "./pages/VerifyEmail";
 import Dashboard from "./pages/Dashboard";
@@ -53,7 +53,7 @@ export default function App() {
         path="/"
         element={
           <ProtectedRoute>
-            <Layout />
+            <AppShell />
           </ProtectedRoute>
         }
       >

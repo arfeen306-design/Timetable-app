@@ -1,0 +1,135 @@
+/* ── Shell structure ──────────────────────────────────────────── */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--surface-page, #F8FAFC);
+}
+
+/* ── Top tab bar ──────────────────────────────────────────────── */
+.top-tab-bar {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  background: #0F172A;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+  z-index: 100;
+}
+
+/* Logo */
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 0 18px;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  height: 100%;
+  flex-shrink: 0;
+}
+.app-logo-mark {
+  width: 26px;
+  height: 26px;
+  background: #4F46E5;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.app-logo-mark svg { width: 14px; height: 14px; }
+.app-logo-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Tabs */
+.top-tabs {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  flex: 1;
+}
+
+.top-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 18px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #64748B;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-body, 'Inter', sans-serif);
+  cursor: pointer;
+  white-space: nowrap;
+  height: 100%;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.top-tab:hover {
+  color: #94A3B8;
+  background: rgba(255,255,255,0.03);
+}
+.top-tab.active {
+  color: #fff;
+  border-bottom-color: #4F46E5;
+  background: rgba(79,70,229,0.1);
+}
+.tab-icon  { font-size: 15px; line-height: 1; }
+.tab-label { font-size: 13px; }
+.tab-new-badge {
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(16,163,74,0.25);
+  color: #4ADE80;
+  padding: 1px 5px;
+  border-radius: 8px;
+  letter-spacing: 0.03em;
+}
+.top-tab.active .tab-new-badge {
+  background: rgba(79,70,229,0.3);
+  color: #818CF8;
+}
+
+/* User area */
+.app-user-area {
+  padding: 0 14px;
+  border-left: 1px solid rgba(255,255,255,0.06);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.user-pill         { display: flex; align-items: center; gap: 8px; }
+.user-av           { width: 26px; height: 26px; border-radius: 50%;
+                     background: #4F46E5; color: #fff; font-size: 10px;
+                     font-weight: 700; display: flex; align-items: center;
+                     justify-content: center; flex-shrink: 0; }
+.user-info         { display: flex; flex-direction: column; }
+.user-name-text    { font-size: 12px; font-weight: 600; color: #CBD5E1; line-height: 1.2; }
+.user-role-text    { font-size: 10px; color: #334155; line-height: 1.2; }
+.user-logout-btn   { background: none; border: none; color: #475569; cursor: pointer;
+                     font-size: 14px; padding: 4px 2px; border-radius: 4px;
+                     transition: color 0.15s; line-height: 1; }
+.user-logout-btn:hover { color: #ef4444; }
+
+/* ── App body ─────────────────────────────────────────────────── */
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Main content */
+.app-main {
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0;
+}
+.app-main.full-width { width: 100%; }
