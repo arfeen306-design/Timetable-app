@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import * as api from "../api";
 import { useToast } from "../context/ToastContext";
+import SearchableSelect from "../components/SearchableSelect";
 
 type Teacher   = Awaited<ReturnType<typeof api.listTeachers>>[0];
 type Committee = api.Committee;
@@ -446,12 +447,13 @@ export default function CommitteesPage() {
             <div className="modal-form">
               <div className="modal-field">
                 <label className="modal-label required">Teacher:</label>
-                <select value={mTeacher} onChange={e => { setMTeacher(Number(e.target.value)); setMError(""); }} autoFocus>
-                  <option value="">— select teacher —</option>
-                  {teachers.map(t => (
-                    <option key={t.id} value={t.id}>{t.first_name} {t.last_name} ({t.code})</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  value={mTeacher}
+                  onChange={v => { setMTeacher(v ? Number(v) : ""); setMError(""); }}
+                  options={teachers.map(t => ({ value: t.id, label: `${t.first_name} ${t.last_name} (${t.code})` }))}
+                  placeholder="— select teacher —"
+                  autoFocus
+                />
               </div>
               <div className="modal-field">
                 <label className="modal-label">Role:</label>

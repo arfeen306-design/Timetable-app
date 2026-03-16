@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
+import SearchableSelect from "../components/SearchableSelect";
 import {
   listTeachers, listAcademicWeeks,
   markAbsent, getFreeTeachers, assignSubstitute,
@@ -316,18 +317,17 @@ export default function SubstitutionPage() {
             <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginBottom: 10 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: "0.72rem", fontWeight: 600, display: "block", marginBottom: 4 }}>Select Teacher</label>
-                <select value={coverTeacherId || ""}
-                  onChange={e => {
-                    const id = Number(e.target.value);
-                    setCoverTeacherId(id || null);
+                <SearchableSelect
+                  value={coverTeacherId || ""}
+                  onChange={v => {
+                    const id = v ? Number(v) : null;
+                    setCoverTeacherId(id);
                     setCoverSlots([]);
                   }}
-                  style={{ width: "100%", padding: "0.4rem 0.75rem", borderRadius: "var(--radius-md)", border: "1px solid var(--slate-300)", fontSize: "0.82rem", background: "#fff" }}>
-                  <option value="">— Choose a teacher —</option>
-                  {teachers.filter(t => !absences.some(a => a.teacher_id === t.id)).map(t => (
-                    <option key={t.id} value={t.id}>{t.first_name} {t.last_name} ({t.code})</option>
-                  ))}
-                </select>
+                  options={teachers.filter(t => !absences.some(a => a.teacher_id === t.id)).map(t => ({ value: t.id, label: `${t.first_name} ${t.last_name} (${t.code})` }))}
+                  placeholder="— Choose a teacher —"
+                  style={{ width: "100%" }}
+                />
               </div>
               <button
                 disabled={!coverTeacherId || coverLoading}

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import * as api from "../../api";
 import { useToast } from "../../context/ToastContext";
+import SearchableSelect from "../../components/SearchableSelect";
 
 type Lesson = Awaited<ReturnType<typeof api.listLessons>>[0];
 type Teacher = Awaited<ReturnType<typeof api.listTeachers>>[0];
@@ -149,10 +150,12 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
             <div className="modal-form">
               <div className="modal-field">
                 <label className="modal-label required">Teacher:</label>
-                <select value={fTeacher} onChange={e => setFTeacher(Number(e.target.value))}>
-                  <option value={0}>Select teacher</option>
-                  {teachers.map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
-                </select>
+                <SearchableSelect
+                  value={fTeacher || ""}
+                  onChange={v => setFTeacher(v ? Number(v) : 0)}
+                  options={teachers.map(t => ({ value: t.id, label: `${t.first_name} ${t.last_name}` }))}
+                  placeholder="Select teacher"
+                />
               </div>
               <div className="modal-field">
                 <label className="modal-label required">Subject:</label>
@@ -186,10 +189,13 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
             <p className="subheading">Assign one teacher and one subject to multiple classes. Set periods per week for each class.</p>
             <div className="modal-form">
               <div className="modal-field"><label className="modal-label">Teacher:</label>
-                <select value={bulkTeacher} onChange={e => setBulkTeacher(Number(e.target.value))} style={{ maxWidth: "100%" }}>
-                  <option value={0}>Select teacher</option>
-                  {teachers.map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
-                </select>
+                <SearchableSelect
+                  value={bulkTeacher || ""}
+                  onChange={v => setBulkTeacher(v ? Number(v) : 0)}
+                  options={teachers.map(t => ({ value: t.id, label: `${t.first_name} ${t.last_name}` }))}
+                  placeholder="Select teacher"
+                  style={{ maxWidth: "100%" }}
+                />
               </div>
               <div className="modal-field"><label className="modal-label">Subject:</label>
                 <select value={bulkSubject} onChange={e => setBulkSubject(Number(e.target.value))} style={{ maxWidth: "100%" }}>

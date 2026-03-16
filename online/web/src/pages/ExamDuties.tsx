@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import * as api from "../api";
 import { useToast } from "../context/ToastContext";
+import SearchableSelect from "../components/SearchableSelect";
 
 type Teacher    = Awaited<ReturnType<typeof api.listTeachers>>[0];
 type Subject    = Awaited<ReturnType<typeof api.listSubjects>>[0];
@@ -809,10 +810,13 @@ function AssignmentsTab({
             <div className="modal-form">
               <div className="modal-field">
                 <label className="modal-label required">Teacher:</label>
-                <select value={aTeacher} onChange={e => { setATeacher(Number(e.target.value)); setAError(""); }} autoFocus>
-                  <option value="">— select teacher —</option>
-                  {teachers.map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name} ({t.code})</option>)}
-                </select>
+                <SearchableSelect
+                  value={aTeacher}
+                  onChange={v => { setATeacher(v ? Number(v) : ""); setAError(""); }}
+                  options={teachers.map(t => ({ value: t.id, label: `${t.first_name} ${t.last_name} (${t.code})` }))}
+                  placeholder="— select teacher —"
+                  autoFocus
+                />
               </div>
               {aError && <p style={{ color: "var(--danger-600)", fontSize: "0.8rem", margin: "0.25rem 0 0 160px" }}>{aError}</p>}
             </div>
