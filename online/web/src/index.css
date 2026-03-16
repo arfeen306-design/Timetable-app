@@ -707,3 +707,78 @@ th { background: var(--slate-50); font-weight: 600; color: var(--slate-600); fon
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DASHBOARD PAGES — mobile overrides (needs !important for inline styles)
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Hero card: reduce padding */
+  .dash-hero {
+    padding: 1.5rem 1rem !important;
+    border-radius: 12px !important;
+  }
+
+  /* Feature highlights: 3 cols → 1 col */
+  .dash-features {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* Project rows: stack name + actions vertically */
+  .dash-project-row {
+    flex-wrap: wrap !important;
+    padding: 0.55rem 0.65rem !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Action buttons: wrap below */
+  .dash-project-actions {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    justify-content: flex-start !important;
+    border-top: 1px solid var(--slate-100);
+    padding-top: 6px;
+    margin-top: 2px;
+  }
+
+  /* Calendar illustration: smaller */
+  .dash-hero > div[style*="width: 100"] {
+    width: 72px !important;
+    height: 72px !important;
+  }
+}
+
+/* ── NewTimetableLanding — enhance mobile ──────────────────── */
+@media (max-width: 768px) {
+  .ntl-right {
+    padding: 20px 12px !important;
+  }
+  .ntl-title {
+    font-size: 20px !important;
+  }
+  .ntl-sub {
+    font-size: 13px !important;
+  }
+  .ntl-card {
+    padding: 18px 16px !important;
+    border-radius: 12px !important;
+  }
+  .ntl-card-icon {
+    font-size: 22px !important;
+  }
+  .ntl-card-title {
+    font-size: 14px !important;
+  }
+  .ntl-left {
+    max-height: 160px !important;
+    padding: 14px 12px !important;
+  }
+  .ntl-header {
+    margin-bottom: 24px !important;
+  }
+  .ntl-import-preview {
+    margin: 20px auto !important;
+    padding: 20px 14px !important;
+  }
+}

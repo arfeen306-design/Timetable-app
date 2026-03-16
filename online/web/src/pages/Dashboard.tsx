@@ -109,7 +109,7 @@ export default function Dashboard() {
       <div style={{ maxWidth: 700, margin: "0 auto", padding: "2rem 0" }}>
         {error && <div className="alert alert-error" style={{ marginBottom: 24 }}>{error}</div>}
 
-        <div style={{
+        <div className="dash-hero" style={{
           display: "flex", flexDirection: "column", alignItems: "center",
           textAlign: "center", padding: "2.5rem 2rem",
           borderRadius: "var(--radius-lg, 16px)",
@@ -205,7 +205,7 @@ export default function Dashboard() {
           <input ref={fileRef} type="file" accept=".json,.timetable.json" style={{ display: "none" }} onChange={handleImportFile} />
 
           {/* Feature highlights */}
-          <div style={{
+          <div className="dash-features" style={{
             display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16,
             marginTop: 32, width: "100%",
             animation: "fadeInUp 0.6s ease 0.5s both",
@@ -290,7 +290,7 @@ export default function Dashboard() {
         <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem", fontWeight: 700, color: "var(--slate-900)" }}>Your Projects</h3>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {projects.map((p) => (
-            <div key={p.id} style={{
+            <div key={p.id} className="dash-project-row" style={{
               display: "flex", alignItems: "center", gap: "0.75rem",
               padding: "0.65rem 0.85rem", borderRadius: "var(--radius-md)",
               border: "1px solid var(--slate-200)", background: "#fff",
@@ -337,7 +337,7 @@ export default function Dashboard() {
 
               {/* Actions */}
               {confirmDeleteId !== p.id && (
-                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                <div className="dash-project-actions" style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                   <Link to={`/project/${p.id}/settings`}
                     style={{ ...actionBtn("var(--primary-50)", "var(--primary-700)"), textDecoration: "none" }}
                     title="Edit project"
