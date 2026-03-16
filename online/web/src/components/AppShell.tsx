@@ -200,7 +200,7 @@ export default function AppShell() {
 
         {/* Tabs */}
         <nav className="top-tabs" role="tablist">
-          {TABS.map((tab, idx) => {
+          {TABS.map((tab) => {
             const isActive = activeTab.id === tab.id;
             return (
               <div
