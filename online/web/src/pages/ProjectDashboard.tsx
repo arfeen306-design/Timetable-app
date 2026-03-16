@@ -145,7 +145,7 @@ export default function ProjectDashboard() {
   if (loading) return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
       <div className="skeleton skeleton-title" style={{ width: "30%" }} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginTop: 16 }}>
+      <div className="pd-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginTop: 16 }}>
         {[1,2,3,4,5].map(i => <div key={i} className="skeleton skeleton-card" style={{ height: 110 }} />)}
       </div>
       <div className="skeleton skeleton-card" style={{ height: 200, marginTop: 16 }} />
@@ -232,7 +232,7 @@ export default function ProjectDashboard() {
       )}
 
       {/* ═══ STAT CARDS (5 across) ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12 }}>
+      <div className="pd-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12 }}>
         {/* Present */}
         <div className="sc anim-card" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#0EA875", opacity: 0.08 }} />
@@ -310,7 +310,7 @@ export default function ProjectDashboard() {
         }}>
 
           {/* Live header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", position: "relative" }}>
+          <div className="pd-live-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span className="live-indicator" style={{ background: "#22C55E", boxShadow: "0 0 0 3px rgba(34,197,94,0.2)" }} />
               <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#0F172A" }}>
@@ -335,7 +335,7 @@ export default function ProjectDashboard() {
 
           {/* Live teacher cards */}
           {liveT.length > 0 ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "0 14px 14px", position: "relative" }}>
+            <div className="pd-live-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "0 14px 14px", position: "relative" }}>
               {liveT.map((t, i) => (
                 <div key={t.teacher_id || i} style={{
                   borderRadius: 10, padding: "10px 12px",
@@ -455,7 +455,7 @@ export default function ProjectDashboard() {
       )}
 
       {/* ═══ BODY GRID: Chart + Subs + Activity ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14 }}>
+      <div className="pd-body-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14 }}>
 
         {/* ── Workload Chart ── */}
         <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden" }}>

@@ -659,3 +659,51 @@ th { background: var(--slate-50); font-weight: 600; color: var(--slate-600); fon
   /* Stack buttons when side by side */
   .btn + .btn { margin-left: 0; margin-top: 0.25rem; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PROJECT DASHBOARD — mobile grid overrides (needs !important for inline styles)
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Stat cards: 5 across → 2 columns */
+  .pd-stat-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  .pd-stat-grid > .sc { font-size: 0.9em; }
+
+  /* Live teacher cards: 4 across → 2 columns */
+  .pd-live-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+    padding: 0 10px 10px !important;
+  }
+
+  /* Live panel header: stack vertically */
+  .pd-live-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    padding: 12px 14px 8px !important;
+  }
+
+  /* Body grid: 3 columns → 1 column stacked */
+  .pd-body-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Overall page container max-width override */
+  .app-main > div[style*="maxWidth"] {
+    padding: 12px 10px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .pd-stat-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+  }
+  .pd-live-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
