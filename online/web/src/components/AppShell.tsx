@@ -76,10 +76,10 @@ const DROPDOWN_GROUPS = [
     label: "SETUP",
     items: [
       { name: "School",      icon: "🏫", segment: "settings" },
+      { name: "Classrooms",  icon: "🚪", segment: "rooms" },
       { name: "Teachers",    icon: "👨‍🏫", segment: "teachers" },
       { name: "Subjects",    icon: "📚", segment: "subjects" },
       { name: "Classes",     icon: "🎓", segment: "classes" },
-      { name: "Classrooms",  icon: "🚪", segment: "rooms" },
       { name: "Lessons",     icon: "📖", segment: "lessons" },
       { name: "Constraints", icon: "⚙️", segment: "constraints" },
     ],

@@ -5,7 +5,6 @@ import { TITLE_OPTIONS } from "../../constants";
 
 type Teacher = Awaited<ReturnType<typeof api.listTeachers>>[0];
 type Subject = Awaited<ReturnType<typeof api.listSubjects>>[0];
-type SchoolClass = api.SchoolClass;
 
 const COLOR_PALETTE = ['#4F46E5','#0891B2','#16A34A','#D97706','#DC2626','#7C3AED','#0F766E','#B45309','#9333EA','#0369A1','#15803D','#C2410C'];
 
@@ -66,8 +65,6 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
   const [fSubjects, setFSubjects] = useState<number[]>([]);
   const [fMaxDay, setFMaxDay] = useState(6);
   const [fMaxWeek, setFMaxWeek] = useState(30);
-  const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [fClassIds, setFClassIds] = useState<number[]>([]);
 
   // Exam duty summary (lazy-loaded per teacher on select)
   const [examSummary, setExamSummary] = useState<api.TeacherExamSummary | null>(null);
@@ -76,10 +73,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
   // Subject lookup by id
   const subjectMap = new Map(subjects.map(s => [s.id, s]));
 
-  // ── Load classes on mount ──
-  useEffect(() => {
-    api.listClasses(pid).then(setClasses).catch(() => setClasses([]));
-  }, [pid]);
+
 
   // ── Load subject assignments for all teachers on mount / when teacher list changes ──
 
@@ -133,7 +127,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     setFName(""); setFCode(""); setFCodeEditable(false); setFTitle("Mr.");
     const usedColors = list.map(t => t.color).filter(Boolean) as string[];
     setFColor(nextAvailableColor(usedColors));
-    setFSubjectId(null); setFSubjects([]); setFMaxDay(6); setFMaxWeek(30); setFClassIds([]);
+    setFSubjectId(null); setFSubjects([]); setFMaxDay(6); setFMaxWeek(30);
     setModalOpen(true);
   }
 
@@ -149,7 +143,6 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     setFSubjectId(assignedSubjectIds.length > 0 ? assignedSubjectIds[0] : null);
     setFMaxDay(teacher.max_periods_day ?? 6);
     setFMaxWeek(teacher.max_periods_week ?? 30);
-    setFClassIds([]);
     setModalOpen(true);
   }
 
@@ -523,62 +516,6 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                 </div>
               </div>
 
-              {/* ── Assign Grades (multi-select checkboxes) ── */}
-              {classes.length > 0 && (
-                <div className="modal-field" style={{ alignItems: "flex-start" }}>
-                  <label className="modal-label" style={{ paddingTop: 4 }}>Assign Grades:</label>
-                  <div style={{ maxHeight: 200, overflowY: "auto", width: "100%" }}>
-                    {(() => {
-                      const sorted = [...classes].sort((a, b) => {
-                        const numA = parseInt(a.name.replace(/\D/g, "")) || 0;
-                        const numB = parseInt(b.name.replace(/\D/g, "")) || 0;
-                        if (numA !== numB) return numA - numB;
-                        return a.name.localeCompare(b.name, undefined, { numeric: true });
-                      });
-                      const groups = new Map<string, typeof sorted>();
-                      sorted.forEach(cls => {
-                        const grade = cls.grade || "Other";
-                        if (!groups.has(grade)) groups.set(grade, []);
-                        groups.get(grade)!.push(cls);
-                      });
-                      return Array.from(groups.entries()).map(([grade, items]) => (
-                        <div key={grade} style={{ marginBottom: 10 }}>
-                          <div style={{
-                            fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)",
-                            textTransform: "uppercase", letterSpacing: "0.04em",
-                            marginBottom: 4, borderBottom: "1px solid var(--slate-100)",
-                            paddingBottom: 2,
-                          }}>Grade {grade}</div>
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 4 }}>
-                            {items.map(cls => {
-                              const checked = fClassIds.includes(cls.id);
-                              return (
-                                <label key={cls.id} style={{
-                                  display: "flex", alignItems: "center", gap: 5,
-                                  fontSize: "0.76rem", cursor: "pointer",
-                                  padding: "4px 8px", borderRadius: 6,
-                                  border: `1px solid ${checked ? "var(--primary-400)" : "var(--slate-200)"}`,
-                                  background: checked ? "var(--primary-50)" : "transparent",
-                                  whiteSpace: "nowrap", transition: "all 0.15s",
-                                }}>
-                                  <input
-                                    type="checkbox" checked={checked}
-                                    onChange={() => setFClassIds(prev =>
-                                      prev.includes(cls.id) ? prev.filter(id => id !== cls.id) : [...prev, cls.id]
-                                    )}
-                                    style={{ margin: 0, accentColor: "var(--primary-600)" }}
-                                  />
-                                  {cls.section || cls.name}
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </div>
-              )}
 
               {/* ── Title ── */}
               <div className="modal-field">
