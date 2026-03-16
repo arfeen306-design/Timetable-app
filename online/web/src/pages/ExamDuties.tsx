@@ -624,7 +624,16 @@ export default function ExamDutiesPage() {
       {tab === "datesheet"   && (
         <DateSheetTab
           pid={pid} sessions={sessions} subjects={subjects} rooms={rooms}
-          onCreated={s => setSessions(prev => [...prev, s])}
+          onCreated={s => {
+            const subj = subjects.find(x => x.id === s.subject_id);
+            setSessions(prev => [...prev, {
+              ...s,
+              subject_name: subj?.name ?? "",
+              subject_color: subj?.color ?? "",
+              slot_count: 0,
+              slots_needed: s.room_ids.length,
+            }]);
+          }}
           onDeleted={id => setSessions(prev => prev.filter(s => s.id !== id))}
         />
       )}

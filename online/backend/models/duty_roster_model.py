@@ -25,6 +25,8 @@ class DutyRoster(Base):
     day_of_week  = Column(Integer,     nullable=False)          # 0 = Mon … 6 = Sun
     period_index = Column(Integer,     nullable=False)
     notes        = Column(String(500), nullable=True)
+    row_id       = Column(Integer, ForeignKey("duty_roster_rows.id", ondelete="SET NULL"), nullable=True)
+    column_index = Column(Integer, nullable=True, default=0)
     created_at   = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at   = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow,
                           onupdate=datetime.utcnow)

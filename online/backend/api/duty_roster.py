@@ -13,6 +13,9 @@ from backend.models.project import Project
 from backend.models.duty_roster_model import DutyRoster
 from backend.models.teacher_model import Teacher
 from backend.models.school_settings import SchoolSettings
+from backend.models.duty_area_model import DutyArea, DutyRosterRow
+import datetime as _dt
+from sqlalchemy import func
 
 router = APIRouter()
 
@@ -184,6 +187,259 @@ def delete_duty_entry(
         raise HTTPException(status_code=404, detail="Duty entry not found")
     db.delete(entry)
     db.commit()
+
+class DutyAreaCreate(BaseModel):
+    name: str
+    color: str = "#4F46E5"
+
+class DutyRosterRowCreate(BaseModel):
+    date_start: Optional[str] = None
+    date_end: Optional[str] = None
+    label: Optional[str] = ""
+
+class DutyRosterRowUpdate(BaseModel):
+    date_start: Optional[str] = None
+    date_end: Optional[str] = None
+    label: Optional[str] = None
+
+class RowReorderItem(BaseModel):
+    id: int
+    row_order: int
+
+class DutyEntryV2Create(BaseModel):
+    row_id: int
+    column_index: int
+    teacher_id: int
+    duty_type: str
+    notes: Optional[str] = None
+
+
+# ── DutyAreas ─────────────────────────────────────────────────────────────────
+
+@router.get("/duty-areas")
+def list_duty_areas(
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    return [
+        {"id": a.id, "project_id": a.project_id, "name": a.name, "color": a.color, "position": a.position}
+        for a in db.query(DutyArea).filter(DutyArea.project_id == project.id).order_by(DutyArea.position, DutyArea.id).all()
+    ]
+
+@router.post("/duty-areas", status_code=201)
+def create_duty_area(
+    data: DutyAreaCreate,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    existing = db.query(DutyArea).filter(
+        DutyArea.project_id == project.id,
+        func.lower(DutyArea.name) == data.name.strip().lower()
+    ).first()
+    if existing:
+        raise HTTPException(400, "Area already exists")
+    max_pos = db.query(func.max(DutyArea.position)).filter(DutyArea.project_id == project.id).scalar() or 0
+    area = DutyArea(project_id=project.id, name=data.name.strip().title(), color=data.color, position=max_pos + 1)
+    db.add(area)
+    db.commit()
+    db.refresh(area)
+    return {"id": area.id, "project_id": area.project_id, "name": area.name, "color": area.color, "position": area.position}
+
+@router.delete("/duty-areas/{area_id}", status_code=204)
+def delete_duty_area(
+    area_id: int,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    area = db.query(DutyArea).filter(DutyArea.id == area_id, DutyArea.project_id == project.id).first()
+    if not area:
+        raise HTTPException(404, "Area not found")
+    db.delete(area)
+    db.commit()
+
+
+# ── DutyRosterRows ────────────────────────────────────────────────────────────
+
+@router.get("/duty-roster-rows")
+def list_duty_roster_rows(
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    rows = db.query(DutyRosterRow).filter(DutyRosterRow.project_id == project.id).order_by(DutyRosterRow.row_order, DutyRosterRow.id).all()
+    return [
+        {
+            "id": r.id, "project_id": r.project_id, "row_order": r.row_order,
+            "label": r.label or "",
+            "date_start": str(r.date_start) if r.date_start else None,
+            "date_end":   str(r.date_end)   if r.date_end   else None,
+        }
+        for r in rows
+    ]
+
+@router.post("/duty-roster-rows", status_code=201)
+def create_duty_roster_row(
+    data: DutyRosterRowCreate,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    max_order = db.query(func.max(DutyRosterRow.row_order)).filter(DutyRosterRow.project_id == project.id).scalar() or -1
+    row = DutyRosterRow(
+        project_id = project.id,
+        row_order  = max_order + 1,
+        label      = data.label or "",
+        date_start = _dt.date.fromisoformat(data.date_start) if data.date_start else None,
+        date_end   = _dt.date.fromisoformat(data.date_end)   if data.date_end   else None,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id, "project_id": row.project_id, "row_order": row.row_order,
+        "label": row.label or "",
+        "date_start": str(row.date_start) if row.date_start else None,
+        "date_end":   str(row.date_end)   if row.date_end   else None,
+    }
+
+@router.patch("/duty-roster-rows/{row_id}")
+def update_duty_roster_row(
+    row_id: int,
+    data: DutyRosterRowUpdate,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    row = db.query(DutyRosterRow).filter(DutyRosterRow.id == row_id, DutyRosterRow.project_id == project.id).first()
+    if not row:
+        raise HTTPException(404, "Row not found")
+    if data.label is not None:
+        row.label = data.label
+    if "date_start" in data.model_fields_set:
+        row.date_start = _dt.date.fromisoformat(data.date_start) if data.date_start else None
+    if "date_end" in data.model_fields_set:
+        row.date_end = _dt.date.fromisoformat(data.date_end) if data.date_end else None
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id, "project_id": row.project_id, "row_order": row.row_order,
+        "label": row.label or "",
+        "date_start": str(row.date_start) if row.date_start else None,
+        "date_end":   str(row.date_end)   if row.date_end   else None,
+    }
+
+@router.delete("/duty-roster-rows/{row_id}", status_code=204)
+def delete_duty_roster_row(
+    row_id: int,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    row = db.query(DutyRosterRow).filter(DutyRosterRow.id == row_id, DutyRosterRow.project_id == project.id).first()
+    if not row:
+        raise HTTPException(404, "Row not found")
+    # delete entries for this row
+    db.query(DutyRoster).filter(DutyRoster.project_id == project.id, DutyRoster.row_id == row_id).delete()
+    db.delete(row)
+    db.commit()
+
+@router.put("/duty-roster-rows/reorder")
+def reorder_duty_roster_rows(
+    items: List[RowReorderItem],
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    for item in items:
+        db.query(DutyRosterRow).filter(
+            DutyRosterRow.id == item.id,
+            DutyRosterRow.project_id == project.id
+        ).update({"row_order": item.row_order})
+    db.commit()
+    return {"ok": True}
+
+
+# ── DutyEntries v2 (row_id + column_index based) ──────────────────────────────
+
+@router.get("/v2/entries")
+def list_duty_entries_v2(
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    entries = (
+        db.query(DutyRoster)
+        .filter(DutyRoster.project_id == project.id, DutyRoster.row_id.isnot(None))
+        .all()
+    )
+    teachers = {t.id: t for t in db.query(Teacher).filter(Teacher.project_id == project.id).all()}
+    result = []
+    for e in entries:
+        t = teachers.get(e.teacher_id)
+        result.append({
+            "id": e.id,
+            "project_id": e.project_id,
+            "row_id": e.row_id,
+            "column_index": e.column_index if e.column_index is not None else 0,
+            "teacher_id": e.teacher_id,
+            "teacher_name": f"{t.first_name} {t.last_name}".strip() if t else "",
+            "teacher_code": t.code if t else "",
+            "duty_type": e.duty_type,
+            "notes": e.notes,
+        })
+    return result
+
+@router.post("/v2/entries", status_code=201)
+def create_duty_entry_v2(
+    data: DutyEntryV2Create,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    # Verify row belongs to project
+    row = db.query(DutyRosterRow).filter(DutyRosterRow.id == data.row_id, DutyRosterRow.project_id == project.id).first()
+    if not row:
+        raise HTTPException(404, "Row not found")
+    # Check duplicate (same teacher, same cell)
+    dup = db.query(DutyRoster).filter(
+        DutyRoster.project_id == project.id,
+        DutyRoster.row_id == data.row_id,
+        DutyRoster.column_index == data.column_index,
+        DutyRoster.teacher_id == data.teacher_id,
+    ).first()
+    if dup:
+        raise HTTPException(409, "Teacher already assigned to this cell")
+    entry = DutyRoster(
+        project_id=project.id,
+        row_id=data.row_id,
+        column_index=data.column_index,
+        teacher_id=data.teacher_id,
+        duty_type=data.duty_type,
+        notes=data.notes,
+        day_of_week=0,   # legacy field — keep non-null
+        period_index=0,  # legacy field — keep non-null
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    t = db.query(Teacher).filter(Teacher.id == data.teacher_id).first()
+    return {
+        "id": entry.id,
+        "project_id": entry.project_id,
+        "row_id": entry.row_id,
+        "column_index": entry.column_index,
+        "teacher_id": entry.teacher_id,
+        "teacher_name": f"{t.first_name} {t.last_name}".strip() if t else "",
+        "teacher_code": t.code if t else "",
+        "duty_type": entry.duty_type,
+        "notes": entry.notes,
+    }
+
+@router.delete("/v2/entries/{entry_id}", status_code=204)
+def delete_duty_entry_v2(
+    entry_id: int,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    entry = db.query(DutyRoster).filter(DutyRoster.id == entry_id, DutyRoster.project_id == project.id).first()
+    if not entry:
+        raise HTTPException(404, "Entry not found")
+    db.delete(entry)
+    db.commit()
+
 
 # ── PDF export ────────────────────────────────────────────────────────────────
 

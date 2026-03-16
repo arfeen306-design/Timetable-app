@@ -47,6 +47,9 @@ def _run_migrations() -> None:
         ("academic_weeks", "academic_year_id", "INTEGER"),
         ("academic_weeks", "label", "VARCHAR(100)"),
         ("academic_weeks", "is_current", "BOOLEAN DEFAULT FALSE"),
+        # Duty roster v2 columns
+        ("duty_roster", "row_id", "INTEGER"),
+        ("duty_roster", "column_index", "INTEGER DEFAULT 0"),
     ]
 
     with engine.begin() as conn:

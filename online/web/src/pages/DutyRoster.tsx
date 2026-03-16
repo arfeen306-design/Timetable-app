@@ -1,70 +1,302 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import * as api from "../api";
 import { useToast } from "../context/ToastContext";
 
-type Teacher = Awaited<ReturnType<typeof api.listTeachers>>[0];
+type Teacher    = Awaited<ReturnType<typeof api.listTeachers>>[0];
+type DutyArea   = api.DutyArea;
+type RosterRow  = api.DutyRosterRow;
+type EntryV2    = api.DutyEntryV2;
 
-const DAY_NAMES  = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const DUTY_TYPES = ["Gate", "Canteen", "Library", "Hall", "Break", "Corridor", "Other"];
-
-/** Map duty type → CSS class (defined in index.css, use token vars) */
-function chipClass(type: string): string {
-  const key = type.toLowerCase();
-  if (DUTY_TYPES.map(d => d.toLowerCase()).includes(key)) return `duty-chip duty-chip-${key}`;
-  return "duty-chip duty-chip-other";
+// ─── Fuzzy search ──────────────────────────────────────────────────────────────
+function fuzzyMatch(query: string, target: string): boolean {
+  if (!query) return true;
+  const q = query.toLowerCase(), t = target.toLowerCase();
+  if (t.includes(q)) return true;
+  let qi = 0;
+  for (let ti = 0; ti < t.length && qi < q.length; ti++) { if (t[ti] === q[qi]) qi++; }
+  return qi === q.length;
+}
+function fuzzyScore(query: string, target: string): number {
+  const t = target.toLowerCase(), q = query.toLowerCase();
+  if (t.startsWith(q)) return 3;
+  if (t.includes(q)) return 2;
+  return 1;
+}
+function fuzzyFilter<T>(items: T[], query: string, getLabel: (i: T) => string): T[] {
+  if (!query.trim()) return items;
+  return items
+    .filter(i => fuzzyMatch(query, getLabel(i)))
+    .sort((a, b) => fuzzyScore(query, getLabel(b)) - fuzzyScore(query, getLabel(a)));
 }
 
-/** Teacher initials from code or first/last name */
-function initials(t: Teacher): string {
-  return t.code || (t.first_name[0] + (t.last_name?.[0] ?? "")).toUpperCase();
+// ─── AreaHeaderCell ────────────────────────────────────────────────────────────
+function AreaHeaderCell({
+  colIdx, areas, selectedAreaId, onSelect, onCreateArea,
+}: {
+  colIdx: number;
+  areas: DutyArea[];
+  selectedAreaId: number | null;
+  onSelect: (colIdx: number, area: DutyArea) => void;
+  onCreateArea: (name: string) => Promise<DutyArea>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLTableHeaderCellElement>(null);
+  const selectedArea = areas.find(a => a.id === selectedAreaId);
+
+  const filtered = areas.filter(a => a.name.toLowerCase().includes(query.toLowerCase()));
+  const exactMatch = areas.some(a => a.name.toLowerCase() === query.toLowerCase());
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  return (
+    <th ref={ref} style={{ padding: "6px 8px", minWidth: 140, position: "relative", fontWeight: 700 }}>
+      <div
+        style={{
+          display: "flex", alignItems: "center", gap: 4, cursor: "pointer",
+          padding: "4px 8px", borderRadius: "var(--radius-sm)",
+          border: "1px solid var(--border-default)",
+          background: "var(--surface-card)", fontSize: "0.78rem", fontWeight: 600,
+          justifyContent: "space-between",
+        }}
+        onClick={() => setOpen(!open)}
+      >
+        <span style={{ color: selectedArea ? "var(--slate-800)" : "var(--slate-400)" }}>
+          {selectedArea?.name ?? "Set area…"}
+        </span>
+        <span style={{ fontSize: "0.65rem", color: "var(--slate-400)" }}>▼</span>
+      </div>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 2px)", left: 0, zIndex: 200,
+          background: "#fff", border: "1px solid var(--border-default)",
+          borderRadius: "var(--radius-md)", boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+          minWidth: 200, overflow: "hidden",
+        }}>
+          <input
+            autoFocus
+            placeholder="Search or add area…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            style={{
+              width: "100%", padding: "8px 12px", border: "none",
+              borderBottom: "1px solid var(--border-subtle)",
+              fontSize: "0.82rem", outline: "none", background: "#fff",
+            }}
+          />
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 200, overflowY: "auto" }}>
+            {filtered.map(a => (
+              <li key={a.id}
+                style={{
+                  padding: "8px 14px", fontSize: "0.82rem", cursor: "pointer",
+                  background: a.id === selectedAreaId ? "#EEF2FF" : undefined,
+                  color: a.id === selectedAreaId ? "#4338CA" : "var(--slate-700)",
+                  fontWeight: a.id === selectedAreaId ? 600 : 400,
+                  display: "flex", alignItems: "center", gap: 6,
+                }}
+                onMouseDown={e => { e.preventDefault(); onSelect(colIdx, a); setOpen(false); setQuery(""); }}
+              >
+                {a.id === selectedAreaId && <span>✓</span>}
+                {a.name}
+              </li>
+            ))}
+            {query.trim().length > 0 && !exactMatch && (
+              <li
+                style={{
+                  padding: "8px 14px", fontSize: "0.82rem", cursor: "pointer",
+                  color: "#4338CA", borderTop: "1px solid var(--border-subtle)",
+                  display: "flex", alignItems: "center", gap: 6,
+                }}
+                onMouseDown={async e => {
+                  e.preventDefault();
+                  const newArea = await onCreateArea(query.trim());
+                  onSelect(colIdx, newArea);
+                  setOpen(false); setQuery("");
+                }}
+              >
+                <span>+</span> Add "{query.trim()}" as area
+              </li>
+            )}
+            {filtered.length === 0 && !query.trim() && (
+              <li style={{ padding: "12px 14px", fontSize: "0.78rem", color: "var(--slate-400)", textAlign: "center" }}>
+                No areas yet. Type to create one.
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+    </th>
+  );
 }
 
-interface ActiveEntry {
-  entry: api.DutyEntry;
-  teacher: Teacher;
+// ─── TeacherChipSelector ───────────────────────────────────────────────────────
+function TeacherChipSelector({
+  rowId, colIdx, entries, allTeachers, onAdd, onRemove,
+}: {
+  rowId: number;
+  colIdx: number;
+  entries: EntryV2[];
+  allTeachers: Teacher[];
+  onAdd: (rowId: number, colIdx: number, teacherId: number) => void;
+  onRemove: (entryId: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const assignedIds = entries.map(e => e.teacher_id);
+  const unassigned = allTeachers.filter(t => !assignedIds.includes(t.id));
+  const filtered = fuzzyFilter(unassigned, query, t => `${t.first_name} ${t.last_name}`);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  function highlightMatch(name: string, q: string) {
+    if (!q) return <>{name}</>;
+    const idx = name.toLowerCase().indexOf(q.toLowerCase());
+    if (idx === -1) return <>{name}</>;
+    return <>{name.slice(0, idx)}<mark style={{ background: "#FEF08A", color: "inherit", borderRadius: 2 }}>{name.slice(idx, idx + q.length)}</mark>{name.slice(idx + q.length)}</>;
+  }
+
+  return (
+    <div ref={ref} style={{ position: "relative", minWidth: 120 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center", minHeight: 32, padding: "3px 4px" }}>
+        {entries.map(e => (
+          <span key={e.id} style={{
+            display: "inline-flex", alignItems: "center", gap: 3,
+            padding: "2px 6px 2px 8px", borderRadius: 20,
+            fontSize: "0.68rem", fontWeight: 500,
+            background: "#EEF2FF", color: "#3730A3", border: "1px solid #C7D2FE",
+            whiteSpace: "nowrap",
+          }}>
+            {e.teacher_name || e.teacher_code}
+            <button
+              type="button"
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 12, color: "#6366F1", lineHeight: 1 }}
+              onClick={ev => { ev.stopPropagation(); onRemove(e.id); }}
+            >×</button>
+          </span>
+        ))}
+        <button
+          type="button"
+          style={{
+            width: 22, height: 22, borderRadius: "50%", border: "1.5px dashed #C7D2FE",
+            background: "none", color: "#6366F1", fontSize: 14, lineHeight: 1,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+        >+</button>
+      </div>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, zIndex: 200,
+          background: "#fff", border: "1px solid var(--border-default)",
+          borderRadius: "var(--radius-md)", boxShadow: "0 12px 32px rgba(0,0,0,0.14)",
+          minWidth: 240, overflow: "hidden",
+        }}>
+          <input
+            ref={inputRef}
+            placeholder="Search by name…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter" && filtered.length > 0) { onAdd(rowId, colIdx, filtered[0].id); setQuery(""); }
+              if (e.key === "Escape") setOpen(false);
+            }}
+            style={{
+              width: "100%", padding: "9px 12px", border: "none",
+              borderBottom: "1px solid var(--border-subtle)",
+              fontSize: "0.82rem", outline: "none",
+            }}
+          />
+          {filtered.length === 0 ? (
+            <div style={{ padding: "14px 12px", fontSize: "0.78rem", color: "var(--slate-400)", textAlign: "center" }}>
+              {query ? `No match for "${query}"` : "All teachers assigned"}
+            </div>
+          ) : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 220, overflowY: "auto" }}>
+              {filtered.slice(0, 8).map(t => {
+                const name = `${t.first_name} ${t.last_name}`.trim();
+                const init = (t.first_name[0] + (t.last_name?.[0] ?? "")).toUpperCase();
+                return (
+                  <li key={t.id}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", cursor: "pointer" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F1F5F9"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ""; }}
+                    onMouseDown={ev => {
+                      ev.preventDefault();
+                      onAdd(rowId, colIdx, t.id);
+                      setQuery("");
+                      // keep open for multi-select
+                    }}
+                  >
+                    <div style={{
+                      width: 26, height: 26, borderRadius: "50%", background: "#4F46E5",
+                      color: "#fff", fontSize: "0.6rem", fontWeight: 700,
+                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    }}>{init}</div>
+                    <span style={{ flex: 1, fontSize: "0.82rem" }}>{highlightMatch(name, query)}</span>
+                    {t.code && <span style={{ fontSize: "0.68rem", color: "var(--slate-400)", background: "#F1F5F9", padding: "1px 5px", borderRadius: 4 }}>{t.code}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function DutyRosterPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const pid   = Number(projectId);
   const toast = useToast();
 
   const [loading,  setLoading]  = useState(true);
-  const [days,     setDays]     = useState(5);
-  const [periods,  setPeriods]  = useState(8);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [entries,  setEntries]  = useState<api.DutyEntry[]>([]);
+  const [areas,    setAreas]    = useState<DutyArea[]>([]);
+  const [rows,     setRows]     = useState<RosterRow[]>([]);
+  const [entries,  setEntries]  = useState<EntryV2[]>([]);
 
-  // Assign-new modal state
-  const [assignSlot, setAssignSlot] = useState<{ day: number; period: number } | null>(null);
-  const [aTeacher,   setATeacher]   = useState<number | "">("");
-  const [aType,      setAType]      = useState(DUTY_TYPES[0]);
-  const [aNotes,     setANotes]     = useState("");
-  const [aError,     setAError]     = useState("");
-  const [aSaving,    setASaving]    = useState(false);
+  // column → area mapping (colIdx → areaId)
+  const [colAreaMap, setColAreaMap] = useState<Record<number, number>>({});
+  // Drag state
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
-  // Inline edit strip (below grid)
-  const [active, setActive]    = useState<ActiveEntry | null>(null);
-  const [eTeacher, setETeacher] = useState<number>(0);
-  const [eType,    setEType]    = useState(DUTY_TYPES[0]);
-  const [eNotes,   setENotes]   = useState("");
-  const [eError,   setEError]   = useState("");
-  const [eSaving,  setESaving]  = useState(false);
+  const numCols = Math.max(Object.keys(colAreaMap).length, areas.length > 0 ? Math.min(areas.length, 7) : 5);
 
   const load = useCallback(async () => {
     try {
-      const [settings, tList, eList] = await Promise.all([
-        api.getSchoolSettings(pid),
+      const [tList, aList, rList, eList] = await Promise.all([
         api.listTeachers(pid),
-        api.listDutyRoster(pid),
+        api.listDutyAreas(pid),
+        api.listDutyRosterRows(pid),
+        api.listDutyEntriesV2(pid),
       ]);
-      setDays(settings.days_per_week || 5);
-      setPeriods(settings.periods_per_day || 8);
       setTeachers(tList);
+      setAreas(aList);
+      setRows(rList);
       setEntries(eList);
+      // Auto-map areas to columns by position
+      const map: Record<number, number> = {};
+      aList.forEach((a, i) => { map[i] = a.id; });
+      setColAreaMap(map);
     } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Failed to load duty roster");
+      toast("error", err instanceof Error ? err.message : "Load failed");
     } finally {
       setLoading(false);
     }
@@ -72,119 +304,96 @@ export default function DutyRosterPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const teacherMap = new Map(teachers.map(t => [t.id, t]));
-
-  // Fast lookup: "day-period" → entry
-  const cellMap = new Map<string, api.DutyEntry>();
-  for (const e of entries) cellMap.set(`${e.day_of_week}-${e.period_index}`, e);
-
-  // ── Assign new entry ───────────────────────────────────────────────────────
-
-  function openAssign(day: number, period: number) {
-    setAssignSlot({ day, period });
-    setATeacher(""); setAType(DUTY_TYPES[0]); setANotes(""); setAError("");
+  // ── Area operations ──
+  async function handleCreateArea(name: string): Promise<DutyArea> {
+    const area = await api.createDutyArea(pid, { name });
+    setAreas(prev => [...prev, area]);
+    return area;
   }
 
-  async function handleAssign() {
-    if (!assignSlot || aTeacher === "") return;
-    // Frontend conflict guard — check locally before API round-trip
-    const conflict = entries.some(
-      e => e.day_of_week === assignSlot.day
-        && e.period_index === assignSlot.period
-        && e.teacher_id  === (aTeacher as number)
-    );
-    if (conflict) {
-      setAError("This teacher already has a duty in this slot.");
-      return;
-    }
-    setAError(""); setASaving(true);
+  function handleSelectArea(colIdx: number, area: DutyArea) {
+    setColAreaMap(prev => ({ ...prev, [colIdx]: area.id }));
+  }
+
+  // ── Row operations ──
+  async function handleAddRow() {
     try {
-      const created = await api.createDutyEntry(pid, {
-        teacher_id:   aTeacher as number,
-        duty_type:    aType,
-        day_of_week:  assignSlot.day,
-        period_index: assignSlot.period,
-        notes:        aNotes.trim() || undefined,
+      const row = await api.createDutyRosterRow(pid, {});
+      setRows(prev => [...prev, row]);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to add row");
+    }
+  }
+
+  async function handleUpdateRow(rowId: number, patch: { date_start?: string | null; date_end?: string | null }) {
+    try {
+      const updated = await api.updateDutyRosterRow(pid, rowId, patch);
+      setRows(prev => prev.map(r => r.id === rowId ? updated : r));
+    } catch { /* silent */ }
+  }
+
+  async function handleDeleteRow(rowId: number) {
+    try {
+      await api.deleteDutyRosterRow(pid, rowId);
+      setRows(prev => prev.filter(r => r.id !== rowId));
+      setEntries(prev => prev.filter(e => e.row_id !== rowId));
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Delete failed");
+    }
+  }
+
+  // ── Drag to reorder rows ──
+  function handleDragStart(idx: number) { setDragIdx(idx); }
+  function handleDragOver(e: React.DragEvent, idx: number) { e.preventDefault(); setDragOverIdx(idx); }
+  async function handleDrop(targetIdx: number) {
+    if (dragIdx === null || dragIdx === targetIdx) { setDragIdx(null); setDragOverIdx(null); return; }
+    const reordered = [...rows];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(targetIdx, 0, moved);
+    setRows(reordered);
+    setDragIdx(null); setDragOverIdx(null);
+    try {
+      await api.reorderDutyRosterRows(pid, reordered.map((r, i) => ({ id: r.id, row_order: i })));
+    } catch { /* silent */ }
+  }
+
+  // ── Entry operations ──
+  async function handleAddTeacher(rowId: number, colIdx: number, teacherId: number) {
+    try {
+      const areaId = colAreaMap[colIdx];
+      const area = areas.find(a => a.id === areaId);
+      const entry = await api.createDutyEntryV2(pid, {
+        row_id: rowId, column_index: colIdx, teacher_id: teacherId,
+        duty_type: area?.name ?? "Duty",
       });
-      setEntries(prev => [...prev, created]);
-      toast("success", "Duty assigned.");
-      setAssignSlot(null);
+      setEntries(prev => [...prev, entry]);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Assign failed";
-      if (msg.includes("409") || msg.toLowerCase().includes("conflict") || msg.toLowerCase().includes("already")) {
-        setAError("This teacher already has a duty in this slot.");
-      } else {
-        setAError(msg);
-      }
-    } finally {
-      setASaving(false);
+      toast("error", err instanceof Error ? err.message : "Assign failed");
     }
   }
 
-  // ── Inline edit strip ──────────────────────────────────────────────────────
-
-  function openEdit(entry: api.DutyEntry) {
-    const teacher = teacherMap.get(entry.teacher_id);
-    if (!teacher) return;
-    setActive({ entry, teacher });
-    setETeacher(entry.teacher_id);
-    setEType(entry.duty_type);
-    setENotes(entry.notes || "");
-    setEError("");
-  }
-
-  async function handleUpdate() {
-    if (!active) return;
-    // Frontend conflict guard for update
-    const conflict = entries.some(
-      e => e.id        !== active.entry.id
-        && e.day_of_week  === active.entry.day_of_week
-        && e.period_index === active.entry.period_index
-        && e.teacher_id   === eTeacher
-    );
-    if (conflict) { setEError("This teacher already has a duty in this slot."); return; }
-    setEError(""); setESaving(true);
+  async function handleRemoveTeacher(entryId: number) {
     try {
-      const updated = await api.updateDutyEntry(pid, active.entry.id, {
-        teacher_id: eTeacher,
-        duty_type:  eType,
-        notes:      eNotes.trim() || undefined,
-      });
-      setEntries(prev => prev.map(e => e.id === active.entry.id ? updated : e));
-      toast("success", "Duty updated.");
-      setActive(null);
+      await api.deleteDutyEntryV2(pid, entryId);
+      setEntries(prev => prev.filter(e => e.id !== entryId));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Update failed";
-      setEError(msg.toLowerCase().includes("conflict") || msg.includes("409") ? "Conflict — this teacher already has a duty in this slot." : msg);
-    } finally {
-      setESaving(false);
-    }
-  }
-
-  async function handleRemove() {
-    if (!active) return;
-    setESaving(true);
-    try {
-      await api.deleteDutyEntry(pid, active.entry.id);
-      setEntries(prev => prev.filter(e => e.id !== active.entry.id));
-      toast("success", "Duty removed.");
-      setActive(null);
-    } catch (err) {
-      setEError(err instanceof Error ? err.message : "Remove failed");
-    } finally {
-      setESaving(false);
+      toast("error", err instanceof Error ? err.message : "Remove failed");
     }
   }
 
   if (loading) return <div className="card"><p className="subheading">Loading…</p></div>;
 
+  const colIndices = Array.from({ length: Math.max(numCols, 5) }, (_, i) => i);
+
   return (
     <div className="card">
-      {/* ── Page header ── */}
+      {/* ── Header ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
         <div>
           <h2 style={{ marginTop: 0, marginBottom: 4 }}>Duty Roster</h2>
-          <p className="subheading" style={{ margin: 0 }}>Click an empty cell to assign a duty. Click a chip to edit or remove.</p>
+          <p className="subheading" style={{ margin: 0 }}>
+            Set area names in column headers · add date ranges in rows · assign multiple teachers per cell.
+          </p>
         </div>
         <button
           type="button" className="btn"
@@ -195,145 +404,135 @@ export default function DutyRosterPage() {
 
       {/* ── Grid ── */}
       <div style={{ overflowX: "auto" }}>
-        <table className="data-table" style={{ minWidth: 420 }}>
+        <table className="data-table" style={{ minWidth: 600, tableLayout: "auto", borderCollapse: "collapse" }}>
           <thead>
             <tr>
-              <th style={{ width: 58, textAlign: "center", fontSize: "0.72rem" }}>Period</th>
-              {Array.from({ length: days }, (_, d) => (
-                <th key={d} style={{ textAlign: "center", fontSize: "0.8rem" }}>{DAY_NAMES[d]}</th>
+              <th style={{ minWidth: 230, textAlign: "left", padding: "6px 8px", fontSize: "0.72rem", color: "var(--slate-500)" }}>Date Range</th>
+              {colIndices.map(colIdx => (
+                <AreaHeaderCell
+                  key={colIdx}
+                  colIdx={colIdx}
+                  areas={areas}
+                  selectedAreaId={colAreaMap[colIdx] ?? null}
+                  onSelect={handleSelectArea}
+                  onCreateArea={handleCreateArea}
+                />
               ))}
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: periods }, (_, p) => (
-              <tr key={p}>
-                <td style={{ fontWeight: 700, color: "var(--slate-500)", fontSize: "0.75rem", textAlign: "center" }}>P{p + 1}</td>
-                {Array.from({ length: days }, (_, d) => {
-                  const entry   = cellMap.get(`${d}-${p}`);
-                  const teacher = entry ? teacherMap.get(entry.teacher_id) : null;
-                  const isActive = active?.entry.id === entry?.id;
-                  return (
-                    <td
-                      key={d}
-                      style={{ padding: "5px 6px", textAlign: "center", verticalAlign: "middle" }}
-                    >
-                      {entry && teacher ? (
-                        <span
-                          className={`${chipClass(entry.duty_type)}${isActive ? " chip-removing" : ""}`}
-                          title={`${teacher.first_name} ${teacher.last_name} — ${entry.duty_type}${entry.notes ? "\n" + entry.notes : ""}`}
-                          style={isActive ? { outline: "2px solid var(--primary-400)", outlineOffset: 1 } : {}}
-                          onClick={() => isActive ? setActive(null) : openEdit(entry)}
-                        >
-                          {initials(teacher)}
-                          <span style={{ opacity: 0.8, fontWeight: 400, fontSize: "0.62rem" }}>{entry.duty_type}</span>
-                        </span>
-                      ) : (
-                        <span className="duty-chip-empty" onClick={() => openAssign(d, p)}>+</span>
-                      )}
-                    </td>
-                  );
-                })}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={colIndices.length + 1} style={{ padding: "2rem", textAlign: "center", color: "var(--slate-400)", fontSize: "0.82rem" }}>
+                  No rows yet. Click "+ Add period" below.
+                </td>
               </tr>
-            ))}
+            )}
+            {rows.map((row, rowIdx) => {
+              const isDragOver = dragOverIdx === rowIdx;
+              return (
+                <tr
+                  key={row.id}
+                  style={{ background: isDragOver ? "#EEF2FF" : undefined, transition: "background 0.1s" }}
+                  onDragOver={e => handleDragOver(e, rowIdx)}
+                  onDrop={() => handleDrop(rowIdx)}
+                >
+                  {/* Row header */}
+                  <td style={{ padding: "4px 8px", verticalAlign: "middle", minWidth: 230 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      {/* Drag handle */}
+                      <div
+                        draggable
+                        onDragStart={() => handleDragStart(rowIdx)}
+                        style={{ cursor: "grab", color: "var(--slate-300)", fontSize: 16, padding: "2px 4px", userSelect: "none", flexShrink: 0 }}
+                        title="Drag to reorder"
+                      >⠿</div>
+                      {/* Date inputs */}
+                      <input
+                        type="date"
+                        value={row.date_start ?? ""}
+                        onChange={e => handleUpdateRow(row.id, { date_start: e.target.value || null })}
+                        style={{
+                          border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)",
+                          padding: "3px 5px", fontSize: "0.72rem", fontFamily: "var(--font-mono)",
+                          width: 120, color: "var(--slate-700)",
+                        }}
+                      />
+                      <span style={{ fontSize: "0.7rem", color: "var(--slate-400)" }}>→</span>
+                      <input
+                        type="date"
+                        value={row.date_end ?? ""}
+                        onChange={e => handleUpdateRow(row.id, { date_end: e.target.value || null })}
+                        style={{
+                          border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)",
+                          padding: "3px 5px", fontSize: "0.72rem", fontFamily: "var(--font-mono)",
+                          width: 120, color: "var(--slate-700)",
+                        }}
+                      />
+                      {/* Delete btn */}
+                      <button
+                        type="button"
+                        style={{
+                          background: "none", border: "none", cursor: "pointer",
+                          color: "var(--danger-400)", padding: "3px 5px", opacity: 0,
+                          borderRadius: "var(--radius-sm)", fontSize: "0.9rem",
+                          transition: "opacity 0.15s",
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "0"; }}
+                        onClick={() => handleDeleteRow(row.id)}
+                        title="Delete row"
+                      >🗑</button>
+                    </div>
+                  </td>
+                  {/* Data cells */}
+                  {colIndices.map(colIdx => {
+                    const cellEntries = entries.filter(e => e.row_id === row.id && e.column_index === colIdx);
+                    return (
+                      <td key={colIdx} style={{ padding: "4px 6px", verticalAlign: "top", borderLeft: "1px solid var(--border-subtle)" }}>
+                        <TeacherChipSelector
+                          rowId={row.id}
+                          colIdx={colIdx}
+                          entries={cellEntries}
+                          allTeachers={teachers}
+                          onAdd={handleAddTeacher}
+                          onRemove={handleRemoveTeacher}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+            {/* Add period row */}
+            <tr>
+              <td colSpan={colIndices.length + 1} style={{ padding: "4px 0" }}>
+                <button
+                  type="button"
+                  style={{
+                    width: "100%", padding: "7px 0", background: "none",
+                    border: "1.5px dashed var(--border-default)", borderRadius: "var(--radius-sm)",
+                    color: "var(--slate-400)", fontSize: "0.8rem", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => {
+                    const el = e.currentTarget as HTMLElement;
+                    el.style.background = "#F8FAFC"; el.style.color = "var(--slate-600)"; el.style.borderColor = "var(--border-default)";
+                  }}
+                  onMouseLeave={e => {
+                    const el = e.currentTarget as HTMLElement;
+                    el.style.background = "none"; el.style.color = "var(--slate-400)"; el.style.borderColor = "var(--border-default)";
+                  }}
+                  onClick={handleAddRow}
+                >
+                  + Add period / time slot
+                </button>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
-
-      {/* ── Inline edit strip ── */}
-      {active && (
-        <div className="duty-edit-strip">
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-            <strong style={{ fontSize: "0.88rem" }}>
-              {DAY_NAMES[active.entry.day_of_week]} · P{active.entry.period_index + 1}
-            </strong>
-
-            <select
-              value={eTeacher}
-              onChange={e => { setETeacher(Number(e.target.value)); setEError(""); }}
-              style={{ fontSize: "0.8rem" }}
-            >
-              {teachers.map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name} ({t.code})</option>)}
-            </select>
-
-            <select value={eType} onChange={e => setEType(e.target.value)} style={{ fontSize: "0.8rem" }}>
-              {DUTY_TYPES.map(dt => <option key={dt}>{dt}</option>)}
-            </select>
-
-            <input
-              value={eNotes}
-              onChange={e => setENotes(e.target.value)}
-              placeholder="Notes (optional)"
-              style={{ fontSize: "0.8rem", minWidth: 130 }}
-            />
-
-            <div style={{ display: "flex", gap: "0.4rem", marginLeft: "auto" }}>
-              <button type="button" className="btn btn-danger" style={{ fontSize: "0.75rem" }} onClick={handleRemove} disabled={eSaving}>
-                {eSaving ? "…" : "Remove Duty"}
-              </button>
-              <button type="button" className="btn btn-primary" style={{ fontSize: "0.75rem" }} onClick={handleUpdate} disabled={eSaving}>
-                {eSaving ? "Saving…" : "Update"}
-              </button>
-              <button type="button" className="btn" style={{ fontSize: "0.75rem" }} onClick={() => setActive(null)} disabled={eSaving}>
-                Close
-              </button>
-            </div>
-          </div>
-          {eError && <p style={{ color: "var(--danger-600)", fontSize: "0.78rem", margin: "0.4rem 0 0" }}>{eError}</p>}
-        </div>
-      )}
-
-      {/* ── Duty-type legend ── */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginTop: "1.1rem" }}>
-        {DUTY_TYPES.map(t => (
-          <span key={t} className={chipClass(t)} style={{ cursor: "default" }}>{t}</span>
-        ))}
-      </div>
-
-      {/* ── Assign modal ── */}
-      {assignSlot && (
-        <div className="modal-overlay" onClick={() => !aSaving && setAssignSlot(null)}>
-          <div className="modal-dialog" onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>
-              Assign Duty
-              <span style={{ marginLeft: 8, fontSize: "0.8rem", fontWeight: 400, color: "var(--slate-500)" }}>
-                {DAY_NAMES[assignSlot.day]} · Period {assignSlot.period + 1}
-              </span>
-            </h3>
-            <div className="modal-form">
-              <div className="modal-field">
-                <label className="modal-label required">Teacher:</label>
-                <select value={aTeacher} onChange={e => { setATeacher(Number(e.target.value)); setAError(""); }} autoFocus>
-                  <option value="">— select teacher —</option>
-                  {teachers.map(t => (
-                    <option key={t.id} value={t.id}>{t.first_name} {t.last_name} ({t.code})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="modal-field">
-                <label className="modal-label required">Duty Type:</label>
-                <select value={aType} onChange={e => setAType(e.target.value)}>
-                  {DUTY_TYPES.map(dt => <option key={dt}>{dt}</option>)}
-                </select>
-              </div>
-              <div className="modal-field">
-                <label className="modal-label">Notes:</label>
-                <input value={aNotes} onChange={e => setANotes(e.target.value)} placeholder="Optional notes…" />
-              </div>
-              {aError && <p style={{ color: "var(--danger-600)", fontSize: "0.8rem", margin: "0.25rem 0 0 164px" }}>{aError}</p>}
-            </div>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={() => setAssignSlot(null)} disabled={aSaving}>Cancel</button>
-              <button
-                type="button" className="btn btn-primary"
-                onClick={handleAssign}
-                disabled={aSaving || aTeacher === ""}
-              >
-                {aSaving ? "Assigning…" : "Assign"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

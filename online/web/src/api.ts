@@ -668,6 +668,60 @@ export function deleteDutyEntry(projectId: number, entryId: number) {
   return api(`/api/projects/${projectId}/duty-roster/${entryId}`, { method: "DELETE" });
 }
 
+// ─── Duty Roster v2 ─────────────────────────────────────────────────────────
+export type DutyArea = {
+  id: number; project_id: number; name: string; color: string; position: number;
+};
+export type DutyRosterRow = {
+  id: number; project_id: number; row_order: number;
+  label: string; date_start: string | null; date_end: string | null;
+};
+export type DutyEntryV2 = {
+  id: number; project_id: number;
+  row_id: number; column_index: number;
+  teacher_id: number; teacher_name: string; teacher_code: string;
+  duty_type: string; notes: string | null;
+};
+
+// Duty Areas
+export function listDutyAreas(pid: number) {
+  return api<DutyArea[]>(`/api/projects/${pid}/duty-roster/duty-areas`);
+}
+export function createDutyArea(pid: number, data: { name: string; color?: string }) {
+  return api<DutyArea>(`/api/projects/${pid}/duty-roster/duty-areas`, { method: "POST", body: JSON.stringify(data) });
+}
+export function deleteDutyArea(pid: number, areaId: number) {
+  return api(`/api/projects/${pid}/duty-roster/duty-areas/${areaId}`, { method: "DELETE" });
+}
+
+// Duty Roster Rows
+export function listDutyRosterRows(pid: number) {
+  return api<DutyRosterRow[]>(`/api/projects/${pid}/duty-roster/duty-roster-rows`);
+}
+export function createDutyRosterRow(pid: number, data?: Partial<DutyRosterRow>) {
+  return api<DutyRosterRow>(`/api/projects/${pid}/duty-roster/duty-roster-rows`, { method: "POST", body: JSON.stringify(data ?? {}) });
+}
+export function updateDutyRosterRow(pid: number, rowId: number, patch: { date_start?: string | null; date_end?: string | null; label?: string }) {
+  return api<DutyRosterRow>(`/api/projects/${pid}/duty-roster/duty-roster-rows/${rowId}`, { method: "PATCH", body: JSON.stringify(patch) });
+}
+export function deleteDutyRosterRow(pid: number, rowId: number) {
+  return api(`/api/projects/${pid}/duty-roster/duty-roster-rows/${rowId}`, { method: "DELETE" });
+}
+export function reorderDutyRosterRows(pid: number, items: { id: number; row_order: number }[]) {
+  return api<{ ok: boolean }>(`/api/projects/${pid}/duty-roster/duty-roster-rows/reorder`, { method: "PUT", body: JSON.stringify(items) });
+}
+
+// Duty Entries v2
+export function listDutyEntriesV2(pid: number) {
+  return api<DutyEntryV2[]>(`/api/projects/${pid}/duty-roster/v2/entries`);
+}
+export function createDutyEntryV2(pid: number, data: { row_id: number; column_index: number; teacher_id: number; duty_type: string; notes?: string }) {
+  return api<DutyEntryV2>(`/api/projects/${pid}/duty-roster/v2/entries`, { method: "POST", body: JSON.stringify(data) });
+}
+export function deleteDutyEntryV2(pid: number, entryId: number) {
+  return api(`/api/projects/${pid}/duty-roster/v2/entries/${entryId}`, { method: "DELETE" });
+}
+
 // ─── Committees ─────────────────────────────────────────────────────────────
 export type CommitteeMemberItem = { id: number; teacher_id: number; role: string };
 
