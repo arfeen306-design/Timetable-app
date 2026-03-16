@@ -19,6 +19,7 @@ const SubstitutionPage = lazy(() => import("./pages/SubstitutionPage"));
 const DutyRosterPage   = lazy(() => import("./pages/DutyRoster"));
 const CommitteesPage   = lazy(() => import("./pages/Committees"));
 const ExamDutiesPage   = lazy(() => import("./pages/ExamDuties"));
+const ZyncaWelcome     = lazy(() => import("./pages/ZyncaWelcome"));
 
 function PageLoader() {
   return (
@@ -93,6 +94,9 @@ export default function App() {
         } />
         <Route path="project/:projectId/exam-duties" element={
           <Suspense fallback={<PageLoader />}><ExamDutiesPage /></Suspense>
+        } />
+        <Route path="project/:projectId/zynca" element={
+          <Suspense fallback={<PageLoader />}><ZyncaWelcome /></Suspense>
         } />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,0 +1,226 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap');
+
+/* ── Page container ──────────────────────────────────────────── */
+.zynca-welcome {
+  position: relative;
+  overflow: hidden;
+  padding: 48px 32px 60px;
+  max-width: 960px;
+  margin: 0 auto;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.zynca-welcome.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Floating shapes ─────────────────────────────────────────── */
+.zynca-shapes {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.zynca-shape {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.06;
+  filter: blur(40px);
+}
+.zynca-s1 { width: 300px; height: 300px; background: #6366F1; top: -60px; right: -80px; animation: zynFloat 8s ease-in-out infinite; }
+.zynca-s2 { width: 200px; height: 200px; background: #06B6D4; bottom: 20%; left: -60px; animation: zynFloat 10s ease-in-out infinite reverse; }
+.zynca-s3 { width: 160px; height: 160px; background: #F59E0B; top: 40%; right: 10%; animation: zynFloat 7s ease-in-out infinite 1s; }
+.zynca-s4 { width: 120px; height: 120px; background: #10B981; bottom: 10%; right: 20%; animation: zynFloat 9s ease-in-out infinite 0.5s; }
+.zynca-s5 { width: 240px; height: 240px; background: #6366F1; top: 60%; left: 15%; animation: zynFloat 12s ease-in-out infinite 2s; }
+
+@keyframes zynFloat {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-30px) scale(1.05); }
+}
+
+/* ── Hero ────────────────────────────────────────────────────── */
+.zynca-hero {
+  text-align: center;
+  margin-bottom: 48px;
+  position: relative;
+  z-index: 1;
+}
+
+.zynca-shield-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  animation: shieldPulse 3s ease-in-out infinite;
+}
+.zynca-hero-shield { width: 64px; height: 76px; }
+
+@keyframes shieldPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+.zynca-title {
+  font-family: 'Sora', sans-serif;
+  font-size: clamp(26px, 3.5vw, 40px);
+  font-weight: 800;
+  color: var(--text-primary, #0F172A);
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+  line-height: 1.2;
+}
+.zynca-brand {
+  background: linear-gradient(135deg, #6366F1, #06B6D4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.zynca-subtitle {
+  font-size: 15px;
+  color: var(--text-secondary, #64748B);
+  max-width: 520px;
+  margin: 0 auto;
+  line-height: 1.65;
+}
+
+/* ── Pie chart metrics ───────────────────────────────────────── */
+.zynca-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 48px;
+  position: relative;
+  z-index: 1;
+}
+.zynca-metric-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface-card, #fff);
+  border: 1px solid var(--border-default, #E2E8F0);
+  border-radius: 16px;
+  padding: 24px 16px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.zynca-metric-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.1);
+}
+.zynca-metric-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #64748B);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.zynca-pie { filter: drop-shadow(0 2px 8px rgba(99,102,241,0.15)); }
+
+/* ── Features grid ───────────────────────────────────────────── */
+.zynca-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 48px;
+  position: relative;
+  z-index: 1;
+}
+.zynca-feat {
+  background: var(--surface-card, #fff);
+  border: 1px solid var(--border-default, #E2E8F0);
+  border-radius: 16px;
+  padding: 28px 24px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.zynca-feat:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(99,102,241,0.08);
+  border-color: rgba(99,102,241,0.2);
+}
+.zynca-feat-icon {
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+.zynca-feat h3 {
+  font-family: 'Sora', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary, #0F172A);
+  margin: 0 0 8px;
+}
+.zynca-feat p {
+  font-size: 13px;
+  color: var(--text-secondary, #64748B);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── CTA section ─────────────────────────────────────────────── */
+.zynca-cta-section {
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  padding: 40px 24px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.06), rgba(6,182,212,0.06));
+  border-radius: 20px;
+  border: 1px solid rgba(99,102,241,0.1);
+}
+.zynca-cta-text {
+  font-family: 'Sora', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary, #0F172A);
+  margin: 0 0 20px;
+}
+.zynca-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #6366F1, #4F46E5);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 16px 36px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Sora', sans-serif;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 8px 28px rgba(99,102,241,0.35);
+}
+.zynca-cta-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 36px rgba(99,102,241,0.5);
+}
+.zynca-cta-btn:active { transform: translateY(0); }
+.zynca-cta-icon { font-size: 20px; }
+
+.zynca-cta-sub {
+  font-size: 13px;
+  color: var(--text-muted, #94A3B8);
+  margin: 16px 0 0;
+}
+
+/* ── Dark mode ───────────────────────────────────────────────── */
+[data-theme="dark"] .zynca-shape { opacity: 0.04; }
+[data-theme="dark"] .zynca-metric-card { background: var(--surface-card); border-color: var(--border-default); }
+[data-theme="dark"] .zynca-feat { background: var(--surface-card); border-color: var(--border-default); }
+[data-theme="dark"] .zynca-cta-section {
+  background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(6,182,212,0.1));
+  border-color: rgba(99,102,241,0.15);
+}
+:root { --zynca-ring-bg: #E2E8F0; --zynca-shield-stroke: #6366F1; --zynca-shield-fill: rgba(99,102,241,0.08); }
+[data-theme="dark"] { --zynca-ring-bg: #1E293B; }
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .zynca-welcome { padding: 32px 16px 40px; }
+  .zynca-metrics { grid-template-columns: repeat(2, 1fr); }
+  .zynca-features-grid { grid-template-columns: 1fr; }
+}

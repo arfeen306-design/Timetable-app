@@ -160,7 +160,7 @@ export default function Dashboard() {
             color: "var(--slate-900)", letterSpacing: "-0.02em",
             animation: "fadeInUp 0.6s ease 0.1s both",
           }}>
-            Welcome to Schedulr
+            Welcome to Myzynca
           </h1>
           <p style={{
             margin: "0.5rem 0 0", fontSize: "0.92rem", color: "var(--slate-500)",

@@ -11,14 +11,14 @@ const ThemeContext = createContext<ThemeContextValue>({ theme: "light", toggleTh
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem("schedulr_theme") as Theme | null;
+    const saved = localStorage.getItem("myzynca_theme") as Theme | null;
     if (saved) return saved;
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("schedulr_theme", theme);
+    localStorage.setItem("myzynca_theme", theme);
   }, [theme]);
 
   function toggleTheme() {

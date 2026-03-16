@@ -94,7 +94,7 @@ export default function Layout() {
           <div className="sidebar-logo-icon">📅</div>
           {sidebarOpen && (
             <div>
-              <div className="sidebar-logo-text">Schedulr</div>
+              <div className="sidebar-logo-text">Myzynca</div>
               <div style={{ fontSize: "0.6rem", color: "#64748b", fontWeight: 500, letterSpacing: "0.04em" }}>School OS</div>
             </div>
           )}

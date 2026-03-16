@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.schedulr.app',
-  appName: 'Schedulr',
+  appId: 'com.myzynca.app',
+  appName: 'Myzynca',
   webDir: 'dist',
   server: {
     // Point to your live Railway backend

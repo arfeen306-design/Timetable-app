@@ -151,15 +151,15 @@ export default function Login() {
         <div className="login-left">
           <div className="login-brand">
             <div className="login-logo-mark">
-              <svg viewBox="0 0 20 20" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
-                <rect x="2" y="2" width="7" height="7" rx="1.5" />
-                <rect x="11" y="2" width="7" height="7" rx="1.5" />
-                <rect x="2" y="11" width="7" height="7" rx="1.5" />
-                <rect x="11" y="11" width="7" height="7" rx="1.5" />
+              <svg viewBox="0 0 60 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M30 2L4 16v20c0 18 12 28 26 32 14-4 26-14 26-32V16L30 2z"
+                  stroke="white" strokeWidth="2.5" fill="rgba(255,255,255,0.1)" />
+                <text x="30" y="46" textAnchor="middle" fontSize="24" fontWeight="800"
+                  fill="white" fontFamily="'Sora', sans-serif">Z</text>
               </svg>
             </div>
             <div className="login-brand-text">
-              <span className="login-brand-name">Schedulr</span>
+              <span className="login-brand-name">Myzynca</span>
               <span className="login-brand-tag">School OS</span>
             </div>
           </div>
@@ -292,7 +292,7 @@ export default function Login() {
                 {loading ? (
                   <><span className="lf-btn-spinner" />{isSignUp ? "Creating account…" : "Signing in…"}</>
                 ) : (
-                  isSignUp ? "Create account" : "Sign in to Schedulr"
+                  isSignUp ? "Create account" : "Sign in to Myzynca"
                 )}
               </button>
             </form>

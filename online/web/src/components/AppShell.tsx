@@ -16,6 +16,13 @@ interface Tab {
 
 const TABS: Tab[] = [
   {
+    id:           "zynca",
+    label:        "Zynca",
+    icon:         "🛡",
+    pathSegments: ["/zynca"],
+    segment:      "zynca",
+  },
+  {
     id:           "timetable",
     label:        "Home",
     icon:         "🗓",

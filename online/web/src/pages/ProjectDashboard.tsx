@@ -77,7 +77,7 @@ const E_AT: DashboardData["absent_teachers"] = [];
 const E_LT: LiveTeacher[] = [];
 
 /* ═══════════════════════════════════════════════════════════════
-   ProjectDashboard — "Schedulr School OS" design
+   ProjectDashboard — "Myzynca School OS" design
    ═══════════════════════════════════════════════════════════════ */
 export default function ProjectDashboard() {
   const { projectId } = useParams();
@@ -90,9 +90,9 @@ export default function ProjectDashboard() {
   const [showHistory, setShowHistory] = useState(false);
 
   /* ── To-Do state ── */
-  const todoKey = `schedulr_tasks_${pid}`;
+  const todoKey = `myzynca_tasks_${pid}`;
   const [tasks, setTasks] = useState<TodoTask[]>(() => {
-    try { return JSON.parse(localStorage.getItem(`schedulr_tasks_${pid}`) || "[]"); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem(`myzynca_tasks_${pid}`) || "[]"); } catch { return []; }
   });
   const [todoFilter, setTodoFilter] = useState<"today" | "week" | "month">("today");
   const [newTitle, setNewTitle] = useState("");
