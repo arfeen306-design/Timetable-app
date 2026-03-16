@@ -172,9 +172,9 @@ a:hover { text-decoration: underline; color: var(--blue-600); }
 .btn-primary {
   background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
   color: #fff; border-color: transparent;
-  box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+  box-shadow: 0 2px 8px rgba(37,99,235,0.3);
 }
-.btn-primary:hover { background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%); box-shadow: 0 4px 12px rgba(99,102,241,0.4); }
+.btn-primary:hover { background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%); box-shadow: 0 4px 12px rgba(37,99,235,0.4); }
 .btn-danger {
   background: linear-gradient(135deg, var(--danger-500) 0%, var(--danger-600) 100%);
   color: #fff; border-color: transparent;
@@ -196,8 +196,8 @@ input, select, textarea {
 }
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: var(--primary-500);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+  border-color: var(--primary-600);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10);
 }
 label { display: block; margin-bottom: 0.25rem; font-weight: 500; font-size: 0.82rem; color: var(--slate-600); }
 .form-group { margin-bottom: var(--sp-4); }
@@ -221,7 +221,7 @@ label { display: block; margin-bottom: 0.25rem; font-weight: 500; font-size: 0.8
   background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
   color: #fff;
   border-color: transparent;
-  box-shadow: 0 2px 6px rgba(99,102,241,0.25);
+  box-shadow: 0 2px 6px rgba(37,99,235,0.25);
 }
 
 /* ═══════ Tables ═══════ */
@@ -231,7 +231,7 @@ table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .data-table tbody tr:hover { background: var(--slate-50); }
 .data-table tbody tr.selected { background: var(--blue-50); }
 th, td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--slate-100); }
-th { background: var(--slate-50); font-weight: 600; color: var(--slate-600); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+th { background: var(--primary-600); font-weight: 600; color: #fff; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* ═══════ Alerts ═══════ */
 .error { color: var(--danger-600); font-size: 0.82rem; margin-top: 0.25rem; }
@@ -479,7 +479,7 @@ th { background: var(--slate-50); font-weight: 600; color: var(--slate-600); fon
 [data-theme="dark"] select:focus,
 [data-theme="dark"] textarea:focus {
   border-color: var(--primary-400);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.2);
 }
 [data-theme="dark"] .btn {
   background: var(--surface-card);
