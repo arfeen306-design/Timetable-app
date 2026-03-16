@@ -17,6 +17,7 @@ from backend.models.duty_roster_model import DutyRoster, Committee, CommitteeMem
 from backend.models.exam_duties_model import ExamSession, ExamDutyConfig, ExamDutySlot
 from backend.models.duty_area_model import DutyArea, DutyRosterRow
 from backend.models.task_model import Task, ShareLink
+from backend.models.timetable_history import TimetableHistory
 
 __all__ = [
     "Base", "get_db", "init_db",
@@ -31,4 +32,5 @@ __all__ = [
     "ExamSession", "ExamDutyConfig", "ExamDutySlot",
     "DutyArea", "DutyRosterRow",
     "Task", "ShareLink",
+    "TimetableHistory",
 ]

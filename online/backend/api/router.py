@@ -1,6 +1,6 @@
 """API router aggregation."""
 from fastapi import APIRouter
-from backend.api import auth, projects, subjects, schools, school_settings, classes, teachers, rooms, lessons, constraints, generation, review, exports, templates, integration, move_entry, workload, substitutions, academic_year, dashboard, duty_roster, committees, exam_duties, date_sheet_upload, tasks, share
+from backend.api import auth, projects, subjects, schools, school_settings, classes, teachers, rooms, lessons, constraints, generation, review, exports, templates, integration, move_entry, workload, substitutions, academic_year, dashboard, duty_roster, committees, exam_duties, date_sheet_upload, tasks, share, timetable_history, timetable_import
 
 api_router = APIRouter()
 
@@ -29,5 +29,7 @@ api_router.include_router(exam_duties.router,  prefix="/projects/{project_id}/ex
 api_router.include_router(date_sheet_upload.router, prefix="/projects/{project_id}/exam-duties", tags=["date-sheet-upload"])
 api_router.include_router(tasks.router,          prefix="/projects/{project_id}/tasks",          tags=["tasks"])
 api_router.include_router(share.router,          prefix="/share",                               tags=["share"])
+api_router.include_router(timetable_history.router, prefix="/projects/{project_id}/history",       tags=["history"])
+api_router.include_router(timetable_import.router,  prefix="/projects/{project_id}",               tags=["timetable-import"])
 api_router.include_router(integration.router,  prefix="/solve",                               tags=["integration"])
 

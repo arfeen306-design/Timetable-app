@@ -164,6 +164,11 @@
   font-size: 15px;
   line-height: 1;
 }
+.tab-dropdown-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+  margin: 4px 0;
+}
 
 /* ── Right side of tab bar ───────────────────────────────────── */
 .top-bar-right {

@@ -23,7 +23,7 @@ const TABS: Tab[] = [
   },
   {
     id:           "timetable",
-    label:        "New Timetable",
+    label:        "Home",
     icon:         "🗓",
     pathSegments: ["/new-timetable", "/settings", "/subjects", "/classes", "/rooms", "/teachers",
                    "/lessons", "/constraints", "/generate", "/review", "/workload",
@@ -109,11 +109,6 @@ export default function AppShell() {
       tab.pathSegments.some(p => location.pathname.includes(p))
     ) ?? TABS[0];
 
-  // Check if user is currently on a timetable setup/schedule page
-  const TIMETABLE_PATHS = ["/settings", "/subjects", "/classes", "/rooms", "/teachers",
-    "/lessons", "/constraints", "/generate", "/review", "/workload", "/academic-year"];
-  const isOnSetupPage = TIMETABLE_PATHS.some(p => location.pathname.includes(p));
-
   // Close dropdowns on outside click
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
@@ -128,15 +123,20 @@ export default function AppShell() {
     return () => document.removeEventListener("mousedown", handleMouseDown);
   }, []);
 
+  // Close dropdown on route change
+  useEffect(() => {
+    setDropdownOpen(false);
+  }, [location.pathname]);
+
   function handleTabClick(tab: Tab) {
     if (tab.hasDropdown) {
-      // New Timetable tab: if on a setup page, toggle dropdown; else navigate to landing
-      if (isOnSetupPage) {
-        setDropdownOpen(prev => !prev);
-      } else {
-        setDropdownOpen(false);
-        navigate(projectId ? `/project/${projectId}/new-timetable` : "/");
+      // On the landing page itself, just navigate (no dropdown needed)
+      const isOnLanding = location.pathname.includes("/new-timetable");
+      if (isOnLanding) {
+        return;
       }
+      // Always toggle dropdown from any other page
+      setDropdownOpen(prev => !prev);
       return;
     }
     setDropdownOpen(false);
@@ -207,9 +207,18 @@ export default function AppShell() {
                   {idx > 1 && <span className="tab-new-badge">New</span>}
                 </button>
 
-                {/* Dropdown for New Timetable */}
+                {/* Dropdown for Home tab */}
                 {tab.hasDropdown && dropdownOpen && (
                   <div className="tab-dropdown">
+                    <button
+                      className={`tab-dropdown-item ${location.pathname.includes("/new-timetable") ? "active" : ""}`}
+                      onClick={() => handleDropdownItemClick("new-timetable")}
+                      style={{ fontWeight: 600 }}
+                    >
+                      <span className="tab-dropdown-icon">🏠</span>
+                      Home
+                    </button>
+                    <div className="tab-dropdown-divider" />
                     {DROPDOWN_GROUPS.map(group => (
                       <div key={group.label}>
                         <div className="tab-dropdown-group-label">{group.label}</div>

@@ -892,6 +892,70 @@ export function getDashboardStats(projectId: number) {
   return api<DashboardStats>(`/api/projects/${projectId}/dashboard/stats`);
 }
 
+// ─── Timetable History ──────────────────────────────────────────────────────
+export interface HistoryEntry {
+  id: number;
+  action: string;
+  description: string;
+  created_by: string;
+  created_at: string | null;
+  clash_count: number;
+  teacher_count: number;
+  class_count: number;
+  is_current: boolean;
+}
+
+export function getTimetableHistory(projectId: number) {
+  return api<HistoryEntry[]>(`/api/projects/${projectId}/history`);
+}
+
+// ─── Timetable Import ──────────────────────────────────────────────────────
+export interface ImportPreview {
+  teachers: { name: string }[];
+  classes: { name: string; grade?: string; section?: string }[];
+  subjects: { name: string }[];
+  periods: number;
+  days: number;
+  slots: { period: number; col: number; raw: string }[];
+  warnings: string[];
+}
+
+export async function importTimetableFile(projectId: number, file: File): Promise<ImportPreview> {
+  const token = getToken();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`/api/projects/${projectId}/import-timetable`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (res.status === 401) {
+    localStorage.removeItem("timetable_token");
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail));
+  }
+  return res.json();
+}
+
+export function confirmTimetableImport(projectId: number, data: { teachers: { name: string }[]; subjects: { name: string }[]; classes: { name: string; grade?: string; section?: string }[] }) {
+  return api<{ ok: boolean; created_teachers: number; created_subjects: number; created_classes: number }>(
+    `/api/projects/${projectId}/confirm-import`,
+    { method: "POST", body: JSON.stringify(data) }
+  );
+}
+
+// ─── Per-project Demo Data ─────────────────────────────────────────────────
+export function loadDemoData(projectId: number) {
+  return api<{ ok: boolean; message: string; teachers: number; classes: number; subjects: number; classrooms: number }>(
+    `/api/projects/${projectId}/load-demo`,
+    { method: "POST" }
+  );
+}
+
 // ─── Share ───────────────────────────────────────────────────────────────────
 export async function uploadPdfForSharing(blob: Blob, filename: string): Promise<{ url: string; uid: string; expires_at: string }> {
   const token = getToken();
