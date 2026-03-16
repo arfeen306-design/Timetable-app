@@ -304,6 +304,28 @@
   color: var(--slate-300, #CBD5E1);
 }
 
+/* Theme toggle */
+.theme-toggle {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s, border-color 0.15s, transform 0.2s;
+}
+.theme-toggle:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.2);
+  transform: rotate(15deg);
+}
+
 /* ── App body ─────────────────────────────────────────────────── */
 .app-body {
   display: flex;

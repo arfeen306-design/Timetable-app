@@ -165,6 +165,58 @@
   --t-slow:   0.35s ease;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  /* ── Surfaces ── */
+  --surface-page:       #0B1120;
+  --surface-card:       #151D2E;
+  --surface-raised:     #1C2639;
+
+  /* ── Text ── */
+  --text-primary:       #E2E8F0;
+  --text-secondary:     #94A3B8;
+  --text-muted:         #64748B;
+  --text-hint:          #475569;
+
+  /* ── Borders ── */
+  --border-subtle:      #1E293B;
+  --border-default:     #2D3A4F;
+  --border-strong:      #3B4A63;
+
+  /* ── Semantic – toned down for dark ── */
+  --success-50:  #052E16;
+  --success-100: #0A3D20;
+  --danger-50:   #2D0A0A;
+  --danger-100:  #3B1414;
+  --danger-200:  #5C2424;
+  --warning-50:  #2D1F00;
+  --warning-100: #3B2A06;
+
+  /* ── Shadows ── */
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.2);
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3);
+  --shadow-xl:  0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.3);
+
+  /* ── Layout / cards ── */
+  --content-bg:   #0B1120;
+  --card-bg:      #151D2E;
+  --card-border:  rgba(255,255,255,0.06);
+
+  /* ── Slate overrides for dark ── */
+  --slate-50:  #0F172A;
+  --slate-100: #1E293B;
+  --slate-200: #2D3A4F;
+  --slate-800: #E2E8F0;
+  --slate-900: #F1F5F9;
+
+  /* ── Skeleton ── */
+  color-scheme: dark;
+}
+
 /* ── View transitions ── */
 ::view-transition-group(*),
 ::view-transition-old(*),
