@@ -39,7 +39,7 @@ export default function Dashboard() {
     try {
       const p = await api.createDemoProject();
       setProjects((prev) => [...prev, p]);
-      navigate(`/project/${p.id}/dashboard`);
+      navigate(`/project/${p.id}/settings`);
     } catch (err) { setError(err instanceof Error ? err.message : "Failed to load demo school"); }
     finally { setDemoLoading(false); }
   }
@@ -52,7 +52,7 @@ export default function Dashboard() {
       const p = await api.createProject({ name: name.trim(), academic_year: academicYear.trim() || new Date().getFullYear().toString() });
       setProjects((prev) => [...prev, p]);
       setName(""); setAcademicYear(""); setShowCreateForm(false);
-      navigate(`/project/${p.id}/dashboard`);
+      navigate(`/project/${p.id}/settings`);
     } catch (err) { setError(err instanceof Error ? err.message : "Failed to create project"); }
     finally { setCreating(false); }
   }
@@ -308,7 +308,7 @@ export default function Dashboard() {
               }}>📅</div>
 
               {/* Name + year */}
-              <Link to={`/project/${p.id}/dashboard`} style={{
+              <Link to={`/project/${p.id}/settings`} style={{
                 flex: 1, fontWeight: 600, fontSize: "0.88rem", color: "var(--primary-700)",
                 textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}>
