@@ -72,7 +72,7 @@ export default function NewTimetableLanding() {
 
   // ── Select project ──
   function handleSelectProject(p: Project) {
-    navigate(`/project/${p.id}/dashboard`);
+    navigate(`/project/${p.id}/new-timetable`);
   }
 
   // ── Create new project ──

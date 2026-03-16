@@ -15,13 +15,6 @@ interface Tab {
 
 const TABS: Tab[] = [
   {
-    id:           "dashboard",
-    label:        "Dashboard",
-    icon:         "📊",
-    pathSegments: ["/dashboard"],
-    segment:      null,
-  },
-  {
     id:           "timetable",
     label:        "Home",
     icon:         "🗓",
@@ -30,6 +23,13 @@ const TABS: Tab[] = [
                    "/academic-year"],
     hasDropdown:  true,
     segment:      "settings",
+  },
+  {
+    id:           "dashboard",
+    label:        "Dashboard",
+    icon:         "📊",
+    pathSegments: ["/dashboard"],
+    segment:      null,
   },
   {
     id:           "substitution",
@@ -130,12 +130,6 @@ export default function AppShell() {
 
   function handleTabClick(tab: Tab) {
     if (tab.hasDropdown) {
-      // On the landing page itself, just navigate (no dropdown needed)
-      const isOnLanding = location.pathname.includes("/new-timetable");
-      if (isOnLanding) {
-        return;
-      }
-      // Always toggle dropdown from any other page
       setDropdownOpen(prev => !prev);
       return;
     }
@@ -169,19 +163,7 @@ export default function AppShell() {
       {/* ── Top tab bar ── */}
       <header className="top-tab-bar">
 
-        {/* Logo */}
-        <div className="app-logo" onClick={() => navigate("/")} role="button" tabIndex={0}>
-          <div className="app-logo-mark">
-            <svg viewBox="0 0 16 16" fill="none" stroke="white"
-                 strokeWidth="1.8" strokeLinecap="round">
-              <rect x="1" y="1" width="6" height="6" rx="1.2" />
-              <rect x="9" y="1" width="6" height="6" rx="1.2" />
-              <rect x="1" y="9" width="6" height="6" rx="1.2" />
-              <rect x="9" y="9" width="6" height="6" rx="1.2" />
-            </svg>
-          </div>
-          <span className="app-logo-name">Schedulr</span>
-        </div>
+
 
         {/* Tabs */}
         <nav className="top-tabs" role="tablist">

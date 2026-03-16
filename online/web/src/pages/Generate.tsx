@@ -84,11 +84,15 @@ export default function Generate() {
             </div>
           )}
           {Object.keys(validation.grouped_errors || {}).length > 0 && (
-            <div>
-              <strong>Grouped errors</strong>
-              <pre style={{ background: "#f1f5f9", padding: "0.75rem", borderRadius: 6, fontSize: "0.8rem" }}>
-                {JSON.stringify(validation.grouped_errors, null, 2)}
-              </pre>
+            <div style={{ marginTop: "0.75rem" }}>
+              {Object.entries(validation.grouped_errors as Record<string, string[]>).map(([category, msgs]) => (
+                <div key={category} className="alert alert-error" style={{ marginBottom: 8 }}>
+                  <strong>{category}</strong>
+                  <ul style={{ margin: "0.4rem 0 0 1rem" }}>
+                    {msgs.map((m, i) => <li key={i}>{m}</li>)}
+                  </ul>
+                </div>
+              ))}
             </div>
           )}
         </div>
