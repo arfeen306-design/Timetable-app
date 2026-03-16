@@ -23,6 +23,32 @@ if TYPE_CHECKING:
     from database.connection import DatabaseConnection
 
 
+def _draw_branding(canvas, doc):
+    """Draw Myzynca branding footer on every PDF page."""
+    canvas.saveState()
+    page_w, page_h = doc.pagesize
+    # Shield icon (navy circle with Z)
+    cx, cy = page_w / 2 - 50, 22
+    canvas.setFillColor(colors.HexColor("#131E2E"))
+    canvas.circle(cx, cy, 8, fill=1, stroke=0)
+    canvas.setFillColor(colors.white)
+    canvas.setFont("Helvetica-Bold", 9)
+    canvas.drawCentredString(cx, cy - 3, "Z")
+    # Brand name
+    canvas.setFillColor(colors.HexColor("#131E2E"))
+    canvas.setFont("Helvetica-Bold", 10)
+    canvas.drawString(cx + 12, cy - 4, "Myzynca")
+    # URL
+    canvas.setFillColor(colors.HexColor("#3B82F6"))
+    canvas.setFont("Helvetica", 8)
+    canvas.drawString(cx + 62, cy - 4, "myzynca.com")
+    # Thin line above footer
+    canvas.setStrokeColor(colors.HexColor("#E2E8F0"))
+    canvas.setLineWidth(0.5)
+    canvas.line(doc.leftMargin, 38, page_w - doc.rightMargin, 38)
+    canvas.restoreState()
+
+
 def export_pdf(db: DatabaseConnection, path: str) -> None:
     """Export class timetables as a multi-page PDF."""
     school_repo = SchoolRepository(db)
@@ -169,7 +195,7 @@ def export_pdf(db: DatabaseConnection, path: str) -> None:
         if cls_idx < len(classes) - 1:
             elements.append(PageBreak())
 
-    doc.build(elements)
+    doc.build(elements, onFirstPage=_draw_branding, onLaterPages=_draw_branding)
 
 
 def export_teacher_pdf(db: DatabaseConnection, path: str) -> None:
@@ -324,7 +350,7 @@ def export_teacher_pdf(db: DatabaseConnection, path: str) -> None:
         if t_idx < len(teachers) - 1:
             elements.append(PageBreak())
 
-    doc.build(elements)
+    doc.build(elements, onFirstPage=_draw_branding, onLaterPages=_draw_branding)
 
 
 def _sanitize_filename(name: str) -> str:
@@ -403,7 +429,7 @@ def export_single_teacher_pdf(db: DatabaseConnection, teacher_id: int, path: str
     elements.append(table)
     elements.append(Spacer(1, 0.3*cm))
     elements.append(Paragraph(f"<b>Total weekly periods: {total_weekly_periods}</b>", styles["Normal"]))
-    doc.build(elements)
+    doc.build(elements, onFirstPage=_draw_branding, onLaterPages=_draw_branding)
 
 
 def _cell_text(entry, for_teacher: bool = False) -> str:
@@ -559,4 +585,4 @@ def export_single_class_pdf(db: DatabaseConnection, class_id: int, path: str) ->
     table, style_cmds = _build_table_with_slots(data, num_days, num_slots, slots_per_day, entry_map)
     table.setStyle(TableStyle(style_cmds))
     elements.append(table)
-    doc.build(elements)
+    doc.build(elements, onFirstPage=_draw_branding, onLaterPages=_draw_branding)
