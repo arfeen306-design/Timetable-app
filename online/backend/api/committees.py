@@ -1,6 +1,9 @@
 """Committees API — CRUD for school committees and their members."""
 from __future__ import annotations
+import io
+import datetime as _dt
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -9,6 +12,7 @@ from backend.auth.project_scope import get_project_or_404
 from backend.models.base import get_db
 from backend.models.project import Project
 from backend.models.duty_roster_model import Committee, CommitteeMember
+from backend.models.teacher_model import Teacher
 
 router = APIRouter()
 
@@ -84,6 +88,97 @@ def create_committee(
     db.commit()
     db.refresh(c)
     return c
+
+
+@router.get("/export-pdf")
+def export_committees_pdf(
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    except ImportError:
+        raise HTTPException(501, "reportlab not installed on server.")
+
+    committees = (
+        db.query(Committee)
+        .filter(Committee.project_id == project.id)
+        .order_by(Committee.name)
+        .all()
+    )
+    teach_map = {t.id: t for t in db.query(Teacher).filter(Teacher.project_id == project.id).all()}
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=20*mm, rightMargin=20*mm,
+                            topMargin=20*mm, bottomMargin=20*mm)
+    styles = getSampleStyleSheet()
+    INDIGO = colors.HexColor("#4F46E5")
+    SLATE  = colors.HexColor("#0F172A")
+    MUTED  = colors.HexColor("#475569")
+    LIGHT  = colors.HexColor("#EEF2FF")
+
+    title_s = ParagraphStyle("T", parent=styles["Normal"], fontSize=16, fontName="Helvetica-Bold",
+                              textColor=SLATE, spaceAfter=2)
+    sub_s   = ParagraphStyle("S", parent=styles["Normal"], fontSize=9, fontName="Helvetica",
+                              textColor=MUTED, spaceAfter=8)
+    comm_s  = ParagraphStyle("C", parent=styles["Normal"], fontSize=11, fontName="Helvetica-Bold",
+                              textColor=SLATE, spaceBefore=8, spaceAfter=3)
+    body_s  = ParagraphStyle("B", parent=styles["Normal"], fontSize=9, fontName="Helvetica",
+                              textColor=SLATE, leading=13)
+
+    story = [
+        Paragraph(f"{project.name}", title_s),
+        Paragraph(f"School Committees  ·  {_dt.date.today().strftime('%d %B %Y')}", sub_s),
+    ]
+
+    if not committees:
+        story.append(Paragraph("No committees found.", body_s))
+    else:
+        for committee in committees:
+            story.append(Paragraph(committee.name, comm_s))
+            if committee.description:
+                story.append(Paragraph(committee.description, body_s))
+                story.append(Spacer(1, 2*mm))
+
+            if not committee.members:
+                story.append(Paragraph("No members assigned.", body_s))
+                story.append(Spacer(1, 3*mm))
+                continue
+
+            table_data = [["#", "Teacher", "Role"]]
+            for i, member in enumerate(committee.members, 1):
+                t = teach_map.get(member.teacher_id)
+                tname = f"{t.first_name} {t.last_name}".strip() if t else f"Teacher #{member.teacher_id}"
+                table_data.append([str(i), tname, member.role or "Member"])
+
+            col_w = [12*mm, 110*mm, 50*mm]
+            tbl = Table(table_data, colWidths=col_w, repeatRows=1)
+            tbl.setStyle(TableStyle([
+                ("BACKGROUND",    (0,0),(-1,0), INDIGO),
+                ("TEXTCOLOR",     (0,0),(-1,0), colors.white),
+                ("FONTNAME",      (0,0),(-1,0), "Helvetica-Bold"),
+                ("FONTSIZE",      (0,0),(-1,-1), 9),
+                ("ALIGN",         (0,0),(0,-1),  "CENTER"),
+                ("TOPPADDING",    (0,0),(-1,-1), 5),
+                ("BOTTOMPADDING", (0,0),(-1,-1), 5),
+                ("LEFTPADDING",   (0,0),(-1,-1), 8),
+                ("BACKGROUND",    (0,1),(0,-1),  LIGHT),
+                ("GRID",          (0,0),(-1,-1), 0.5, colors.HexColor("#E2E8F0")),
+                *[("BACKGROUND",  (0,r),(-1,r), colors.HexColor("#F8FAFC"))
+                  for r in range(2, len(table_data), 2)],
+            ]))
+            story.append(tbl)
+            story.append(Spacer(1, 4*mm))
+
+    doc.build(story)
+    buf.seek(0)
+    fname = f"committees_{project.name.replace(' ','_')}.pdf"
+    return StreamingResponse(buf, media_type="application/pdf",
+                             headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
 @router.get("/{committee_id}", response_model=CommitteeResponse)

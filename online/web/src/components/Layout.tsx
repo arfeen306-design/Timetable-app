@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { Outlet, Link, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ErrorBoundary from "./ErrorBoundary";
@@ -63,27 +64,47 @@ export default function Layout() {
   const location = useLocation();
   const activeStep = getActiveNum(location.pathname);
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const collapseTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleMouseEnter = () => {
+    clearTimeout(collapseTimer.current);
+    setSidebarOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    collapseTimer.current = setTimeout(() => setSidebarOpen(false), 300);
+  };
+
+  useEffect(() => () => clearTimeout(collapseTimer.current), []);
+
   // User initials for avatar
   const email = user?.email || "";
   const initials = email.split("@")[0].slice(0, 2).toUpperCase();
 
   return (
     <div className="app-layout">
-      <aside className="sidebar">
+      <aside
+        className={`sidebar ${sidebarOpen ? "sidebar--open" : "sidebar--collapsed"}`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         {/* ── Logo ── */}
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon">📅</div>
-          <div>
-            <div className="sidebar-logo-text">Schedulr</div>
-            <div style={{ fontSize: "0.6rem", color: "#64748b", fontWeight: 500, letterSpacing: "0.04em" }}>School OS</div>
-          </div>
+          {sidebarOpen && (
+            <div>
+              <div className="sidebar-logo-text">Schedulr</div>
+              <div style={{ fontSize: "0.6rem", color: "#64748b", fontWeight: 500, letterSpacing: "0.04em" }}>School OS</div>
+            </div>
+          )}
         </div>
 
         {/* ── Navigation ── */}
         <nav className="sidebar-nav">
           {NAV_GROUPS.map((group) => (
             <div key={group.label}>
-              <div className="sidebar-group-label">{group.label}</div>
+              {sidebarOpen && <div className="sidebar-group-label">{group.label}</div>}
               {group.items.map((item) => {
                 const href = item.num === 1 ? "/" : projectId ? item.path.replace(":projectId", projectId) : "#";
                 const isActive = item.num === activeStep;
@@ -95,15 +116,20 @@ export default function Layout() {
                     className={`sidebar-item ${isActive ? "active" : ""} ${disabled ? "disabled" : ""}`}
                     onClick={(e) => disabled && e.preventDefault()}
                     aria-disabled={disabled}
+                    title={!sidebarOpen ? item.label : undefined}
                   >
                     <span style={{ fontSize: "0.88rem", width: 20, textAlign: "center", flexShrink: 0 }}>{item.icon}</span>
-                    <span style={{ flex: 1 }}>{item.label}</span>
-                    {"badge" in item && item.badge && (
-                      <span style={{
-                        fontSize: "0.58rem", fontWeight: 700, padding: "1px 6px",
-                        borderRadius: 4, background: "rgba(99,102,241,0.2)", color: "#a5b4fc",
-                        letterSpacing: "0.03em",
-                      }}>{item.badge}</span>
+                    {sidebarOpen && (
+                      <>
+                        <span style={{ flex: 1 }}>{item.label}</span>
+                        {"badge" in item && item.badge && (
+                          <span style={{
+                            fontSize: "0.58rem", fontWeight: 700, padding: "1px 6px",
+                            borderRadius: 4, background: "rgba(99,102,241,0.2)", color: "#a5b4fc",
+                            letterSpacing: "0.03em",
+                          }}>{item.badge}</span>
+                        )}
+                      </>
                     )}
                   </Link>
                 );
@@ -114,29 +140,35 @@ export default function Layout() {
 
         {/* ── User footer ── */}
         <div style={{
-          padding: "0.75rem 1.25rem", borderTop: "1px solid rgba(255,255,255,0.06)",
-          display: "flex", alignItems: "center", gap: 10,
+          padding: sidebarOpen ? "0.75rem 1.25rem" : "0.75rem 0",
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: sidebarOpen ? 10 : 0,
         }}>
           <div style={{
             width: 32, height: 32, borderRadius: 8,
             background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "0.65rem", fontWeight: 700, color: "#fff",
+            fontSize: "0.65rem", fontWeight: 700, color: "#fff", flexShrink: 0,
           }}>{initials}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {email.split("@")[0]}
-            </div>
-            <div style={{ fontSize: "0.6rem", color: "#64748b" }}>Administrator</div>
-          </div>
-          <button type="button" onClick={logout} title="Sign out"
-            style={{
-              background: "none", border: "none", color: "#64748b", cursor: "pointer",
-              fontSize: "1rem", padding: 4, borderRadius: 4, transition: "color 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = "#ef4444"; }}
-            onMouseLeave={e => { e.currentTarget.style.color = "#64748b"; }}
-          >⏻</button>
+          {sidebarOpen && (
+            <>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {email.split("@")[0]}
+                </div>
+                <div style={{ fontSize: "0.6rem", color: "#64748b" }}>Administrator</div>
+              </div>
+              <button type="button" onClick={logout} title="Sign out"
+                style={{
+                  background: "none", border: "none", color: "#64748b", cursor: "pointer",
+                  fontSize: "1rem", padding: 4, borderRadius: 4, transition: "color 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = "#ef4444"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "#64748b"; }}
+              >⏻</button>
+            </>
+          )}
         </div>
       </aside>
 

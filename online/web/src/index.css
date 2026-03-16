@@ -23,14 +23,33 @@ a:hover { text-decoration: underline; color: var(--blue-600); }
 
 /* ── Sidebar ── */
 .sidebar {
-  width: var(--sidebar-w);
-  min-width: var(--sidebar-w);
+  width: 56px;
+  min-width: 56px;
   background: var(--sidebar-bg);
   color: #fff;
   display: flex;
   flex-direction: column;
   box-shadow: 2px 0 12px rgba(0,0,0,0.18);
   z-index: 10;
+  overflow: hidden;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sidebar--open {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+}
+.sidebar--collapsed {
+  width: 56px;
+  min-width: 56px;
+}
+.sidebar--collapsed .sidebar-item {
+  padding: 9px 0;
+  justify-content: center;
+}
+.sidebar--collapsed .sidebar-logo {
+  justify-content: center;
+  padding-left: var(--sp-3);
+  padding-right: var(--sp-3);
 }
 .sidebar-logo {
   padding: var(--sp-5) var(--sp-5) var(--sp-4);

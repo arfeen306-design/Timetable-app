@@ -8,8 +8,9 @@ type Subject    = Awaited<ReturnType<typeof api.listSubjects>>[0];
 type Room       = Awaited<ReturnType<typeof api.listRooms>>[0];
 type ExamSession = api.ExamSession;
 type ExamSlot    = api.ExamSlot;
+type TeacherDutySummary = api.TeacherDutySummary;
 
-type Tab = "setup" | "datesheet" | "assignments";
+type Tab = "setup" | "datesheet" | "assignments" | "summary";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,26 @@ function badge(txt: string, bg: string, fg: string) {
       borderRadius: "var(--radius-full)", background: bg, color: fg, whiteSpace: "nowrap",
     }}>{txt}</span>
   );
+}
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-GB", {
+    weekday: "short", day: "numeric", month: "short",
+  });
+}
+
+function formatHours(minutes: number): string {
+  if (minutes === 0) return "0h";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+function getDutyCountClass(count: number): string {
+  if (count === 0) return "duty-none";
+  if (count <= 3)  return "duty-ok";
+  if (count <= 6)  return "duty-warn";
+  return "duty-heavy";
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -144,17 +165,28 @@ function DateSheetTab({
   onDeleted: (id: number) => void;
 }) {
   const toast = useToast();
-  const [showAdd, setShowAdd] = useState(false);
-  const [fSubject,  setFSubject]  = useState<number | "">("");
-  const [fDate,     setFDate]     = useState("");
-  const [fStart,    setFStart]    = useState("09:00");
-  const [fEnd,      setFEnd]      = useState("12:00");
-  const [fRooms,    setFRooms]    = useState<number[]>([]);
-  const [saving,    setSaving]    = useState(false);
-  const [formError, setFormError] = useState("");
+  const [showAdd,    setShowAdd]    = useState(false);
+  const [prefillDate, setPrefillDate] = useState("");
+  const [fSubject,   setFSubject]   = useState<number | "">("");
+  const [fDate,      setFDate]      = useState("");
+  const [fStart,     setFStart]     = useState("09:00");
+  const [fEnd,       setFEnd]       = useState("12:00");
+  const [fRooms,     setFRooms]     = useState<number[]>([]);
+  const [saving,     setSaving]     = useState(false);
+  const [formError,  setFormError]  = useState("");
   const [confirmDel, setConfirmDel] = useState<number | null>(null);
 
-  // Which subject teacher would be excluded
+  function openAddModal(prefill?: string) {
+    setPrefillDate(prefill ?? "");
+    setFDate(prefill ?? "");
+    setFSubject("");
+    setFStart("09:00");
+    setFEnd("12:00");
+    setFRooms([]);
+    setFormError("");
+    setShowAdd(true);
+  }
+
   const subjectTeacherNote = fSubject !== "" ? `Subject: ${subjects.find(s => s.id === fSubject)?.name ?? ""}` : "";
 
   async function create() {
@@ -188,10 +220,21 @@ function DateSheetTab({
     }
   }
 
+  // Group sessions by date
+  const sessionsByDate: Record<string, ExamSession[]> = {};
+  sessions.forEach(s => {
+    if (!sessionsByDate[s.date]) sessionsByDate[s.date] = [];
+    sessionsByDate[s.date].push(s);
+  });
+  Object.values(sessionsByDate).forEach(group =>
+    group.sort((a, b) => a.start_time.localeCompare(b.start_time))
+  );
+  const sortedDates = Object.keys(sessionsByDate).sort();
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.75rem" }}>
-        <button type="button" className="btn btn-primary" style={{ fontSize: "0.82rem" }} onClick={() => setShowAdd(true)}>
+        <button type="button" className="btn btn-primary" style={{ fontSize: "0.82rem" }} onClick={() => openAddModal()}>
           + Add Paper
         </button>
       </div>
@@ -200,44 +243,60 @@ function DateSheetTab({
         <p className="subheading" style={{ textAlign: "center", padding: "2rem 0" }}>No exam sessions yet. Add a paper to get started.</p>
       )}
 
-      {sessions.length > 0 && (
+      {sortedDates.length > 0 && (
         <table className="data-table">
           <thead>
             <tr>
-              <th>Date</th><th>Subject</th><th>Start</th><th>End</th><th>Rooms</th><th>Assigned</th><th></th>
+              <th>Date</th><th>Subject</th><th>Time</th><th>Rooms</th><th>Assigned</th><th></th>
             </tr>
           </thead>
           <tbody>
-            {sessions.map(s => (
-              <tr key={s.id}>
-                <td>{new Date(s.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</td>
-                <td>
-                  <span style={{ fontWeight: 600, color: s.subject_color || "var(--primary-600)" }}>{s.subject_name}</span>
-                </td>
-                <td>{s.start_time}</td>
-                <td>{s.end_time}</td>
-                <td>{s.room_ids.length > 0 ? `${s.room_ids.length} room${s.room_ids.length !== 1 ? "s" : ""}` : "—"}</td>
-                <td>
-                  {s.slot_count >= s.slots_needed && s.slots_needed > 0
-                    ? badge("Full", "var(--success-100)", "var(--success-700)")
-                    : s.slot_count > 0
-                      ? badge(`${s.slot_count}/${s.slots_needed}`, "var(--warning-100)", "var(--warning-700)")
-                      : badge("Unassigned", "var(--slate-100)", "var(--slate-500)")}
-                </td>
-                <td>
-                  {confirmDel === s.id ? (
-                    <span style={{ display: "flex", gap: 4, alignItems: "center", fontSize: "0.75rem" }}>
-                      Remove?
-                      <button type="button" className="btn btn-danger" style={{ fontSize: "0.68rem", padding: "2px 6px" }} onClick={() => del(s.id)}>Yes</button>
-                      <button type="button" className="btn" style={{ fontSize: "0.68rem", padding: "2px 6px" }} onClick={() => setConfirmDel(null)}>No</button>
-                    </span>
-                  ) : (
-                    <button type="button" className="btn" style={{ fontSize: "0.72rem", padding: "2px 8px", color: "var(--danger-500)" }}
-                      onClick={() => setConfirmDel(s.id)}>Remove</button>
+            {sortedDates.map(date => {
+              const group = sessionsByDate[date];
+              return group.map((s, idx) => (
+                <tr key={s.id} style={idx === 0 ? { borderTop: "2px solid var(--border-default)" } : {}}>
+                  {idx === 0 && (
+                    <td rowSpan={group.length} style={{ verticalAlign: "top", paddingTop: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
+                      {formatDate(date)}
+                      <button
+                        type="button"
+                        title="Add another paper on this day"
+                        onClick={() => openAddModal(date)}
+                        style={{
+                          marginLeft: 6, background: "none", cursor: "pointer",
+                          border: "1px dashed var(--primary-400)", borderRadius: 4,
+                          color: "var(--primary-500)", fontSize: "11px", padding: "1px 5px",
+                        }}
+                      >+</button>
+                    </td>
                   )}
-                </td>
-              </tr>
-            ))}
+                  <td>
+                    <span style={{ fontWeight: 600, color: s.subject_color || "var(--primary-600)" }}>{s.subject_name}</span>
+                  </td>
+                  <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.78rem" }}>{s.start_time} – {s.end_time}</td>
+                  <td>{s.room_ids.length > 0 ? `${s.room_ids.length} room${s.room_ids.length !== 1 ? "s" : ""}` : "—"}</td>
+                  <td>
+                    {s.slot_count >= s.slots_needed && s.slots_needed > 0
+                      ? badge("Full", "var(--success-100)", "var(--success-700)")
+                      : s.slot_count > 0
+                        ? badge(`${s.slot_count}/${s.slots_needed}`, "var(--warning-100)", "var(--warning-700)")
+                        : badge("Unassigned", "var(--slate-100)", "var(--slate-500)")}
+                  </td>
+                  <td>
+                    {confirmDel === s.id ? (
+                      <span style={{ display: "flex", gap: 4, alignItems: "center", fontSize: "0.75rem" }}>
+                        Remove?
+                        <button type="button" className="btn btn-danger" style={{ fontSize: "0.68rem", padding: "2px 6px" }} onClick={() => del(s.id)}>Yes</button>
+                        <button type="button" className="btn" style={{ fontSize: "0.68rem", padding: "2px 6px" }} onClick={() => setConfirmDel(null)}>No</button>
+                      </span>
+                    ) : (
+                      <button type="button" className="btn" style={{ fontSize: "0.72rem", padding: "2px 8px", color: "var(--danger-500)" }}
+                        onClick={() => setConfirmDel(s.id)}>Remove</button>
+                    )}
+                  </td>
+                </tr>
+              ));
+            })}
           </tbody>
         </table>
       )}
@@ -246,7 +305,7 @@ function DateSheetTab({
       {showAdd && (
         <div className="modal-overlay" onClick={() => !saving && setShowAdd(false)}>
           <div className="modal-dialog" onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>Add Exam Paper</h3>
+            <h3 style={{ marginTop: 0 }}>Add Exam Paper{prefillDate && ` — ${formatDate(prefillDate)}`}</h3>
             <div className="modal-form">
               <div className="modal-field">
                 <label className="modal-label required">Subject:</label>
@@ -388,12 +447,7 @@ function AssignmentsTab({
       toast("success", "Teacher assigned.");
       setAssignModal(null);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Assign failed";
-      if (msg.includes("409") || msg.toLowerCase().includes("exempt") || msg.toLowerCase().includes("conflict") || msg.toLowerCase().includes("subject")) {
-        setAError(msg);
-      } else {
-        setAError(msg);
-      }
+      setAError(err instanceof Error ? err.message : "Assign failed");
     } finally { setASaving(false); }
   }
 
@@ -409,8 +463,6 @@ function AssignmentsTab({
         const isAuto    = autoRunning.has(sess.id);
         const assignedRoomIds = new Set(sessSlots.map(s => s.room_id));
         const unassignedRoomIds = sess.room_ids.filter(rid => !assignedRoomIds.has(rid));
-
-        // Available teachers: not already in this session
         const assignedTeacherIds = new Set(sessSlots.map(s => s.teacher_id));
         const availableTeachers  = teachers.filter(t => !assignedTeacherIds.has(t.id));
 
@@ -419,7 +471,6 @@ function AssignmentsTab({
             border: "1px solid var(--border-default)", borderRadius: "var(--radius-lg)",
             overflow: "hidden", background: "var(--surface-card)",
           }}>
-            {/* Session header */}
             <div style={{
               display: "flex", alignItems: "center", gap: "0.75rem",
               padding: "0.75rem 1rem", borderBottom: "1px solid var(--border-subtle)",
@@ -447,7 +498,6 @@ function AssignmentsTab({
             <div style={{ padding: "0.75rem 1rem" }}>
               {isLoading && <p style={{ color: "var(--slate-400)", fontSize: "0.8rem" }}>Loading…</p>}
 
-              {/* Assigned slots */}
               {sessSlots.length > 0 && (
                 <div style={{ marginBottom: "0.6rem" }}>
                   <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", letterSpacing: "0.05em", marginBottom: "0.35rem" }}>ASSIGNED</div>
@@ -464,7 +514,6 @@ function AssignmentsTab({
                 </div>
               )}
 
-              {/* Unassigned rooms */}
               {unassignedRoomIds.length > 0 && (
                 <div style={{ marginBottom: "0.6rem" }}>
                   {unassignedRoomIds.map(rid => {
@@ -483,7 +532,6 @@ function AssignmentsTab({
                 </div>
               )}
 
-              {/* Available teachers preview */}
               {availableTeachers.length > 0 && unassignedRoomIds.length > 0 && (
                 <div>
                   <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", letterSpacing: "0.05em", marginBottom: "0.35rem" }}>AVAILABLE TEACHERS</div>
@@ -516,7 +564,6 @@ function AssignmentsTab({
         );
       })}
 
-      {/* Manual assign modal */}
       {assignModal && (
         <div className="modal-overlay" onClick={() => !aSaving && setAssignModal(null)}>
           <div className="modal-dialog" onClick={e => e.stopPropagation()}>
@@ -550,6 +597,121 @@ function AssignmentsTab({
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// SUMMARY TAB
+// ══════════════════════════════════════════════════════════════════════════════
+
+type SortKey = "teacher_name" | "exam_duty_count" | "exam_duty_minutes" | "roster_duty_count" | "total_duty_events";
+
+function SummaryTab({ pid }: { pid: number }) {
+  const toast = useToast();
+  const [summary,   setSummary]   = useState<TeacherDutySummary[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [sortKey,   setSortKey]   = useState<SortKey>("total_duty_events");
+  const [sortAsc,   setSortAsc]   = useState(false);
+
+  useEffect(() => {
+    api.getTeacherDutySummary(pid)
+      .then(data => setSummary(data))
+      .catch(err => toast("error", err instanceof Error ? err.message : "Failed to load summary"))
+      .finally(() => setLoading(false));
+  }, [pid, toast]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortAsc(a => !a);
+    else { setSortKey(key); setSortAsc(false); }
+  }
+
+  const active = summary.filter(t => !t.is_exempt);
+  const exempt = summary.filter(t => t.is_exempt);
+
+  const sorted = [...active].sort((a, b) => {
+    const va = a[sortKey] as string | number;
+    const vb = b[sortKey] as string | number;
+    const cmp = typeof va === "string" ? va.localeCompare(vb as string) : (va as number) - (vb as number);
+    return sortAsc ? cmp : -cmp;
+  });
+
+  const dutyColors: Record<string, string> = {
+    "duty-none":  "var(--slate-400)",
+    "duty-ok":    "var(--success-600)",
+    "duty-warn":  "var(--warning-600)",
+    "duty-heavy": "var(--danger-600)",
+  };
+
+  const SortHeader = ({ k, label }: { k: SortKey; label: string }) => (
+    <th style={{ cursor: "pointer", userSelect: "none" }} onClick={() => toggleSort(k)}>
+      {label}{sortKey === k ? (sortAsc ? " ▲" : " ▼") : ""}
+    </th>
+  );
+
+  if (loading) return <p className="subheading" style={{ padding: "2rem 0", textAlign: "center" }}>Loading summary…</p>;
+
+  return (
+    <div>
+      <h4 style={{ marginTop: 0, marginBottom: "1rem", fontSize: "0.9rem", color: "var(--slate-700)" }}>
+        TEACHER DUTY SUMMARY
+      </h4>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <SortHeader k="teacher_name" label="Teacher" />
+            <th>Subject</th>
+            <SortHeader k="exam_duty_count" label="Exam Duties" />
+            <SortHeader k="exam_duty_minutes" label="Hours" />
+            <SortHeader k="roster_duty_count" label="Roster" />
+            <SortHeader k="total_duty_events" label="Total" />
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map(t => {
+            const cls = getDutyCountClass(t.total_duty_events);
+            const clr = dutyColors[cls];
+            return (
+              <tr key={t.teacher_id}>
+                <td style={{ fontWeight: 600 }}>{t.teacher_name}</td>
+                <td style={{ color: "var(--slate-500)", fontSize: "0.8rem" }}>{t.subject || "—"}</td>
+                <td>
+                  <span style={{ fontWeight: 600, color: dutyColors[getDutyCountClass(t.exam_duty_count)] }}>
+                    {t.exam_duty_count}
+                  </span>
+                </td>
+                <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem" }}>
+                  {formatHours(t.exam_duty_minutes)}
+                </td>
+                <td>{t.roster_duty_count}</td>
+                <td>
+                  <span style={{ fontWeight: 700, color: clr }}>{t.total_duty_events}</span>
+                </td>
+              </tr>
+            );
+          })}
+          {sorted.length === 0 && (
+            <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--slate-400)", padding: "1.5rem 0" }}>No teachers found.</td></tr>
+          )}
+        </tbody>
+      </table>
+
+      {exempt.length > 0 && (
+        <div style={{ marginTop: "1.5rem" }}>
+          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)", letterSpacing: "0.07em", marginBottom: "0.5rem" }}>
+            EXEMPT FROM DUTIES
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+            {exempt.map(t => (
+              <span key={t.teacher_id} style={{
+                fontSize: "0.78rem", padding: "3px 10px", borderRadius: "var(--radius-pill)",
+                background: "var(--slate-100)", color: "var(--slate-500)",
+                border: "1px solid var(--slate-200)",
+              }}>{t.teacher_name}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -560,6 +722,7 @@ export default function ExamDutiesPage() {
 
   const [tab,      setTab]      = useState<Tab>("setup");
   const [loading,  setLoading]  = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [rooms,    setRooms]    = useState<Room[]>([]);
@@ -578,10 +741,22 @@ export default function ExamDutiesPage() {
     }).finally(() => setLoading(false));
   }, [pid, toast]);
 
+  async function handleExportPdf() {
+    setExporting(true);
+    try {
+      await api.exportExamDutiesPdf(pid);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "PDF export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const TABS: { key: Tab; label: string }[] = [
     { key: "setup",       label: "⚙️ Setup" },
     { key: "datesheet",   label: "📋 Date Sheet" },
     { key: "assignments", label: "👤 Assignments" },
+    { key: "summary",     label: "📊 Summary" },
   ];
 
   if (loading) return <div className="card"><p className="subheading">Loading…</p></div>;
@@ -594,11 +769,9 @@ export default function ExamDutiesPage() {
           <p className="subheading" style={{ margin: 0 }}>Schedule exam invigilators with conflict-free auto-assignment.</p>
         </div>
         <button type="button" className="btn" style={{ fontSize: "0.78rem" }}
-          onClick={() => {
-            const date = sessions.length > 0 ? sessions[0].date : new Date().toISOString().slice(0, 10);
-            window.open(`/api/projects/${pid}/exam-duties/export-pdf?date=${date}`, "_blank");
-          }}>
-          📄 Export PDF
+          onClick={handleExportPdf}
+          disabled={exporting}>
+          {exporting ? "Exporting…" : "📄 Export PDF"}
         </button>
       </div>
 
@@ -640,6 +813,7 @@ export default function ExamDutiesPage() {
       {tab === "assignments" && (
         <AssignmentsTab pid={pid} sessions={sessions} teachers={teachers} rooms={rooms} />
       )}
+      {tab === "summary"     && <SummaryTab pid={pid} />}
     </div>
   );
 }

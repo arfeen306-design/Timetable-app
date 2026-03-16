@@ -634,6 +634,38 @@ export function getTeacherExamSummary(projectId: number, teacherId: number) {
   return api<TeacherExamSummary>(`/api/projects/${projectId}/exam-duties/teacher-summary/${teacherId}`);
 }
 
+export interface TeacherDutySummary {
+  teacher_id:        number;
+  teacher_name:      string;
+  subject:           string;
+  initials:          string;
+  exam_duty_count:   number;
+  exam_duty_minutes: number;
+  roster_duty_count: number;
+  total_duty_events: number;
+  is_exempt:         boolean;
+}
+export function getTeacherDutySummary(projectId: number) {
+  return api<TeacherDutySummary[]>(`/api/projects/${projectId}/exam-duties/teacher-duty-summary`);
+}
+
+export function exportExamDutiesPdf(projectId: number): Promise<void> {
+  return apiBlob(`/api/projects/${projectId}/exam-duties/export-pdf`).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `exam_duties.pdf`; a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+export function exportCommitteesPdf(projectId: number): Promise<void> {
+  return apiBlob(`/api/projects/${projectId}/committees/export-pdf`).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `committees.pdf`; a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
 // ─── Duty Roster ────────────────────────────────────────────────────────────
 export type DutyEntry = {
   id: number;

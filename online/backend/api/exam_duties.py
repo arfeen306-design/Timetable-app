@@ -6,6 +6,7 @@ import datetime as _dt
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional as _Opt
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -511,19 +512,94 @@ def teacher_exam_summary(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PDF export per date
+# Teacher duty summary (all teachers in project)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/teacher-duty-summary")
+def get_teacher_duty_summary(
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    from backend.models.duty_roster_model import DutyRoster
+    from backend.models.project import Subject
+
+    cfg = db.query(ExamDutyConfig).filter(ExamDutyConfig.project_id == project.id).first()
+    exempt_ids = set(json.loads(cfg.exempt_teacher_ids_json or "[]")) if cfg else set()
+
+    teachers = db.query(Teacher).filter(Teacher.project_id == project.id).all()
+
+    # Exam slots for this project
+    exam_slots = (
+        db.query(ExamDutySlot)
+        .join(ExamSession, ExamDutySlot.session_id == ExamSession.id)
+        .filter(ExamSession.project_id == project.id)
+        .all()
+    )
+
+    exam_count_map: dict = {}
+    exam_minutes_map: dict = {}
+    for sl in exam_slots:
+        tid = sl.teacher_id
+        exam_count_map[tid] = exam_count_map.get(tid, 0) + 1
+        start = _dt.datetime.combine(_dt.date.today(), sl.duty_start)
+        end   = _dt.datetime.combine(_dt.date.today(), sl.duty_end)
+        mins  = max(0, int((end - start).total_seconds() / 60))
+        exam_minutes_map[tid] = exam_minutes_map.get(tid, 0) + mins
+
+    # Duty roster entries per teacher
+    roster_entries = (
+        db.query(DutyRoster)
+        .filter(DutyRoster.project_id == project.id, DutyRoster.teacher_id != None)
+        .all()
+    )
+    roster_count_map: dict = {}
+    for r in roster_entries:
+        if r.teacher_id:
+            roster_count_map[r.teacher_id] = roster_count_map.get(r.teacher_id, 0) + 1
+
+    # Subject names for teachers
+    all_subjects = {s.id: s for s in db.query(Subject).filter(Subject.project_id == project.id).all()}
+    subj_map: dict = {}
+    for ts in db.query(TeacherSubject).all():
+        subj = all_subjects.get(ts.subject_id)
+        if subj and ts.teacher_id not in subj_map:
+            subj_map[ts.teacher_id] = subj.name
+
+    result = []
+    for t in teachers:
+        ec = exam_count_map.get(t.id, 0)
+        em = exam_minutes_map.get(t.id, 0)
+        rc = roster_count_map.get(t.id, 0)
+        result.append({
+            "teacher_id":        t.id,
+            "teacher_name":      f"{t.first_name} {t.last_name}".strip(),
+            "subject":           subj_map.get(t.id, ""),
+            "initials":          t.code or "",
+            "exam_duty_count":   ec,
+            "exam_duty_minutes": em,
+            "roster_duty_count": rc,
+            "total_duty_events": ec + rc,
+            "is_exempt":         t.id in exempt_ids,
+        })
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PDF export (all sessions or single date)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/export-pdf")
 def export_exam_duties_pdf(
-    date: str = Query(..., description="ISO date YYYY-MM-DD"),
+    date: _Opt[str] = Query(None, description="ISO date YYYY-MM-DD — omit to export all"),
     project: Project = Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
-    try:
-        date_obj = _dt.date.fromisoformat(date)
-    except ValueError:
-        raise HTTPException(422, "date must be YYYY-MM-DD")
+    date_obj = None
+    if date:
+        try:
+            date_obj = _dt.date.fromisoformat(date)
+        except ValueError:
+            raise HTTPException(422, "date must be YYYY-MM-DD")
 
     try:
         from reportlab.lib.pagesizes import A4
@@ -534,12 +610,10 @@ def export_exam_duties_pdf(
     except ImportError:
         raise HTTPException(501, "reportlab not installed on server.")
 
-    sessions = (
-        db.query(ExamSession)
-        .filter(ExamSession.project_id == project.id, ExamSession.date == date_obj)
-        .order_by(ExamSession.start_time)
-        .all()
-    )
+    q = db.query(ExamSession).filter(ExamSession.project_id == project.id)
+    if date_obj:
+        q = q.filter(ExamSession.date == date_obj)
+    sessions = q.order_by(ExamSession.date, ExamSession.start_time).all()
 
     from backend.models.project import Subject
     subj_map = {s.id: s for s in db.query(Subject).filter(Subject.project_id == project.id).all()}
@@ -552,13 +626,14 @@ def export_exam_duties_pdf(
     styles = getSampleStyleSheet()
     title_s = ParagraphStyle("T", parent=styles["Heading1"], fontSize=14, spaceAfter=2)
     sub_s   = ParagraphStyle("S", parent=styles["Normal"],   fontSize=9,  spaceAfter=8, textColor=colors.grey)
+    date_label = date_obj.strftime('%A, %d %B %Y') if date_obj else "All Sessions"
     story   = [
         Paragraph(f"{project.name} — Exam Duty Roster", title_s),
-        Paragraph(f"{date_obj.strftime('%A, %d %B %Y')}", sub_s),
+        Paragraph(date_label, sub_s),
     ]
 
     if not sessions:
-        story.append(Paragraph("No exam sessions on this date.", styles["Normal"]))
+        story.append(Paragraph("No exam sessions found.", styles["Normal"]))
     else:
         header = ["Paper", "Room", "Teacher", "Time"]
         rows   = [header]
