@@ -99,6 +99,10 @@ export default function ProjectDashboard() {
   const [newDue, setNewDue] = useState("");
   const [newPriority, setNewPriority] = useState<"high" | "medium" | "low">("medium");
 
+  /* ── Calendar state ── */
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+
   const saveTasks = (t: TodoTask[]) => { setTasks(t); localStorage.setItem(todoKey, JSON.stringify(t)); };
   const addTask = () => {
     if (!newTitle.trim()) return;
@@ -631,26 +635,69 @@ export default function ProjectDashboard() {
       {/* ═══ WIDGETS ROW ═══ */}
       <div className="pd-body-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14 }}>
 
-        {/* ── Google Calendar Embed ── */}
-        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Google Calendar</div>
-              <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>View upcoming events</div>
+        {/* ── Calendar Widget ── */}
+        {(() => {
+          const now = new Date();
+          const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+          const firstDay = new Date(calYear, calMonth, 1).getDay();
+          const monthName = new Date(calYear, calMonth).toLocaleString("default", { month: "long", year: "numeric" });
+          const today = now.getDate();
+          const isCurrentMonth = calMonth === now.getMonth() && calYear === now.getFullYear();
+          const cells: (number | null)[] = [];
+          for (let i = 0; i < firstDay; i++) cells.push(null);
+          for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+          const prevMonth = () => { if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1); } else setCalMonth(calMonth - 1); };
+          const nextMonth = () => { if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1); } else setCalMonth(calMonth + 1); };
+          return (
+            <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Calendar</div>
+                  <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>School schedule overview</div>
+                </div>
+                <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: "0.65rem", fontWeight: 600, color: "#4285F4", textDecoration: "none" }}>
+                  Google Calendar ↗
+                </a>
+              </div>
+              <div style={{ padding: "12px 16px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <button onClick={prevMonth} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1rem", color: "var(--slate-500)", padding: "2px 8px" }}>‹</button>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-800)" }}>{monthName}</span>
+                  <button onClick={nextMonth} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1rem", color: "var(--slate-500)", padding: "2px 8px" }}>›</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, textAlign: "center", marginBottom: 4 }}>
+                  {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
+                    <div key={d} style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--slate-400)", padding: "2px 0", textTransform: "uppercase" }}>{d}</div>
+                  ))}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, textAlign: "center" }}>
+                  {cells.map((day, i) => {
+                    const isToday = isCurrentMonth && day === today;
+                    const isWeekend = i % 7 === 0 || i % 7 === 6;
+                    return (
+                      <div key={i} style={{
+                        fontSize: "0.72rem", fontWeight: isToday ? 800 : 500,
+                        color: day == null ? "transparent" : isToday ? "#fff" : isWeekend ? "var(--slate-400)" : "var(--slate-700)",
+                        background: isToday ? "#4285F4" : "transparent",
+                        borderRadius: "50%", width: 28, height: 28, lineHeight: "28px",
+                        margin: "0 auto",
+                      }}>
+                        {day ?? ""}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ marginTop: 12, padding: "8px 12px", background: "#EEF2FF", borderRadius: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4285F4", flexShrink: 0 }} />
+                  <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--slate-700)" }}>
+                    Today: {now.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                  </span>
+                </div>
+              </div>
             </div>
-            <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: "0.65rem", fontWeight: 600, color: "#4285F4", textDecoration: "none" }}>
-              Open full ↗
-            </a>
-          </div>
-          <div style={{ flex: 1, minHeight: 350 }}>
-            <iframe
-              src="https://calendar.google.com/calendar/embed?showTitle=0&showNav=1&showPrint=0&showTabs=0&showCalendars=0&mode=AGENDA&height=350&wkst=1"
-              style={{ width: "100%", height: 350, border: "none" }}
-              title="Google Calendar"
-            />
-          </div>
-        </div>
+          );
+        })()}
 
         {/* ── To-Do Widget ── */}
         <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
