@@ -232,6 +232,59 @@ Timetable app/
 - Added route in `App.tsx`: `/project/:id/zynca`
 - Features: animated pie charts, floating shapes, value prop cards, CTA button targeting principals
 
+### Session: 2026-03-16 (Mobile Responsive Overhaul)
+
+#### Mobile Responsive CSS — AppShell (`AppShell.css`)
+- Added **two breakpoints**: `≤768px` (phone/tablet) and `≤480px` (small phones)
+- **Tab bar:** horizontal scrollable (swipe left/right), hidden scrollbar
+- **Logo:** icon-only on mobile (hides name text)
+- **Live Now pill:** hidden on phones
+- **Theme toggle + profile:** compacted (28px and 26px)
+- **Dropdowns:** full-width on mobile (`position: fixed; left:0; right:0`)
+- **Tab badges ("New"):** hidden on mobile
+
+#### Mobile Responsive CSS — Content Pages (`index.css`)
+- **Sidebar force-hidden:** `.sidebar`, `.sidebar--open`, `.sidebar--collapsed` → `display: none !important`
+- **Forms:** stacked layout (labels above inputs), `font-size: 16px` to prevent iOS zoom
+- **Modals:** 95% viewport width on mobile with overflow scroll
+- **Tables:** horizontal scroll wrapper + smaller cells
+- **Stat cards:** 2-column grid instead of auto-fit
+- **Buttons:** 40px min height for touch targets
+- **Toasts:** repositioned bottom-center (full width)
+- **Headings/cards:** reduced padding and font sizes
+- **Global overflow:** `overflow-x: hidden !important` on `body`, `#root`, `.app-shell`, `.app-body`, `.app-main`
+
+#### ProjectDashboard Mobile Fixes (`ProjectDashboard.tsx` + `index.css`)
+- **Problem:** Inline `style={{ gridTemplateColumns: "repeat(5,1fr)" }}` overrides CSS classes
+- **Solution:** Added CSS class names to inline-styled grid containers; used `!important` overrides
+- Classes added: `pd-page`, `pd-stat-grid`, `pd-live-grid`, `pd-body-grid`, `pd-live-header`
+- **Stat cards:** 5 → 2 columns on mobile
+- **Live teacher cards:** 4 → 2 columns (→ 1 on tiny phones)
+- **Body grid + widgets row:** 3 columns → 1 column stacked
+- **Live header:** stacks vertically
+- **Page wrapper:** `maxWidth: 1100` → `100%` on mobile
+
+#### Dashboard Page Mobile Fixes (`Dashboard.tsx` + `index.css`)
+- Classes added: `dash-hero`, `dash-features`, `dash-project-row`, `dash-project-actions`
+- **Feature highlights:** 3 → 1 column
+- **Project rows:** action buttons wrap below name
+- **Hero card:** reduced padding
+
+#### NewTimetableLanding Mobile Fixes (`NewTimetableLanding.css`)
+- Enhanced existing `@media (max-width: 768px)` block
+- Reduced padding on `.ntl-right`, `.ntl-card`
+- Smaller title/subtitle fonts
+- Sidebar height capped at 160px on mobile
+- Import preview gets compact padding
+
+#### Delete Project Feature (`NewTimetableLanding.tsx` + `.css`)
+- Added **✕ delete button** on each project card in the Saved Projects sidebar
+- Button appears on hover (desktop), positioned top-right of card
+- Clicking shows inline **"Delete '...'? Yes / No"** confirmation bar
+- Calls `api.deleteProject()` and removes from state
+- If deleting active project, navigates to next available project or home
+- CSS: `.project-card-delete`, `.project-delete-confirm`, `.project-delete-yes`, `.project-delete-no`
+
 ---
 
 ## 7. Common Commands
@@ -261,8 +314,12 @@ cd "Timetable app" && git add online/ && git commit -m "message" && git push ori
 
 ## 8. Known Considerations
 
+- **Mobile responsive approach:** Inline React styles (`style={{...}}`) require CSS class names + `!important` overrides — all key grids now have `pd-*` and `dash-*` classes for this purpose
+- **Mobile delete button:** The ✕ button on project cards uses `:hover` to show — on touch devices it may not be visible (consider making always-visible on mobile)
 - **Dashboard auto-redirect:** `Dashboard.tsx` auto-redirects to the first available project — pending user decision on whether to remove this
 - **vite.config.js:** Must stay in ESM format (`import`/`export`) since `package.json` has `"type": "module"`
 - **Capacitor server URL:** Currently points to Railway — remove `server.url` from `capacitor.config.ts` for offline-first bundled mode
 - **iOS deployment target:** Must be ≥ 16.0 for Capacitor 7
 - **Brand name:** All user-facing text now says "Myzynca", internal code variable names may still reference older naming conventions
+- **Browser cache:** After deploying CSS changes, users may need to clear cache or use incognito to see updates
+
