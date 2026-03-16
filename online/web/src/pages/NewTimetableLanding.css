@@ -82,6 +82,74 @@
   flex-shrink: 0;
 }
 
+/* Delete button on project card */
+.project-card-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.05);
+  color: var(--text-muted, #94A3B8);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+.project-card:hover .project-card-delete { opacity: 1; }
+.project-card-delete:hover {
+  background: #FDEAED;
+  color: #E8334A;
+}
+.project-card { position: relative; }
+
+/* Inline delete confirmation */
+.project-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-top: -2px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 0 0 10px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #991B1B;
+}
+.project-delete-confirm span { flex: 1; }
+.project-delete-yes {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: none;
+  background: #E8334A;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font-body, 'Inter', sans-serif);
+}
+.project-delete-yes:hover { background: #C81D35; }
+.project-delete-no {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid #E5E7EB;
+  background: #fff;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-body, 'Inter', sans-serif);
+}
+.project-delete-no:hover { background: #F3F4F6; }
+
 /* + New Project button */
 .ntl-new-project-btn {
   display: flex;

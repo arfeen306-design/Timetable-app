@@ -48,6 +48,10 @@ export default function NewTimetableLanding() {
   const [newYear, setNewYear] = useState("");
   const [creating, setCreating] = useState(false);
 
+  // ── Delete project ──
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   // ── Load projects ──
   useEffect(() => {
     api.listProjects()
@@ -94,6 +98,29 @@ export default function NewTimetableLanding() {
       toast("error", err instanceof Error ? err.message : "Failed to create project");
     } finally {
       setCreating(false);
+    }
+  }
+
+  // ── Delete project ──
+  async function handleDelete(projectId: number) {
+    setDeleting(true);
+    try {
+      await api.deleteProject(projectId);
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      toast("success", "Project deleted");
+      if (projectId === pid) {
+        const remaining = projects.filter((p) => p.id !== projectId);
+        if (remaining.length > 0) {
+          navigate(`/project/${remaining[0].id}/new-timetable`);
+        } else {
+          navigate("/");
+        }
+      }
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteId(null);
     }
   }
 
@@ -228,7 +255,28 @@ export default function NewTimetableLanding() {
                   {p.id === pid && (
                     <span className="project-card-active-badge">Active</span>
                   )}
+                  <button
+                    className="project-card-delete"
+                    title="Delete project"
+                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(p.id); }}
+                  >✕</button>
                 </div>
+
+                {/* Inline delete confirm */}
+                {confirmDeleteId === p.id && (
+                  <div className="project-delete-confirm">
+                    <span>Delete "{p.name}"?</span>
+                    <button
+                      className="project-delete-yes"
+                      disabled={deleting}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
+                    >{deleting ? "…" : "Yes"}</button>
+                    <button
+                      className="project-delete-no"
+                      onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }}
+                    >No</button>
+                  </div>
+                )}
 
                 {/* History for active project */}
                 {p.id === pid && hasHistory && (
