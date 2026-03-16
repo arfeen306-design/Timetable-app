@@ -530,7 +530,12 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                 <div className="modal-field" style={{ alignItems: "flex-start" }}>
                   <label className="modal-label" style={{ paddingTop: 4 }}>Assign Grades:</label>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 140, overflowY: "auto" }}>
-                    {classes.map(cls => {
+                    {[...classes].sort((a, b) => {
+                      const numA = parseInt(a.name.replace(/\D/g, "")) || 0;
+                      const numB = parseInt(b.name.replace(/\D/g, "")) || 0;
+                      if (numA !== numB) return numA - numB;
+                      return a.name.localeCompare(b.name, undefined, { numeric: true });
+                    }).map(cls => {
                       const checked = fClassIds.includes(cls.id);
                       return (
                         <label
