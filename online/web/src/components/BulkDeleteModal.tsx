@@ -22,7 +22,7 @@ function BulkDeleteModal({ items, entityLabel, onConfirm, onClose }: Props) {
   const ids = items.map((i) => i.id);
   const count = items.length;
   const entityPlural = count === 1 ? entityLabel : `${entityLabel}s`;
-  const isConfirmed = typed === "DELETE";
+  const isConfirmed = typed.toUpperCase() === "DELETE";
 
   async function handleConfirm() {
     if (!isConfirmed || loading) return;
