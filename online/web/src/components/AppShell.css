@@ -54,6 +54,7 @@
   align-items: stretch;
   height: 100%;
   flex: 1;
+  padding-left: 18px;
 }
 
 .top-tab-wrap {
