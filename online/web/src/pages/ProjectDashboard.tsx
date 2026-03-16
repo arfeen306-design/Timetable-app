@@ -174,7 +174,7 @@ export default function ProjectDashboard() {
   const aDash = aPct * 188.5;
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div className="pd-page" style={{ maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 18 }}>
 
       {/* ═══ TOPBAR ═══ */}
       <div style={{
@@ -629,7 +629,7 @@ export default function ProjectDashboard() {
       </div>
 
       {/* ═══ WIDGETS ROW ═══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14 }}>
+      <div className="pd-body-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14 }}>
 
         {/* ── Google Calendar Placeholder ── */}
         <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>

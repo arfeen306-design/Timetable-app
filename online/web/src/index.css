@@ -664,6 +664,13 @@ th { background: var(--slate-50); font-weight: 600; color: var(--slate-600); fon
    PROJECT DASHBOARD — mobile grid overrides (needs !important for inline styles)
    ══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
+  /* Page-level: full width, reduced padding */
+  .pd-page {
+    max-width: 100% !important;
+    padding: 12px 10px !important;
+    gap: 12px !important;
+  }
+
   /* Stat cards: 5 across → 2 columns */
   .pd-stat-grid {
     grid-template-columns: 1fr 1fr !important;
@@ -686,15 +693,37 @@ th { background: var(--slate-50); font-weight: 600; color: var(--slate-600); fon
     padding: 12px 14px 8px !important;
   }
 
-  /* Body grid: 3 columns → 1 column stacked */
+  /* Body grid + widgets row: 3 columns → 1 column stacked */
   .pd-body-grid {
     grid-template-columns: 1fr !important;
     gap: 12px !important;
   }
 
-  /* Overall page container max-width override */
-  .app-main > div[style*="maxWidth"] {
-    padding: 12px 10px !important;
+  /* FORCE hide sidebar from Layout.tsx on mobile */
+  .sidebar,
+  .sidebar--open,
+  .sidebar--collapsed {
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+  }
+
+  /* Force main-wrap full width */
+  .main-wrap {
+    width: 100% !important;
+  }
+
+  /* Prevent ANY horizontal overflow on mobile */
+  body, #root, .app-shell, .app-body, .app-main {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+
+  /* Topbar in ProjectDashboard: stack title + actions */
+  .pd-page > div:first-child {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 12px !important;
   }
 }
 
