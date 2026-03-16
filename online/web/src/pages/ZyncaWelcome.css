@@ -157,6 +157,7 @@
   border: 1px solid var(--mz-border);
   border-radius: var(--mz-radius);
   padding: 28px 16px 24px;
+  box-shadow: 0px 4px 20px rgba(0,0,0,0.05);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 .mz-metric-card:hover {
@@ -191,6 +192,7 @@
   border: 1px solid var(--mz-border);
   border-radius: var(--mz-radius);
   padding: 28px 24px;
+  box-shadow: 0px 4px 20px rgba(0,0,0,0.05);
   transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 .mz-feat-card:hover {
@@ -210,8 +212,8 @@
 }
 .mz-feat-card h3 {
   font-family: 'Sora', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
   color: var(--mz-text);
   margin: 0 0 8px;
   letter-spacing: -0.01em;
@@ -219,8 +221,9 @@
 .mz-feat-card p {
   font-family: 'Sora', sans-serif;
   font-size: 13px;
+  font-weight: 400;
   color: var(--mz-text-2);
-  line-height: 1.6;
+  line-height: 1.75;
   margin: 0;
 }
 
@@ -233,15 +236,15 @@
   background: var(--mz-card);
   border: 1px solid var(--mz-border);
   border-radius: var(--mz-radius);
-  box-shadow: 0 4px 20px rgba(26,43,86,0.04);
+  box-shadow: 0px 4px 20px rgba(0,0,0,0.05);
 }
 .mz-cta-heading {
   font-family: 'Sora', sans-serif;
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 800;
   color: var(--mz-text);
   margin: 0 0 22px;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 .mz-cta-btn {
   display: inline-flex;

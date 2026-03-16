@@ -4,13 +4,13 @@ import "./ZyncaWelcome.css";
 
 // ── Animated ring chart data ───────────────────────────────────
 const METRICS = [
-  { label: "Teachers Assigned", pct: 87, color: "#2563EB" },   // Cobalt Blue
-  { label: "Rooms Utilized",    pct: 72, color: "#0891B2" },   // Teal
-  { label: "Clashes Resolved",  pct: 100, color: "#16A34A" },  // Success Green
-  { label: "Periods Covered",   pct: 94, color: "#D97706" },   // Amber Orange
+  { label: "Teachers Assigned", pct: 87, color: "#2563EB", track: "rgba(37,99,235,0.10)" },
+  { label: "Rooms Utilized",    pct: 72, color: "#0891B2", track: "rgba(8,145,178,0.10)" },
+  { label: "Clashes Resolved",  pct: 100, color: "#16A34A", track: "rgba(22,163,74,0.10)" },
+  { label: "Periods Covered",   pct: 94, color: "#D97706", track: "rgba(217,119,6,0.10)" },
 ];
 
-function AnimatedRing({ pct, color, delay }: { pct: number; color: string; delay: number }) {
+function AnimatedRing({ pct, color, trackColor, delay }: { pct: number; color: string; trackColor: string; delay: number }) {
   const [animPct, setAnimPct] = useState(0);
   useEffect(() => {
     const t = setTimeout(() => {
@@ -29,7 +29,7 @@ function AnimatedRing({ pct, color, delay }: { pct: number; color: string; delay
 
   return (
     <svg width="110" height="110" viewBox="0 0 110 110" className="mz-ring-svg">
-      <circle cx="55" cy="55" r={r} fill="none" stroke="var(--mz-ring-track)" strokeWidth="7" />
+      <circle cx="55" cy="55" r={r} fill="none" stroke={trackColor} strokeWidth="7" />
       <circle cx="55" cy="55" r={r} fill="none" stroke={color} strokeWidth="7"
         strokeDasharray={c} strokeDashoffset={offset}
         strokeLinecap="round" transform="rotate(-90 55 55)"
@@ -102,7 +102,7 @@ export default function ZyncaWelcome() {
       <div className="mz-metrics">
         {METRICS.map((d, i) => (
           <div key={d.label} className="mz-metric-card">
-            <AnimatedRing pct={d.pct} color={d.color} delay={i * 250} />
+            <AnimatedRing pct={d.pct} color={d.color} trackColor={d.track} delay={i * 250} />
             <span className="mz-metric-label">{d.label}</span>
           </div>
         ))}
