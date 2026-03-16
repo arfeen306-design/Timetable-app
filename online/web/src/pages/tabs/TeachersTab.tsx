@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import * as api from "../../api";
 import { useToast } from "../../context/ToastContext";
 import { TITLE_OPTIONS } from "../../constants";
-import BulkDeleteModal from "../../components/BulkDeleteModal";
 
 type Teacher = Awaited<ReturnType<typeof api.listTeachers>>[0];
 type Subject = Awaited<ReturnType<typeof api.listSubjects>>[0];
@@ -46,7 +45,6 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [editTeacher, setEditTeacher] = useState<Teacher | null>(null);
   const importRef = React.createRef<HTMLInputElement>();
   const [importing, setImporting] = useState(false);
@@ -197,26 +195,34 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
 
   // ── Delete (single, inline confirm) ──
 
-  async function confirmAndDelete(id: number) {
+  async function handleDelete() {
+    // If checkboxes are checked, bulk-delete those
+    if (checkedIds.size > 0) {
+      const ids = Array.from(checkedIds);
+      try {
+        const result = await api.bulkDeleteTeachers(pid, ids);
+        onChange(list.filter(t => !ids.includes(t.id)));
+        setCheckedIds(new Set());
+        if (ids.includes(selectedId as number)) setSelectedId(null);
+        const msg = `${result.deleted} teacher${result.deleted !== 1 ? "s" : ""} deleted.` +
+          (result.failed.length > 0 ? ` ${result.failed.length} could not be removed.` : "");
+        toast("success", msg);
+      } catch (err) {
+        toast("error", err instanceof Error ? err.message : "Delete failed");
+      }
+      return;
+    }
+    // Otherwise delete the single selected row
+    if (selectedId == null) return;
     try {
-      await api.deleteTeacher(pid, id);
-      onChange(list.filter(t => t.id !== id));
-      if (selectedId === id) setSelectedId(null);
+      await api.deleteTeacher(pid, selectedId);
+      onChange(list.filter(t => t.id !== selectedId));
+      setSelectedId(null);
       setConfirmDeleteId(null);
       toast("success", "Teacher deleted.");
-    } catch (err) { toast("error", err instanceof Error ? err.message : "Delete failed"); }
-  }
-
-  // ── Bulk delete ──
-
-  async function handleBulkDelete(ids: number[]) {
-    const result = await api.bulkDeleteTeachers(pid, ids);
-    onChange(list.filter(t => !ids.includes(t.id)));
-    setCheckedIds(new Set());
-    setBulkDeleteOpen(false);
-    const msg = `${result.deleted} teacher${result.deleted !== 1 ? "s" : ""} deleted.` +
-      (result.failed.length > 0 ? ` ${result.failed.length} could not be removed.` : "");
-    toast("success", msg);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Delete failed");
+    }
   }
 
   // ── Excel import ──
@@ -234,9 +240,6 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
 
   const allChecked = list.length > 0 && checkedIds.size === list.length;
   const someChecked = checkedIds.size > 0 && !allChecked;
-  const checkedItems = list
-    .filter(t => checkedIds.has(t.id))
-    .map(t => ({ id: t.id, name: `${t.first_name} ${t.last_name}`.trim() }));
 
   return (
     <div className="card">
@@ -252,14 +255,9 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
         <button type="button" className="btn" onClick={() => openEdit()} disabled={selectedId == null}>Edit</button>
         <button
           type="button" className="btn btn-danger"
-          disabled={selectedId == null}
-          onClick={() => selectedId != null && setConfirmDeleteId(selectedId)}
-        >Delete</button>
-        {checkedIds.size > 0 && (
-          <button type="button" className="btn btn-danger" onClick={() => setBulkDeleteOpen(true)}>
-            Delete selected ({checkedIds.size})
-          </button>
-        )}
+          disabled={selectedId == null && checkedIds.size === 0}
+          onClick={handleDelete}
+        >{checkedIds.size > 0 ? `Delete (${checkedIds.size})` : "Delete"}</button>
       </div>
 
       {/* ── Import result ── */}
@@ -404,7 +402,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                           <button
                             type="button" className="btn btn-danger"
                             style={{ fontSize: "0.78rem" }}
-                            onClick={() => confirmAndDelete(t.id)}
+                            onClick={() => handleDelete()}
                           >Yes, delete</button>
                           <button
                             type="button" className="btn"
@@ -529,37 +527,55 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
               {classes.length > 0 && (
                 <div className="modal-field" style={{ alignItems: "flex-start" }}>
                   <label className="modal-label" style={{ paddingTop: 4 }}>Assign Grades:</label>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 140, overflowY: "auto" }}>
-                    {[...classes].sort((a, b) => {
-                      const numA = parseInt(a.name.replace(/\D/g, "")) || 0;
-                      const numB = parseInt(b.name.replace(/\D/g, "")) || 0;
-                      if (numA !== numB) return numA - numB;
-                      return a.name.localeCompare(b.name, undefined, { numeric: true });
-                    }).map(cls => {
-                      const checked = fClassIds.includes(cls.id);
-                      return (
-                        <label
-                          key={cls.id}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 4,
-                            fontSize: "0.78rem", cursor: "pointer",
-                            padding: "2px 8px", borderRadius: "var(--radius-sm)",
-                            border: `1px solid ${checked ? "var(--primary-400)" : "var(--slate-200)"}`,
-                            background: checked ? "var(--primary-50)" : "transparent",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => setFClassIds(prev =>
-                              prev.includes(cls.id) ? prev.filter(id => id !== cls.id) : [...prev, cls.id]
-                            )}
-                            style={{ margin: 0 }}
-                          />
-                          {cls.name}
-                        </label>
-                      );
-                    })}
+                  <div style={{ maxHeight: 200, overflowY: "auto", width: "100%" }}>
+                    {(() => {
+                      const sorted = [...classes].sort((a, b) => {
+                        const numA = parseInt(a.name.replace(/\D/g, "")) || 0;
+                        const numB = parseInt(b.name.replace(/\D/g, "")) || 0;
+                        if (numA !== numB) return numA - numB;
+                        return a.name.localeCompare(b.name, undefined, { numeric: true });
+                      });
+                      const groups = new Map<string, typeof sorted>();
+                      sorted.forEach(cls => {
+                        const grade = cls.grade || "Other";
+                        if (!groups.has(grade)) groups.set(grade, []);
+                        groups.get(grade)!.push(cls);
+                      });
+                      return Array.from(groups.entries()).map(([grade, items]) => (
+                        <div key={grade} style={{ marginBottom: 10 }}>
+                          <div style={{
+                            fontSize: "0.7rem", fontWeight: 700, color: "var(--slate-500)",
+                            textTransform: "uppercase", letterSpacing: "0.04em",
+                            marginBottom: 4, borderBottom: "1px solid var(--slate-100)",
+                            paddingBottom: 2,
+                          }}>Grade {grade}</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 4 }}>
+                            {items.map(cls => {
+                              const checked = fClassIds.includes(cls.id);
+                              return (
+                                <label key={cls.id} style={{
+                                  display: "flex", alignItems: "center", gap: 5,
+                                  fontSize: "0.76rem", cursor: "pointer",
+                                  padding: "4px 8px", borderRadius: 6,
+                                  border: `1px solid ${checked ? "var(--primary-400)" : "var(--slate-200)"}`,
+                                  background: checked ? "var(--primary-50)" : "transparent",
+                                  whiteSpace: "nowrap", transition: "all 0.15s",
+                                }}>
+                                  <input
+                                    type="checkbox" checked={checked}
+                                    onChange={() => setFClassIds(prev =>
+                                      prev.includes(cls.id) ? prev.filter(id => id !== cls.id) : [...prev, cls.id]
+                                    )}
+                                    style={{ margin: 0, accentColor: "var(--primary-600)" }}
+                                  />
+                                  {cls.section || cls.name}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ));
+                    })()}
                   </div>
                 </div>
               )}
@@ -597,15 +613,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
         </div>
       )}
 
-      {/* ── Bulk delete modal ── */}
-      {bulkDeleteOpen && (
-        <BulkDeleteModal
-          items={checkedItems}
-          entityLabel="teacher"
-          onConfirm={handleBulkDelete}
-          onClose={() => setBulkDeleteOpen(false)}
-        />
-      )}
+
     </div>
   );
 }

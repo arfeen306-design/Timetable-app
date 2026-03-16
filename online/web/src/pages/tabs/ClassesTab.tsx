@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import * as api from "../../api";
 import type { SchoolClass, Room } from "../../api";
 import { useToast } from "../../context/ToastContext";
-import BulkDeleteModal from "../../components/BulkDeleteModal";
 
 type Teacher = Awaited<ReturnType<typeof api.listTeachers>>[0];
 
@@ -20,7 +19,7 @@ function ClassesTab({ pid, classes, teachers, rooms, onChange, onNext }: Props) 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
   const [editClass, setEditClass] = useState<SchoolClass | null>(null);
   const importRef = React.createRef<HTMLInputElement>();
   const [importing, setImporting] = useState(false);
@@ -118,10 +117,25 @@ function ClassesTab({ pid, classes, teachers, rooms, onChange, onNext }: Props) 
     }
   }
 
-  async function deleteSelected() {
+  async function handleDelete() {
+    // If checkboxes are checked, bulk-delete those
+    if (checkedIds.size > 0) {
+      const ids = Array.from(checkedIds);
+      try {
+        const result = await api.bulkDeleteClasses(pid, ids);
+        onChange(classes.filter(c => !ids.includes(c.id)));
+        setCheckedIds(new Set());
+        if (ids.includes(selectedId as number)) setSelectedId(null);
+        const msg = `${result.deleted} class${result.deleted !== 1 ? "es" : ""} deleted.` +
+          (result.failed.length > 0 ? ` ${result.failed.length} could not be removed.` : "");
+        toast("success", msg);
+      } catch (err) {
+        toast("error", err instanceof Error ? err.message : "Delete failed");
+      }
+      return;
+    }
+    // Otherwise delete the single selected row
     if (selectedId == null) return;
-    const name = classes.find(c => c.id === selectedId)?.name ?? "";
-    if (!confirm(`Delete class "${name}"? This will also remove related lessons.`)) return;
     try {
       await api.deleteClass(pid, selectedId);
       onChange(classes.filter(c => c.id !== selectedId));
@@ -130,16 +144,6 @@ function ClassesTab({ pid, classes, teachers, rooms, onChange, onNext }: Props) 
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Delete failed");
     }
-  }
-
-  async function handleBulkDelete(ids: number[]) {
-    const result = await api.bulkDeleteClasses(pid, ids);
-    onChange(classes.filter(c => !ids.includes(c.id)));
-    setCheckedIds(new Set());
-    setBulkDeleteOpen(false);
-    const msg = `${result.deleted} class${result.deleted !== 1 ? "es" : ""} deleted.` +
-      (result.failed.length > 0 ? ` ${result.failed.length} could not be removed.` : "");
-    toast("success", msg);
   }
 
   async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -155,9 +159,6 @@ function ClassesTab({ pid, classes, teachers, rooms, onChange, onNext }: Props) 
 
   const allChecked = classes.length > 0 && checkedIds.size === classes.length;
   const someChecked = checkedIds.size > 0 && !allChecked;
-  const checkedItems = classes
-    .filter(c => checkedIds.has(c.id))
-    .map(c => ({ id: c.id, name: c.name }));
 
   return (
     <div className="card">
@@ -171,12 +172,9 @@ function ClassesTab({ pid, classes, teachers, rooms, onChange, onNext }: Props) 
         <button type="button" className="btn" onClick={() => importRef.current?.click()} disabled={importing}>{importing ? "Importing…" : "Import from Excel"}</button>
         <button type="button" className="btn" onClick={() => api.downloadTemplate("classes")}>Download Template</button>
         <button type="button" className="btn" onClick={() => openEdit()} disabled={selectedId == null}>Edit</button>
-        <button type="button" className="btn btn-danger" onClick={deleteSelected} disabled={selectedId == null}>Delete</button>
-        {checkedIds.size > 0 && (
-          <button type="button" className="btn btn-danger" onClick={() => setBulkDeleteOpen(true)}>
-            Delete selected ({checkedIds.size})
-          </button>
-        )}
+        <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={selectedId == null && checkedIds.size === 0}>
+          {checkedIds.size > 0 ? `Delete (${checkedIds.size})` : "Delete"}
+        </button>
       </div>
 
       {/* ── Import Result ── */}
@@ -292,15 +290,7 @@ function ClassesTab({ pid, classes, teachers, rooms, onChange, onNext }: Props) 
         </div>
       )}
 
-      {/* ── Bulk Delete Modal ── */}
-      {bulkDeleteOpen && (
-        <BulkDeleteModal
-          items={checkedItems}
-          entityLabel="class"
-          onConfirm={handleBulkDelete}
-          onClose={() => setBulkDeleteOpen(false)}
-        />
-      )}
+
     </div>
   );
 }
