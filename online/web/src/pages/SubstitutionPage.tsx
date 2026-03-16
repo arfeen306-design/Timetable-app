@@ -70,6 +70,7 @@ export default function SubstitutionPage() {
   const [freeCount, setFreeCount] = useState<Record<string, number>>({});
   const [expandedSlot, setExpandedSlot] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [teacherSearch, setTeacherSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [removingChips, setRemovingChips] = useState<Set<number>>(new Set());
@@ -259,8 +260,25 @@ export default function SubstitutionPage() {
             <input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Sick leave" />
           </div>
         </div>
+        {/* Search teachers */}
+        <div style={{ position: "relative", marginBottom: 6 }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: "0.82rem", color: "var(--slate-400)", pointerEvents: "none" }}>🔍</span>
+          <input
+            value={teacherSearch}
+            onChange={e => setTeacherSearch(e.target.value)}
+            placeholder="Search by name or code…"
+            style={{ paddingLeft: 32, width: "100%", boxSizing: "border-box" }}
+          />
+        </div>
         <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid var(--slate-200)", borderRadius: "var(--radius-md)", padding: 4, marginBottom: 8 }}>
-          {teachers.map(t => {
+          {teachers
+            .filter(t => {
+              if (!teacherSearch.trim()) return true;
+              const q = teacherSearch.toLowerCase();
+              const full = `${t.first_name} ${t.last_name} ${t.code}`.toLowerCase();
+              return full.includes(q);
+            })
+            .map(t => {
             const checked = selectedAbsent.includes(t.id);
             const alreadyAbsent = absences.some(a => a.teacher_id === t.id);
             return (
