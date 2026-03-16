@@ -631,39 +631,24 @@ export default function ProjectDashboard() {
       {/* ═══ WIDGETS ROW ═══ */}
       <div className="pd-body-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14 }}>
 
-        {/* ── Google Calendar Placeholder ── */}
+        {/* ── Google Calendar Embed ── */}
         <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
-            <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Google Calendar</div>
-            <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>View upcoming events for the next 7 days</div>
-          </div>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "28px 18px", gap: 14 }}>
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-              <rect x="6" y="10" width="36" height="32" rx="4" stroke="var(--slate-300)" strokeWidth="2" fill="none" />
-              <path d="M6 18h36" stroke="var(--slate-300)" strokeWidth="2" />
-              <rect x="14" y="6" width="2" height="8" rx="1" fill="var(--slate-300)" />
-              <rect x="32" y="6" width="2" height="8" rx="1" fill="var(--slate-300)" />
-              <rect x="14" y="24" width="6" height="4" rx="1" fill="#4285F4" />
-              <rect x="24" y="24" width="6" height="4" rx="1" fill="#0EA875" />
-              <rect x="14" y="32" width="6" height="4" rx="1" fill="#E8A020" />
-              <rect x="24" y="32" width="6" height="4" rx="1" fill="#E8334A" />
-            </svg>
-            <div style={{ fontSize: "0.75rem", color: "var(--slate-400)", textAlign: "center", lineHeight: 1.5 }}>
-              Open Google Calendar to manage upcoming school events, meetings, and deadlines.
+          <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Google Calendar</div>
+              <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>View upcoming events</div>
             </div>
             <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer"
-              className="btn" style={{
-              fontSize: "0.72rem", fontWeight: 700, padding: "8px 20px",
-              background: "#4285F4", color: "#fff", border: "none", borderRadius: 8,
-              display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
-              textDecoration: "none",
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-              Open Google Calendar
+              style={{ fontSize: "0.65rem", fontWeight: 600, color: "#4285F4", textDecoration: "none" }}>
+              Open full ↗
             </a>
-            <div style={{ fontSize: "0.6rem", color: "var(--slate-300)" }}>Opens in a new tab</div>
+          </div>
+          <div style={{ flex: 1, minHeight: 350 }}>
+            <iframe
+              src="https://calendar.google.com/calendar/embed?showTitle=0&showNav=1&showPrint=0&showTabs=0&showCalendars=0&mode=AGENDA&height=350&wkst=1"
+              style={{ width: "100%", height: 350, border: "none" }}
+              title="Google Calendar"
+            />
           </div>
         </div>
 
