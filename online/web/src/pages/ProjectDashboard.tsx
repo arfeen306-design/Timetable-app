@@ -99,6 +99,10 @@ export default function ProjectDashboard() {
       .then(setData).catch(console.error).finally(() => setLoading(false));
   }, [pid]);
 
+  // ── useLivePeriod must be called unconditionally (Rules of Hooks) ──
+  const slots = data?.lesson_slots ?? E_SLOTS;
+  const { currentSlot, currentIndex } = useLivePeriod(slots);
+
   if (loading) return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
       <div className="skeleton skeleton-title" style={{ width: "30%" }} />
@@ -112,7 +116,6 @@ export default function ProjectDashboard() {
 
   const d = data;
   const s = d.stats || {} as DashboardData["stats"];
-  const slots = d.lesson_slots || E_SLOTS;
   // class_breakdown used below in stats card
   const unassigned = d.unassigned || E_UN;
   const subs = d.substitutions_today || E_SUB;
@@ -121,8 +124,6 @@ export default function ProjectDashboard() {
   const absent = d.absent_teachers || E_AT;
   const liveT = d.live_teachers || E_LT;
   const chartMax = Math.max(...wChart.map(w => w.total), 1);
-  // useLivePeriod ticks every 30 s — replaces the old one-shot slot mutation
-  const { currentSlot, currentIndex } = useLivePeriod(slots);
   const curLesson = currentSlot?.type === "lesson" ? currentSlot : null;
   const uncovered = unassigned.length;
 
