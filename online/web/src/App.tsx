@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import ProjectDashboard from "./pages/ProjectDashboard";
 import ProjectEditor from "./pages/ProjectEditor";
 import AcademicYearPage from "./pages/AcademicYearPage";
+import NewTimetableLanding from "./pages/NewTimetableLanding";
 
 // Heavy pages — code-split, only downloaded when visited
 const Generate         = lazy(() => import("./pages/Generate"));
@@ -60,6 +61,7 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="project/:projectId" element={<RedirectToDashboard />} />
         <Route path="project/:projectId/dashboard" element={<ProjectDashboard />} />
+        <Route path="project/:projectId/new-timetable" element={<NewTimetableLanding />} />
         <Route path="project/:projectId/settings" element={<ProjectEditor />} />
         <Route path="project/:projectId/subjects" element={<ProjectEditor />} />
         <Route path="project/:projectId/classes" element={<ProjectEditor />} />

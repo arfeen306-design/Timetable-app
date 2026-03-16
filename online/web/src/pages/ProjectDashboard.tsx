@@ -288,44 +288,48 @@ export default function ProjectDashboard() {
         </div>
       </div>
 
-      {/* ═══ LIVE NOW PANEL — dark navy ═══ */}
+      {/* ═══ LIVE NOW PANEL — light colorful theme ═══ */}
       {d.is_off_day ? (
         <div style={{
-          background: "#0D1117", borderRadius: 14, padding: "18px 20px",
+          background: "linear-gradient(135deg, #FEFCE8 0%, #F0FDF4 50%, #FDF2F8 100%)",
+          border: "1px solid #E9D5FF", borderRadius: 14, padding: "18px 20px",
           position: "relative", overflow: "hidden",
         }}>
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(91,78,232,0.15) 0%, transparent 60%)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
             <span style={{ fontSize: "1.2rem" }}>🏖️</span>
             <div>
-              <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#fff" }}>{d.day_name} — No school today</div>
-              <div style={{ fontSize: "0.68rem", color: "#4A5568" }}>Dashboard stats will resume on the next working day.</div>
+              <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#0F172A" }}>{d.day_name} — No school today</div>
+              <div style={{ fontSize: "0.68rem", color: "#64748B" }}>Dashboard stats will resume on the next working day.</div>
             </div>
           </div>
         </div>
       ) : (
         <div style={{
-          background: "#0D1117", borderRadius: 14, position: "relative", overflow: "hidden",
+          background: "linear-gradient(135deg, #FEFCE8 0%, #F0FDF4 50%, #FDF2F8 100%)",
+          border: "1px solid #E9D5FF", borderRadius: 14, position: "relative", overflow: "hidden",
         }}>
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(91,78,232,0.15) 0%, transparent 60%)" }} />
 
           {/* Live header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span className="live-indicator" />
-              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#fff" }}>
+              <span className="live-indicator" style={{ background: "#22C55E", boxShadow: "0 0 0 3px rgba(34,197,94,0.2)" }} />
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#0F172A" }}>
                 Live right now {curLesson ? `— Lesson ${curLesson.lesson_number}` : ""}
               </span>
               {curLesson && (
                 <span style={{
-                  background: "rgba(91,78,232,0.4)", color: "#C4BEFF",
+                  background: "#DBEAFE", color: "#1D4ED8",
                   fontSize: "0.68rem", fontWeight: 700, padding: "3px 10px",
                   borderRadius: 20, fontFamily: "var(--font-mono)",
                 }}>{fmt12(curLesson.start_time)} – {fmt12(curLesson.end_time)}</span>
               )}
             </div>
-            <div style={{ fontSize: "0.68rem", color: "#4A5568", fontFamily: "var(--font-mono)" }}>
-              {s.busy_now} busy · {s.free_now} free · {s.on_sub_now} on sub
+            <div style={{ fontSize: "0.68rem", fontFamily: "var(--font-mono)", display: "flex", gap: 8 }}>
+              <span style={{ color: "#D97706", fontWeight: 600 }}>{s.busy_now} busy</span>
+              <span style={{ color: "#64748B" }}>·</span>
+              <span style={{ color: "#16A34A", fontWeight: 600 }}>{s.free_now} free</span>
+              <span style={{ color: "#64748B" }}>·</span>
+              <span style={{ color: "#7C3AED", fontWeight: 600 }}>{s.on_sub_now} on sub</span>
             </div>
           </div>
 
@@ -335,8 +339,8 @@ export default function ProjectDashboard() {
               {liveT.map((t, i) => (
                 <div key={t.teacher_id || i} style={{
                   borderRadius: 10, padding: "10px 12px",
-                  background: t.status === "free" ? "rgba(14,168,117,0.1)" : t.status === "sub" ? "rgba(240,104,48,0.15)" : "rgba(255,255,255,0.06)",
-                  border: `1px solid ${t.status === "free" ? "rgba(14,168,117,0.2)" : t.status === "sub" ? "rgba(240,104,48,0.25)" : "rgba(255,255,255,0.08)"}`,
+                  background: "#fff",
+                  border: "1px solid #E2E8F0",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
                     <div style={{
@@ -345,19 +349,19 @@ export default function ProjectDashboard() {
                       display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                     }}>{t.initials}</div>
                     <div>
-                      <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "#E8ECF4" }}>{t.name}</div>
+                      <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "#0F172A" }}>{t.name}</div>
                       <div style={{
                         fontSize: "0.62rem", marginTop: 1,
-                        color: t.status === "free" ? "#0EA875" : t.status === "sub" ? "#F06830" : "#6B7A99",
+                        color: t.status === "free" ? "#16A34A" : t.status === "sub" ? "#7C3AED" : "#64748B",
                       }}>
                         {t.status === "busy" ? "Teaching" : t.status === "sub" ? "On substitution" : "Free this period"}
                       </div>
                     </div>
                   </div>
                   {t.status === "busy" && (
-                    <div style={{ fontSize: "0.6rem", color: "#4A5568", display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ fontSize: "0.6rem", color: "#475569", display: "flex", alignItems: "center", gap: 4 }}>
                       <span style={{
-                        background: "rgba(91,78,232,0.25)", color: "#9B8FF5",
+                        background: "#EEF2FF", color: "#4F46E5",
                         fontSize: "0.58rem", fontWeight: 600, padding: "1px 6px", borderRadius: 4,
                         fontFamily: "var(--font-mono)",
                       }}>{t.class_name}</span>
@@ -367,15 +371,15 @@ export default function ProjectDashboard() {
                   {t.status === "sub" && (
                     <div style={{ fontSize: "0.6rem", display: "flex", alignItems: "center", gap: 4 }}>
                       <span style={{
-                        background: "rgba(240,104,48,0.25)", color: "#F06830",
+                        background: "#F5F3FF", color: "#7C3AED",
                         fontSize: "0.58rem", fontWeight: 700, padding: "1px 6px", borderRadius: 4,
                         fontFamily: "var(--font-mono)",
                       }}>{t.class_name}</span>
-                      <span style={{ color: "#F06830", fontWeight: 600 }}>↔ {t.subject_name}</span>
+                      <span style={{ color: "#7C3AED", fontWeight: 600 }}>↔ {t.subject_name}</span>
                     </div>
                   )}
                   {t.status === "free" && (
-                    <div style={{ fontSize: "0.6rem", color: "#0EA875", fontWeight: 600 }}>Available for substitution</div>
+                    <div style={{ fontSize: "0.6rem", color: "#16A34A", fontWeight: 600 }}>Available for substitution</div>
                   )}
                 </div>
               ))}
@@ -393,9 +397,9 @@ export default function ProjectDashboard() {
                       flex: sl.type === "break" ? 0.3 : 1, height: sl.type === "break" ? 24 : 32,
                       borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: sl.type === "break" ? "0.52rem" : "0.62rem", fontWeight: 700,
-                      background: isCurrent ? "#5B4EE8" : isPast ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
-                      color: isCurrent ? "#fff" : isPast ? "#4A5568" : "#6B7A99",
-                      border: isCurrent ? "none" : "1px solid rgba(255,255,255,0.06)",
+                      background: isCurrent ? "#4F46E5" : isPast ? "#F1F5F9" : "#F8FAFC",
+                      color: isCurrent ? "#fff" : isPast ? "#94A3B8" : "#475569",
+                      border: isCurrent ? "none" : "1px solid #E2E8F0",
                     }}>
                       {sl.type === "break" ? "☕" : `L${sl.lesson_number}`}
                     </div>

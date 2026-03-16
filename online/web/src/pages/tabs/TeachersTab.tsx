@@ -66,6 +66,8 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
   const [fColor, setFColor] = useState("#E8725A");
   const [fSubjectId, setFSubjectId] = useState<number | null>(null);
   const [fSubjects, setFSubjects] = useState<number[]>([]);
+  const [fMaxDay, setFMaxDay] = useState(6);
+  const [fMaxWeek, setFMaxWeek] = useState(30);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [fClassIds, setFClassIds] = useState<number[]>([]);
 
@@ -133,7 +135,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     setFName(""); setFCode(""); setFCodeEditable(false); setFTitle("Mr.");
     const usedColors = list.map(t => t.color).filter(Boolean) as string[];
     setFColor(nextAvailableColor(usedColors));
-    setFSubjectId(null); setFSubjects([]); setFClassIds([]);
+    setFSubjectId(null); setFSubjects([]); setFMaxDay(6); setFMaxWeek(30); setFClassIds([]);
     setModalOpen(true);
   }
 
@@ -147,6 +149,8 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     const assignedSubjectIds = teacherSubjectIds.get(teacher.id) || [];
     setFSubjects(assignedSubjectIds);
     setFSubjectId(assignedSubjectIds.length > 0 ? assignedSubjectIds[0] : null);
+    setFMaxDay(teacher.max_periods_day ?? 6);
+    setFMaxWeek(teacher.max_periods_week ?? 30);
     setFClassIds([]);
     setModalOpen(true);
   }
@@ -171,7 +175,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     const subjectsToSave = fSubjectId != null ? [fSubjectId] : fSubjects;
     const data = {
       first_name: firstName, last_name: lastName, code: fCode.trim(),
-      title: fTitle, color: fColor, max_periods_day: 6, max_periods_week: 30,
+      title: fTitle, color: fColor, max_periods_day: fMaxDay, max_periods_week: fMaxWeek,
     };
     try {
       if (editTeacher) {
@@ -494,6 +498,32 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                   </select>
                 </div>
               )}
+
+              {/* ── Max Lessons / Day + Week ── */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="modal-field">
+                  <label className="modal-label">Max Lessons / Day:</label>
+                  <input
+                    type="number"
+                    value={fMaxDay}
+                    onChange={e => setFMaxDay(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
+                    min={1}
+                    max={10}
+                    style={{ textAlign: "center", fontFamily: "var(--font-mono)", fontSize: "0.88rem", fontWeight: 600 }}
+                  />
+                </div>
+                <div className="modal-field">
+                  <label className="modal-label">Max Lessons / Week:</label>
+                  <input
+                    type="number"
+                    value={fMaxWeek}
+                    onChange={e => setFMaxWeek(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
+                    min={1}
+                    max={50}
+                    style={{ textAlign: "center", fontFamily: "var(--font-mono)", fontSize: "0.88rem", fontWeight: 600 }}
+                  />
+                </div>
+              </div>
 
               {/* ── Assign Grades (multi-select checkboxes) ── */}
               {classes.length > 0 && (

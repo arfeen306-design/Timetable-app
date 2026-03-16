@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { TimetableSidebar } from "./TimetableSidebar";
 import ErrorBoundary from "./ErrorBoundary";
 import "./AppShell.css";
 
@@ -26,7 +25,7 @@ const TABS: Tab[] = [
     id:           "timetable",
     label:        "New Timetable",
     icon:         "🗓",
-    pathSegments: ["/settings", "/subjects", "/classes", "/rooms", "/teachers",
+    pathSegments: ["/new-timetable", "/settings", "/subjects", "/classes", "/rooms", "/teachers",
                    "/lessons", "/constraints", "/generate", "/review", "/workload",
                    "/academic-year"],
     hasDropdown:  true,
@@ -110,7 +109,10 @@ export default function AppShell() {
       tab.pathSegments.some(p => location.pathname.includes(p))
     ) ?? TABS[0];
 
-  const isInTimetableTab = activeTab.id === "timetable";
+  // Check if user is currently on a timetable setup/schedule page
+  const TIMETABLE_PATHS = ["/settings", "/subjects", "/classes", "/rooms", "/teachers",
+    "/lessons", "/constraints", "/generate", "/review", "/workload", "/academic-year"];
+  const isOnSetupPage = TIMETABLE_PATHS.some(p => location.pathname.includes(p));
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -128,7 +130,13 @@ export default function AppShell() {
 
   function handleTabClick(tab: Tab) {
     if (tab.hasDropdown) {
-      setDropdownOpen(prev => !prev);
+      // New Timetable tab: if on a setup page, toggle dropdown; else navigate to landing
+      if (isOnSetupPage) {
+        setDropdownOpen(prev => !prev);
+      } else {
+        setDropdownOpen(false);
+        navigate(projectId ? `/project/${projectId}/new-timetable` : "/");
+      }
       return;
     }
     setDropdownOpen(false);
@@ -270,14 +278,9 @@ export default function AppShell() {
         </div>
       </header>
 
-      {/* ── Body: sidebar + content ── */}
+      {/* ── Body: full-width content ── */}
       <div className="app-body">
-
-        {isInTimetableTab && (
-          <TimetableSidebar projectId={projectId} activePath={location.pathname} />
-        )}
-
-        <main className={`app-main ${isInTimetableTab ? "with-sidebar" : "full-width"}`}>
+        <main className="app-main full-width">
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>

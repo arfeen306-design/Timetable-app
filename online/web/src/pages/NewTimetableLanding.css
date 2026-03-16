@@ -1,0 +1,99 @@
+.ntl-page {
+  min-height: calc(100vh - 52px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  background: var(--surface-page, #F8FAFC);
+}
+
+.ntl-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.ntl-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--slate-900, #0F172A);
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+.ntl-sub {
+  font-size: 15px;
+  color: var(--slate-400, #94A3B8);
+  margin: 0;
+}
+
+.ntl-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 680px;
+}
+
+.ntl-card {
+  background: var(--card-bg);
+  border: 2px solid transparent;
+  border-radius: 16px;
+  padding: 28px 24px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.18s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-family: var(--font-body, 'Inter', sans-serif);
+  position: relative;
+}
+
+.ntl-card:hover {
+  border-color: var(--card-color);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+.ntl-card:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.ntl-card-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.ntl-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--card-color);
+}
+
+.ntl-card-desc {
+  font-size: 13px;
+  color: var(--slate-500, #64748B);
+  line-height: 1.5;
+}
+
+.ntl-card-spinner {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--slate-200, #E2E8F0);
+  border-top-color: var(--card-color);
+  border-radius: 50%;
+  animation: ntlSpin 0.7s linear infinite;
+}
+
+@keyframes ntlSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 600px) {
+  .ntl-grid { grid-template-columns: 1fr; }
+}
