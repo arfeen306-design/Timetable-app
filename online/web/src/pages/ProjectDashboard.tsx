@@ -649,19 +649,21 @@ export default function ProjectDashboard() {
               <rect x="24" y="32" width="6" height="4" rx="1" fill="#E8334A" />
             </svg>
             <div style={{ fontSize: "0.75rem", color: "var(--slate-400)", textAlign: "center", lineHeight: 1.5 }}>
-              Connect your Google Calendar to see upcoming school events, meetings, and deadlines.
+              Open Google Calendar to manage upcoming school events, meetings, and deadlines.
             </div>
-            <button className="btn" style={{
+            <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer"
+              className="btn" style={{
               fontSize: "0.72rem", fontWeight: 700, padding: "8px 20px",
               background: "#4285F4", color: "#fff", border: "none", borderRadius: 8,
               display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+              textDecoration: "none",
             }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" />
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
               </svg>
-              Connect Google Calendar
-            </button>
-            <div style={{ fontSize: "0.6rem", color: "var(--slate-300)" }}>OAuth integration coming soon</div>
+              Open Google Calendar
+            </a>
+            <div style={{ fontSize: "0.6rem", color: "var(--slate-300)" }}>Opens in a new tab</div>
           </div>
         </div>
 
