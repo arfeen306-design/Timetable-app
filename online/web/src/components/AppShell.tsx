@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
+import { useProjectProgress } from "../hooks/useProjectProgress";
 import ErrorBoundary from "./ErrorBoundary";
 import "./AppShell.css";
 
@@ -24,7 +26,7 @@ const TABS: Tab[] = [
   },
   {
     id:           "timetable",
-    label:        "Home",
+    label:        "New Timetable",
     icon:         "🗓",
     pathSegments: ["/new-timetable", "/settings", "/subjects", "/classes", "/rooms", "/teachers",
                    "/lessons", "/constraints", "/generate", "/review", "/workload",
@@ -102,6 +104,7 @@ export default function AppShell() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const toast = useToast();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -111,6 +114,22 @@ export default function AppShell() {
   // Parse projectId from pathname
   const projectIdMatch = location.pathname.match(/\/project\/([^/]+)/);
   const projectId = projectIdMatch ? projectIdMatch[1] : undefined;
+
+  // Project progress for tab locking
+  const progress = useProjectProgress(projectId ? Number(projectId) : undefined);
+
+  // Compute which tabs are enabled
+  const enabledTabs = useMemo(() => {
+    const set = new Set<string>(["zynca", "timetable"]); // always enabled
+    if (progress.hasGenerated) {
+      set.add("dashboard");
+      set.add("substitution");
+      set.add("duty-roster");
+      set.add("exam-duties");
+      set.add("committees");
+    }
+    return set;
+  }, [progress.hasGenerated]);
 
   // Determine active tab
   const activeTab =
@@ -138,6 +157,11 @@ export default function AppShell() {
   }, [location.pathname]);
 
   function handleTabClick(tab: Tab) {
+    // Check if tab is locked
+    if (!enabledTabs.has(tab.id)) {
+      toast("info", "Complete your timetable setup first to unlock this tab");
+      return;
+    }
     if (tab.hasDropdown) {
       setDropdownOpen(prev => !prev);
       return;
@@ -187,15 +211,16 @@ export default function AppShell() {
                 <button
                   role="tab"
                   aria-selected={isActive}
-                  className={`top-tab ${isActive ? "active" : ""}`}
+                  className={`top-tab ${isActive ? "active" : ""} ${!enabledTabs.has(tab.id) ? "tab-locked" : ""}`}
                   onClick={() => handleTabClick(tab)}
+                  title={!enabledTabs.has(tab.id) ? "Generate a timetable first" : undefined}
                 >
                   <span className="tab-icon" aria-hidden="true">{tab.icon}</span>
                   <span className="tab-label">{tab.label}</span>
                   {tab.hasDropdown && (
                     <span className={`tab-chevron ${dropdownOpen ? "open" : ""}`}>▾</span>
                   )}
-                  {idx > 1 && <span className="tab-new-badge">New</span>}
+                  {!enabledTabs.has(tab.id) && <span className="tab-lock-icon">🔒</span>}
                 </button>
 
                 {/* Dropdown for Home tab */}

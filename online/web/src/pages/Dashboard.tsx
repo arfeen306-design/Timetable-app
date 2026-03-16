@@ -106,125 +106,200 @@ export default function Dashboard() {
      ═══════════════════════════════════════════════════════════ */
   if (projects.length === 0 && !showCreateForm) {
     return (
-      <div style={{ maxWidth: 700, margin: "0 auto", padding: "2rem 0" }}>
+      <div style={{ maxWidth: 780, margin: "0 auto", padding: "2rem 1rem" }}>
         {error && <div className="alert alert-error" style={{ marginBottom: 24 }}>{error}</div>}
 
+        {/* ── Keyframe animations ── */}
+        <style>{`
+          @keyframes heroFloat1 { 0%,100%{transform:translate(0,0) rotate(0deg)} 50%{transform:translate(12px,-18px) rotate(8deg)} }
+          @keyframes heroFloat2 { 0%,100%{transform:translate(0,0) rotate(0deg)} 50%{transform:translate(-14px,12px) rotate(-6deg)} }
+          @keyframes heroFloat3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(8px,-10px) scale(1.1)} }
+          @keyframes heroPulse  { 0%,100%{box-shadow:0 0 0 0 rgba(79,70,229,0.3)} 50%{box-shadow:0 0 0 18px rgba(79,70,229,0)} }
+          @keyframes heroSlide  { from{opacity:0;transform:translateY(26px)} to{opacity:1;transform:translateY(0)} }
+          @keyframes ringDraw   { from{stroke-dashoffset:314} to{stroke-dashoffset:314} }
+          @keyframes cardHover  { 0%{transform:translateY(0)} 50%{transform:translateY(-3px)} 100%{transform:translateY(0)} }
+          @keyframes shimmer    { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+          @keyframes countUp    { from{opacity:0;transform:scale(0.5)} to{opacity:1;transform:scale(1)} }
+        `}</style>
+
+        {/* ═══ HERO CARD ═══ */}
         <div className="dash-hero" style={{
           display: "flex", flexDirection: "column", alignItems: "center",
-          textAlign: "center", padding: "2.5rem 2rem",
-          borderRadius: "var(--radius-lg, 16px)",
-          background: "linear-gradient(135deg, var(--surface-card, #fff) 0%, #f0f0ff 50%, #eef2ff 100%)",
-          border: "1px solid var(--border-default, var(--slate-200))",
-          position: "relative", overflow: "hidden",
+          textAlign: "center", padding: "3rem 2rem 2.5rem",
+          borderRadius: 24, position: "relative", overflow: "hidden",
+          background: "linear-gradient(145deg, #0F172A 0%, #1E293B 40%, #312E81 100%)",
+          border: "1px solid rgba(99,102,241,0.15)",
+          boxShadow: "0 20px 60px rgba(15,23,42,0.35)",
         }}>
-          {/* Decorative bg circles */}
-          <div style={{ position: "absolute", top: -40, right: -40, width: 160, height: 160, borderRadius: "50%", background: "rgba(99,102,241,0.06)" }} />
-          <div style={{ position: "absolute", bottom: -30, left: -30, width: 120, height: 120, borderRadius: "50%", background: "rgba(20,184,166,0.06)" }} />
-          <div style={{ position: "absolute", top: 20, left: 40, width: 60, height: 60, borderRadius: "50%", background: "rgba(245,158,11,0.05)" }} />
+          {/* Floating shapes */}
+          <div style={{ position:"absolute",top:-30,right:-20,width:140,height:140,borderRadius:"50%",
+            background:"radial-gradient(circle, rgba(99,102,241,0.2) 0%, transparent 70%)",
+            animation:"heroFloat1 8s ease-in-out infinite" }} />
+          <div style={{ position:"absolute",bottom:-40,left:-30,width:180,height:180,borderRadius:"50%",
+            background:"radial-gradient(circle, rgba(20,184,166,0.15) 0%, transparent 70%)",
+            animation:"heroFloat2 10s ease-in-out infinite" }} />
+          <div style={{ position:"absolute",top:40,left:"15%",width:60,height:60,borderRadius:16,
+            background:"rgba(245,158,11,0.1)", transform:"rotate(20deg)",
+            animation:"heroFloat3 6s ease-in-out infinite" }} />
+          <div style={{ position:"absolute",bottom:60,right:"12%",width:40,height:40,borderRadius:"50%",
+            background:"rgba(236,72,153,0.12)",
+            animation:"heroFloat1 7s ease-in-out infinite 1s" }} />
 
-          {/* Calendar illustration */}
+          {/* Shield logo with pulse */}
           <div style={{
-            width: 100, height: 100, borderRadius: 20, position: "relative",
-            background: "linear-gradient(135deg, #6366f1 0%, #818cf8 100%)",
-            boxShadow: "0 12px 32px rgba(99,102,241,0.25)",
-            display: "flex", flexDirection: "column", alignItems: "center",
-            marginBottom: 24, animation: "fadeInUp 0.6s ease",
+            width: 80, height: 80, borderRadius: 20, marginBottom: 24,
+            background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 50%, #4338CA 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 8px 32px rgba(99,102,241,0.4)",
+            animation: "heroSlide 0.6s ease, heroPulse 3s ease-in-out infinite 1s",
           }}>
-            {/* Calendar top bar */}
-            <div style={{
-              width: "100%", height: 28, borderRadius: "20px 20px 0 0",
-              background: "rgba(255,255,255,0.2)",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.7)" }} />
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.5)" }} />
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.3)" }} />
-            </div>
-            {/* Calendar grid */}
-            <div style={{
-              display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4,
-              padding: "10px 12px", flex: 1, width: "100%", boxSizing: "border-box",
-            }}>
-              {[1,2,3,4,5,6,7,8].map(i => (
-                <div key={i} style={{
-                  borderRadius: 3, background: i === 3 ? "#fff" : "rgba(255,255,255,0.2)",
-                  height: 12,
-                  animation: i === 3 ? "livePulse 2s infinite" : undefined,
-                }} />
-              ))}
-            </div>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" fill="rgba(255,255,255,0.15)" stroke="#fff" strokeWidth="1.5"/>
+              <text x="12" y="16" textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff" fontFamily="Sora, sans-serif">Z</text>
+            </svg>
           </div>
 
+          {/* Title */}
           <h1 style={{
-            margin: 0, fontSize: "1.6rem", fontWeight: 800,
-            color: "var(--slate-900)", letterSpacing: "-0.02em",
-            animation: "fadeInUp 0.6s ease 0.1s both",
+            margin: 0, fontSize: "2rem", fontWeight: 800, color: "#fff",
+            letterSpacing: "-0.03em", lineHeight: 1.2,
+            animation: "heroSlide 0.6s ease 0.1s both",
           }}>
-            Welcome to Myzynca
+            Welcome to <span style={{ color:"#818CF8" }}>Myzynca</span>
           </h1>
           <p style={{
-            margin: "0.5rem 0 0", fontSize: "0.92rem", color: "var(--slate-500)",
-            maxWidth: 380, lineHeight: 1.5,
-            animation: "fadeInUp 0.6s ease 0.2s both",
+            margin: "0.6rem 0 0", fontSize: "1rem", color: "rgba(255,255,255,0.55)",
+            maxWidth: 420, lineHeight: 1.6,
+            animation: "heroSlide 0.6s ease 0.2s both",
           }}>
-            Generate clash-free timetables for any school in seconds. Create your first project to get started.
+            Your school's operating system. Generate clash‑free timetables in seconds — saving hours of manual work.
+          </p>
+
+          {/* Progress ring (0%) */}
+          <div style={{
+            margin: "28px 0 8px", position: "relative",
+            animation: "heroSlide 0.6s ease 0.3s both",
+          }}>
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
+              <circle cx="50" cy="50" r="42" fill="none" stroke="#6366F1" strokeWidth="8"
+                strokeDasharray="264" strokeDashoffset="264"
+                strokeLinecap="round" transform="rotate(-90 50 50)"
+                style={{ transition: "stroke-dashoffset 1.5s ease" }} />
+              <text x="50" y="46" textAnchor="middle" fontSize="18" fontWeight="800" fill="#fff" fontFamily="var(--font-mono)">0%</text>
+              <text x="50" y="62" textAnchor="middle" fontSize="8" fill="rgba(255,255,255,0.4)">setup</text>
+            </svg>
+          </div>
+          <p style={{
+            fontSize: "0.72rem", color: "rgba(255,255,255,0.35)",
+            animation: "heroSlide 0.6s ease 0.35s both",
+          }}>
+            Create your first project to begin
           </p>
 
           {/* CTA buttons */}
           <div style={{
-            display: "flex", gap: 10, marginTop: 28, flexWrap: "wrap", justifyContent: "center",
-            animation: "fadeInUp 0.6s ease 0.3s both",
+            display: "flex", gap: 12, marginTop: 24, flexWrap: "wrap", justifyContent: "center",
+            animation: "heroSlide 0.6s ease 0.4s both",
           }}>
-            <button type="button" className="btn btn-primary" onClick={() => setShowCreateForm(true)}
+            <button type="button" onClick={() => setShowCreateForm(true)}
               style={{
-                fontSize: "0.95rem", padding: "0.7rem 1.5rem", fontWeight: 700,
-                borderRadius: "var(--radius-md, 8px)",
-                boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
+                fontSize: "0.95rem", padding: "0.75rem 1.8rem", fontWeight: 700,
+                borderRadius: 12, border: "none", cursor: "pointer",
+                background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
+                color: "#fff", fontFamily: "var(--font-sans)",
+                boxShadow: "0 6px 24px rgba(99,102,241,0.4)",
+                transition: "all 0.2s",
               }}>
               ✨ Create Your First Timetable
             </button>
-            <button type="button" className="btn" onClick={handleLoadDemo} disabled={demoLoading}
-              style={{ fontSize: "0.85rem", padding: "0.6rem 1.2rem", fontWeight: 600 }}>
+            <button type="button" onClick={handleLoadDemo} disabled={demoLoading}
+              style={{
+                fontSize: "0.85rem", padding: "0.65rem 1.4rem", fontWeight: 600,
+                borderRadius: 12, cursor: "pointer",
+                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)",
+                color: "rgba(255,255,255,0.8)", fontFamily: "var(--font-sans)",
+                transition: "all 0.2s",
+              }}>
               {demoLoading ? "⏳ Loading…" : "🧪 Try Demo School"}
             </button>
           </div>
 
-          <div style={{
-            display: "flex", gap: 16, marginTop: 16,
-            animation: "fadeInUp 0.6s ease 0.4s both",
-          }}>
-            <button type="button" onClick={() => fileRef.current?.click()} disabled={importing}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                fontSize: "0.78rem", fontWeight: 600, color: "var(--slate-400)",
-                fontFamily: "var(--font-sans)", textDecoration: "underline", textUnderlineOffset: 2,
-              }}>
-              {importing ? "⏳ Importing…" : "📂 Or upload an existing project"}
-            </button>
-          </div>
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={importing}
+            style={{
+              background: "none", border: "none", cursor: "pointer", marginTop: 14,
+              fontSize: "0.75rem", fontWeight: 600, color: "rgba(255,255,255,0.35)",
+              fontFamily: "var(--font-sans)", textDecoration: "underline", textUnderlineOffset: 3,
+              animation: "heroSlide 0.6s ease 0.45s both",
+            }}>
+            {importing ? "⏳ Importing…" : "📂 Or upload an existing project"}
+          </button>
           <input ref={fileRef} type="file" accept=".json,.timetable.json" style={{ display: "none" }} onChange={handleImportFile} />
+        </div>
 
-          {/* Feature highlights */}
-          <div className="dash-features" style={{
-            display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16,
-            marginTop: 32, width: "100%",
-            animation: "fadeInUp 0.6s ease 0.5s both",
-          }}>
-            {[
-              { icon: "⚡", title: "Instant Generation", desc: "AI-powered engine creates timetables in seconds" },
-              { icon: "🔄", title: "Smart Substitutions", desc: "Auto-assign substitutes when teachers are absent" },
-              { icon: "📊", title: "Live Dashboard", desc: "Real-time stats, workload tracking, and insights" },
-            ].map((f, i) => (
-              <div key={i} style={{
-                padding: "0.75rem", borderRadius: "var(--radius-md, 8px)",
-                background: "rgba(255,255,255,0.7)", border: "1px solid rgba(99,102,241,0.08)",
+        {/* ═══ FEATURE CARDS ═══ */}
+        <div className="dash-features" style={{
+          display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16,
+          marginTop: 24,
+        }}>
+          {[
+            { icon: "⚡", color: "#6366F1", title: "Instant Generation",
+              desc: "AI-powered constraint solver creates your perfect timetable — zero clashes, every time.",
+              stat: "< 10s", statLabel: "generation time" },
+            { icon: "🔄", color: "#0EA875", title: "Smart Substitutions",
+              desc: "Teacher absent? Auto-assign qualified substitutes with one click. No more scrambling.",
+              stat: "1-click", statLabel: "auto-assign" },
+            { icon: "📊", color: "#E8A020", title: "Live Dashboard",
+              desc: "Real-time attendance, workload analytics, and insights. Know your school's pulse.",
+              stat: "Real-time", statLabel: "live tracking" },
+          ].map((f, i) => (
+            <div key={i} style={{
+              padding: "1.5rem 1.2rem", borderRadius: 16,
+              background: "var(--surface-card, #fff)",
+              border: "1px solid var(--border-default, #E2E8F0)",
+              position: "relative", overflow: "hidden",
+              transition: "all 0.25s ease",
+              animation: `heroSlide 0.6s ease ${0.5 + i * 0.1}s both`,
+              cursor: "default",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = `0 12px 32px ${f.color}20`; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
+            >
+              <div style={{
+                position: "absolute", top: -20, right: -20, width: 60, height: 60,
+                borderRadius: "50%", background: `${f.color}10`,
+              }} />
+              <div style={{ fontSize: "1.5rem", marginBottom: 10 }}>{f.icon}</div>
+              <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--slate-900)", marginBottom: 6 }}>{f.title}</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--slate-500)", lineHeight: 1.5, marginBottom: 14 }}>{f.desc}</div>
+              <div style={{
+                display: "flex", alignItems: "baseline", gap: 6,
+                borderTop: "1px solid var(--border-default, #F1F5F9)", paddingTop: 10,
               }}>
-                <div style={{ fontSize: "1.2rem", marginBottom: 4 }}>{f.icon}</div>
-                <div style={{ fontWeight: 700, fontSize: "0.72rem", color: "var(--slate-800)", marginBottom: 2 }}>{f.title}</div>
-                <div style={{ fontSize: "0.65rem", color: "var(--slate-400)", lineHeight: 1.4 }}>{f.desc}</div>
+                <span style={{ fontSize: "1.1rem", fontWeight: 800, color: f.color, fontFamily: "var(--font-mono)" }}>{f.stat}</span>
+                <span style={{ fontSize: "0.65rem", color: "var(--slate-400)" }}>{f.statLabel}</span>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ═══ TRUST SIGNALS ═══ */}
+        <div style={{
+          display: "flex", justifyContent: "center", gap: 28, marginTop: 20,
+          animation: "heroSlide 0.6s ease 0.8s both",
+        }}>
+          {[
+            { icon: "🌍", text: "Schools worldwide" },
+            { icon: "🛡️", text: "Clash-free guarantee" },
+            { icon: "⏱️", text: "Setup under 15 min" },
+          ].map((t, i) => (
+            <div key={i} style={{
+              display: "flex", alignItems: "center", gap: 6,
+              fontSize: "0.72rem", color: "var(--slate-400)", fontWeight: 500,
+            }}>
+              <span>{t.icon}</span> {t.text}
+            </div>
+          ))}
         </div>
       </div>
     );

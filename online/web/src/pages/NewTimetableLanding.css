@@ -438,6 +438,18 @@
   to { transform: rotate(360deg); }
 }
 
+/* ── Progress tracker ── */
+.ntl-progress-tracker {
+  width: 100%;
+  max-width: 680px;
+  padding: 20px 24px;
+  background: var(--surface-card, #fff);
+  border: 1px solid var(--border-default, #E2E8F0);
+  border-radius: 16px;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
 @media (max-width: 768px) {
   .ntl-layout {
     grid-template-columns: 1fr;

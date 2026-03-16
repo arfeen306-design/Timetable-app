@@ -114,6 +114,21 @@
   color: #818CF8;
 }
 
+/* Locked tab */
+.top-tab.tab-locked {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.top-tab.tab-locked:hover {
+  color: rgba(255,255,255,0.45);
+  border-bottom-color: transparent;
+  background: none;
+}
+.tab-lock-icon {
+  font-size: 9px;
+  margin-left: 2px;
+}
+
 /* ── Tab dropdown ────────────────────────────────────────────── */
 .tab-dropdown {
   position: absolute;

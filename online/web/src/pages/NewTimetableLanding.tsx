@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as api from "../api";
 import { useToast } from "../context/ToastContext";
+import { useProjectProgress } from "../hooks/useProjectProgress";
 import "./NewTimetableLanding.css";
 
 type Project = { id: number; name: string; academic_year: string; school_id?: number; archived?: boolean; created_at?: string; updated_at?: string };
@@ -335,10 +336,13 @@ export default function NewTimetableLanding() {
         )}
       </aside>
 
-      {/* ═══ RIGHT COLUMN: Cards ═══ */}
+      {/* ═══ RIGHT COLUMN: Progress + Cards ═══ */}
       <div className="ntl-right">
-        <div className="ntl-header">
-          <h1 className="ntl-title">New Timetable &mdash; Home</h1>
+        {/* ── Live Progress Tracker ── */}
+        {pid > 0 && <ProgressTracker projectId={pid} />}
+
+        <div className="ntl-header" style={{ marginTop: pid > 0 ? 8 : 0 }}>
+          <h1 className="ntl-title">New Timetable</h1>
           <p className="ntl-sub">How would you like to get started?</p>
         </div>
 
@@ -427,6 +431,129 @@ export default function NewTimetableLanding() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PROGRESS TRACKER sub-component
+   ═══════════════════════════════════════════════════════════ */
+function ProgressTracker({ projectId }: { projectId: number }) {
+  const p = useProjectProgress(projectId);
+  const navigate = useNavigate();
+
+  if (p.loading) return null;
+
+  const steps = [
+    { label: "School Settings", done: true, count: null, link: "settings", icon: "🏫" },
+    { label: "Teachers", done: p.teachers > 0, count: p.teachers, link: "teachers", icon: "👨\u200D🏫" },
+    { label: "Subjects", done: p.subjects > 0, count: p.subjects, link: "subjects", icon: "📚" },
+    { label: "Classes", done: p.classes > 0, count: p.classes, link: "classes", icon: "🎓" },
+    { label: "Lessons", done: p.lessons > 0, count: p.lessons, link: "lessons", icon: "📖" },
+  ];
+  const doneCount = steps.filter(s => s.done).length;
+  const allReady = doneCount >= 4 && p.lessons > 0;
+  const circumference = 2 * Math.PI * 42;
+  const dashOffset = circumference - (p.percent / 100) * circumference;
+
+  return (
+    <div className="ntl-progress-tracker">
+      <style>{`
+        @keyframes ptSlide { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes ptBarFill { from{width:0} }
+        @keyframes ptPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+        .ntl-progress-tracker { animation: ptSlide 0.5s ease; }
+        .pt-step-current { animation: ptPulse 2s ease-in-out infinite; }
+      `}</style>
+
+      {/* Progress ring + headline */}
+      <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 20 }}>
+        <svg width="80" height="80" viewBox="0 0 100 100" style={{ flexShrink: 0 }}>
+          <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border-default, #E2E8F0)" strokeWidth="7" />
+          <circle cx="50" cy="50" r="42" fill="none" stroke="#6366F1" strokeWidth="7"
+            strokeDasharray={circumference} strokeDashoffset={dashOffset}
+            strokeLinecap="round" transform="rotate(-90 50 50)"
+            style={{ transition: "stroke-dashoffset 1s ease" }} />
+          <text x="50" y="46" textAnchor="middle" fontSize="18" fontWeight="800"
+            fill="var(--slate-900, #0F172A)" fontFamily="var(--font-mono)">{p.percent}%</text>
+          <text x="50" y="62" textAnchor="middle" fontSize="8"
+            fill="var(--slate-400, #94A3B8)">complete</text>
+        </svg>
+        <div>
+          <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--slate-900)" }}>
+            {p.hasGenerated ? "🎉 Timetable Generated!" : "Setup Progress"}
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "var(--slate-400)", marginTop: 2 }}>
+            {p.hasGenerated
+              ? "Your timetable is ready. Dashboard is now unlocked!"
+              : `${doneCount} of ${steps.length} steps complete`}
+          </div>
+        </div>
+      </div>
+
+      {/* Step bars */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {steps.map((s, i) => {
+          const isNext = !s.done && (i === 0 || steps[i - 1].done);
+          return (
+            <div key={s.label}
+              className={isNext ? "pt-step-current" : ""}
+              onClick={() => navigate(`/project/${projectId}/${s.link}`)}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "8px 12px", borderRadius: 10, cursor: "pointer",
+                background: s.done ? "#F0FDF4" : isNext ? "#EEF2FF" : "var(--surface-raised, #F8FAFC)",
+                border: `1px solid ${s.done ? "#BBF7D0" : isNext ? "#C7D2FE" : "var(--border-default, #E2E8F0)"}`,
+                transition: "all 0.2s",
+              }}
+            >
+              <span style={{ fontSize: 16, width: 24, textAlign: "center" }}>
+                {s.done ? "✅" : s.icon}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--slate-700)" }}>{s.label}</span>
+                  {s.count !== null && (
+                    <span style={{
+                      fontSize: "0.68rem", fontWeight: 700, fontFamily: "var(--font-mono)",
+                      color: s.done ? "#16A34A" : "var(--slate-400)",
+                    }}>{s.count} added</span>
+                  )}
+                </div>
+                <div style={{
+                  height: 4, borderRadius: 2, marginTop: 4,
+                  background: "var(--border-default, #E2E8F0)", overflow: "hidden",
+                }}>
+                  <div style={{
+                    height: "100%", borderRadius: 2,
+                    background: s.done ? "#16A34A" : isNext ? "#6366F1" : "transparent",
+                    width: s.done ? "100%" : "0%",
+                    transition: "width 0.8s ease",
+                  }} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Generate CTA */}
+      {allReady && !p.hasGenerated && (
+        <button
+          onClick={() => navigate(`/project/${projectId}/generate`)}
+          style={{
+            marginTop: 14, width: "100%", padding: "10px 0", borderRadius: 10,
+            border: "none", cursor: "pointer",
+            background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
+            color: "#fff", fontSize: "0.85rem", fontWeight: 700,
+            fontFamily: "var(--font-sans)",
+            boxShadow: "0 4px 16px rgba(99,102,241,0.3)",
+            transition: "all 0.2s",
+          }}
+        >
+          ▶️ Generate Timetable Now
+        </button>
+      )}
     </div>
   );
 }
