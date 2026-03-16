@@ -351,3 +351,112 @@
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — AppShell
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── ≤ 768px — phone & small tablet ─────────────────────────── */
+@media (max-width: 768px) {
+  .top-tab-bar {
+    height: 48px;
+    overflow: hidden;
+  }
+
+  /* Logo: icon only, hide name */
+  .app-logo {
+    padding: 0 10px;
+    border-right: none;
+    gap: 0;
+  }
+  .app-logo-name { display: none; }
+  .app-logo-mark { width: 24px; height: 24px; border-radius: 6px; }
+  .app-logo-mark svg { width: 12px; height: 12px; }
+
+  /* Tabs: horizontal scroll, icons + short labels */
+  .top-tabs {
+    padding-left: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;          /* Firefox */
+    gap: 0;
+  }
+  .top-tabs::-webkit-scrollbar { display: none; }  /* Chrome/Safari */
+
+  .top-tab {
+    padding: 0 10px;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .tab-icon  { font-size: 14px; }
+  .tab-label { font-size: 11px; }
+  .tab-chevron { font-size: 9px; }
+  .tab-new-badge { display: none; }
+
+  /* Right side: compact */
+  .top-bar-right {
+    padding: 0 8px;
+    gap: 5px;
+    border-left: none;
+  }
+  .live-now-pill { display: none; }   /* Hide on phones */
+
+  .theme-toggle {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+  .profile-btn {
+    width: 26px;
+    height: 26px;
+    font-size: 10px;
+  }
+  .profile-av { width: 26px; height: 26px; }
+
+  /* Dropdowns: full width on mobile */
+  .tab-dropdown {
+    position: fixed;
+    top: 48px;
+    left: 0;
+    right: 0;
+    border-radius: 0 0 12px 12px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  .profile-dropdown {
+    position: fixed;
+    top: 48px;
+    right: 0;
+    left: auto;
+    width: 260px;
+    border-radius: 0 0 10px 10px;
+  }
+
+  /* Body: no overflow issue */
+  .app-body {
+    flex-direction: column;
+  }
+  .app-main {
+    overflow-x: hidden;
+  }
+}
+
+/* ── ≤ 480px — very small phones ────────────────────────────── */
+@media (max-width: 480px) {
+  .top-tab-bar { height: 44px; }
+
+  .top-tab {
+    padding: 0 8px;
+    gap: 3px;
+  }
+  .tab-label { font-size: 10px; }
+  .tab-icon  { font-size: 13px; }
+
+  .app-logo { padding: 0 8px; }
+  .app-logo-mark { width: 22px; height: 22px; }
+
+  .top-bar-right { padding: 0 6px; gap: 4px; }
+
+  .profile-dropdown { width: 100%; right: 0; left: 0; }
+}

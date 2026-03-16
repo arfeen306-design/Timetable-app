@@ -521,3 +521,141 @@ th { background: var(--slate-50); font-weight: 600; color: var(--slate-600); fon
 [data-theme="dark"] ::-webkit-scrollbar-track { background: var(--surface-page); }
 [data-theme="dark"] ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — content pages
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  /* ── Layout & spacing ── */
+  .main-content { padding: var(--sp-3) var(--sp-3); }
+  .container { padding: 0 var(--sp-2); }
+  .card { padding: var(--sp-4) var(--sp-3); border-radius: var(--radius-md); }
+  .settings-card { padding: var(--sp-4) var(--sp-3); border-radius: 10px; }
+
+  /* ── Sidebar: hide on mobile ── */
+  .sidebar { display: none; }
+  .app-layout { flex-direction: column; }
+
+  /* ── Forms: stacked layout ── */
+  input, select, textarea { max-width: 100%; font-size: 16px; } /* 16px prevents iOS zoom */
+  .settings-field {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-1);
+  }
+  .settings-label {
+    min-width: unset;
+    text-align: left;
+  }
+  .settings-hint {
+    margin-left: 0;
+    padding-left: 0;
+  }
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    max-width: 100%;
+  }
+  .break-card { margin-left: 0; }
+
+  /* ── Modal fields: stacked ── */
+  .modal-field {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 4px !important;
+  }
+  .modal-label {
+    min-width: unset !important;
+    text-align: left !important;
+  }
+  .modal-field input,
+  .modal-field select,
+  .modal-field textarea {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* ── Modal overlay: full screen on mobile ── */
+  .modal-overlay > div,
+  .modal-card {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: auto;
+    border-radius: 12px !important;
+  }
+
+  /* ── Tables: horizontal scroll ── */
+  table, .data-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  th, td { padding: 0.45rem 0.55rem; font-size: 0.78rem; }
+
+  /* ── Tabs (internal page tabs): wrap + smaller ── */
+  .tabs {
+    gap: 0.25rem;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── Stats cards: 2 columns ── */
+  .stat-cards { grid-template-columns: repeat(2, 1fr); gap: var(--sp-2); }
+  .stat-card { padding: var(--sp-3) var(--sp-3); }
+  .stat-card-value { font-size: 1.2rem; }
+  .stat-card-label { font-size: 0.65rem; }
+
+  /* ── Buttons: touch-friendly ── */
+  .btn { padding: 0.6rem 1rem; font-size: 0.8rem; min-height: 40px; }
+  .btn-primary, .btn-danger { min-height: 40px; }
+
+  /* ── Dashboard intro ── */
+  .intro-page { padding: var(--sp-4) 0; }
+  .intro-title { font-size: 1.3rem; }
+  .intro-subtitle { font-size: 0.88rem; }
+  .btn-intro { max-width: 100%; }
+
+  /* ── Toasts: bottom center on mobile ── */
+  .toast-container {
+    left: var(--sp-3);
+    right: var(--sp-3);
+    bottom: var(--sp-3);
+  }
+  .toast { max-width: 100%; }
+
+  /* ── Headings: tighter ── */
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.1rem; }
+  h3 { font-size: 0.95rem; }
+
+  /* ── Settings card heading ── */
+  .settings-card h2 { font-size: 1.2rem; }
+  .settings-section-title { font-size: 0.9rem; }
+}
+
+/* ── ≤ 480px — very small phones ───────────────────────────── */
+@media (max-width: 480px) {
+  .main-content { padding: var(--sp-2); }
+  .card { padding: var(--sp-3) var(--sp-2); }
+  .stat-cards { grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+  .stat-card-value { font-size: 1rem; }
+  .intro-title { font-size: 1.1rem; }
+  .intro-actions { gap: 0.5rem; }
+
+  /* Stack buttons when side by side */
+  .btn + .btn { margin-left: 0; margin-top: 0.25rem; }
+}
