@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import "./Login.css";
 
 // ── Animated timetable grid ───────────────────────────────────
@@ -66,6 +67,7 @@ const FEATURES = [
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const [isSignUp,     setIsSignUp]     = useState(false);
   const [email,        setEmail]        = useState("");
@@ -134,6 +136,16 @@ export default function Login() {
       <AnimatedGrid />
       <div className="login-overlay" />
 
+      {/* Theme Toggle */}
+      <button
+        type="button"
+        className="login-theme-toggle"
+        onClick={toggleTheme}
+        title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      >
+        {theme === "dark" ? "☀️" : "🌙"}
+      </button>
+
       <div className="login-content">
         {/* ── Left: product showcase ── */}
         <div className="login-left">
@@ -158,7 +170,7 @@ export default function Login() {
             will ever need.
           </h1>
           <p className="login-sub">
-            Built for Pakistani schools. Powered by constraint solving.<br />
+            Built for schools worldwide. Powered by constraint solving.<br />
             Zero clashes guaranteed.
           </p>
 

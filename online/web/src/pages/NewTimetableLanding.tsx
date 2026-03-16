@@ -374,7 +374,7 @@ export default function NewTimetableLanding() {
           >
             <div className="ntl-card-icon">&#127918;</div>
             <div className="ntl-card-title">Load Demo Data</div>
-            <div className="ntl-card-desc">Populate with sample Pakistani O-Level school data to explore all features.</div>
+            <div className="ntl-card-desc">Populate with sample school data to explore all features.</div>
             {loading === "demo" && <div className="ntl-card-spinner" />}
           </button>
         </div>
