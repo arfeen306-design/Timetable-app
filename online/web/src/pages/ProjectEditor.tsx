@@ -224,6 +224,7 @@ function SettingsTab({
   const [fridayDayIndex, setFridayDayIndex] = useState(4);
   const [fridayFirstPeriodStart, setFridayFirstPeriodStart] = useState("08:10");
   const [fridayDefaultDuration, setFridayDefaultDuration] = useState(40);
+  const [fridayPeriodsPerDay, setFridayPeriodsPerDay] = useState(0); // 0 = same as regular
   const [fridayLessonDurations, setFridayLessonDurations] = useState<number[]>([]);
   const [fridayNumBreaks, setFridayNumBreaks] = useState(0);
   const [fridayBreaks, setFridayBreaks] = useState<BreakItem[]>([]);
@@ -250,6 +251,7 @@ function SettingsTab({
         setFridayDayIndex(bell.friday_day_index ?? 4);
         setFridayFirstPeriodStart(bell.friday_first_period_start || "08:10");
         setFridayDefaultDuration(bell.friday_default_duration || 40);
+        setFridayPeriodsPerDay(bell.friday_periods_per_day ?? 0);
         if (Array.isArray(bell.friday_lesson_durations)) setFridayLessonDurations(bell.friday_lesson_durations);
       }
     } catch { /* ignore */ }
@@ -280,8 +282,9 @@ function SettingsTab({
   const schedule = computeSchedule(periodsPerDay, firstPeriodStart, defaultDuration, lessonDurations, breaks);
   const schoolEnd = schedule.length > 0 ? schedule[schedule.length - 1].end : firstPeriodStart;
 
+  const fridayPeriodCount = fridayPeriodsPerDay > 0 ? fridayPeriodsPerDay : periodsPerDay;
   const fridaySchedule = fridayDifferent
-    ? computeSchedule(periodsPerDay, fridayFirstPeriodStart, fridayDefaultDuration, fridayLessonDurations, fridayBreaks)
+    ? computeSchedule(fridayPeriodCount, fridayFirstPeriodStart, fridayDefaultDuration, fridayLessonDurations, fridayBreaks)
     : [];
   const fridayEnd = fridaySchedule.length > 0 ? fridaySchedule[fridaySchedule.length - 1].end : "";
 
@@ -314,6 +317,7 @@ function SettingsTab({
         friday_day_index: fridayDayIndex,
         friday_first_period_start: fridayFirstPeriodStart,
         friday_default_duration: fridayDefaultDuration,
+        friday_periods_per_day: fridayPeriodsPerDay > 0 ? fridayPeriodsPerDay : periodsPerDay,
         friday_lesson_durations: fridayLessonDurations,
       });
       const allBreaks = [
@@ -415,6 +419,7 @@ function SettingsTab({
         </div>
         {fridayDifferent && (
           <div style={{marginLeft:20,marginTop:"0.75rem"}}>
+            <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} lessons per day</label><select value={fridayPeriodsPerDay || periodsPerDay} onChange={e => setFridayPeriodsPerDay(Number(e.target.value))} style={inputNarrow}>{Array.from({length:16},(_,i) => <option key={i} value={i}>{i}{i === periodsPerDay ? " (same)" : ""}</option>)}</select></div>
             <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} first lesson starts at</label><select value={fridayFirstPeriodStart} onChange={e => setFridayFirstPeriodStart(e.target.value)} style={{width:120}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
             <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} default lesson duration</label><select value={fridayDefaultDuration} onChange={e => setFridayDefaultDuration(Number(e.target.value))} style={inputNarrow}>{DURATION_OPTIONS.map(m => <option key={m} value={m}>{m} min</option>)}</select></div>
             <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} breaks</label><select value={fridayNumBreaks} onChange={e => setFridayNumBreaks(Number(e.target.value))} style={inputNarrow}>{Array.from({length:10},(_,i) => <option key={i} value={i}>{i}</option>)}</select></div>

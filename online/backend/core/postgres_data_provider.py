@@ -57,8 +57,15 @@ class PostgresDataProvider:
             "academic_year": settings.academic_year or "",
             "days_per_week": settings.days_per_week,
             "periods_per_day": settings.periods_per_day,
+            "period_duration_minutes": getattr(settings, "period_duration_minutes", 45),
             "weekend_days": settings.weekend_days or "5,6",
-            "bell_schedule_json": settings.bell_schedule_json or "[]",
+            "working_days": getattr(settings, "working_days", "1,2,3,4,5"),
+            "bell_schedule_json": settings.bell_schedule_json or "{}",
+            "breaks_json": getattr(settings, "breaks_json", "[]"),
+            "school_start_time": getattr(settings, "school_start_time", "08:00"),
+            "school_end_time": getattr(settings, "school_end_time", "15:00"),
+            "friday_start_time": getattr(settings, "friday_start_time", None),
+            "friday_end_time": getattr(settings, "friday_end_time", None),
         }
 
     def get_subjects(self) -> list[dict[str, Any]]:

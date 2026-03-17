@@ -48,7 +48,18 @@ class TimetableSolver:
         except (KeyError, TypeError, ValueError):
             pass
         zero_period = bool(bell.get("zero_period", False))
+        friday_different = bool(bell.get("friday_different", False))
+        friday_day_index = bell.get("friday_day_index", 4)
+        friday_periods_base = bell.get("friday_periods_per_day", num_periods_base)
+        if friday_different and friday_periods_base and int(friday_periods_base) > 0:
+            friday_num_periods = int(friday_periods_base) + (1 if zero_period else 0)
+        else:
+            friday_num_periods = None  # same as regular
+
         num_periods = num_periods_base + (1 if zero_period else 0)
+        # Use the maximum to keep a uniform grid
+        if friday_num_periods and friday_num_periods > num_periods:
+            num_periods = friday_num_periods
         total_slots = num_days * num_periods
 
         lessons = p.get_lessons()
@@ -128,6 +139,16 @@ class TimetableSolver:
                     if 0 <= sp <= num_periods - dur:
                         forbidden.add(day * num_periods + sp)
             occ_forbidden_slots.append(forbidden)
+
+        # Forbid slots on the exceptional day that exceed its period count
+        if friday_different and friday_num_periods is not None and friday_num_periods < num_periods:
+            # friday_day_index is 0-based (0=Mon, 4=Fri)
+            friday_day_idx = int(friday_day_index) if friday_day_index < num_days else num_days - 1
+            friday_forbidden = set()
+            for p in range(friday_num_periods, num_periods):
+                friday_forbidden.add(friday_day_idx * num_periods + p)
+            for occ_set in occ_forbidden_slots:
+                occ_set.update(friday_forbidden)
 
         # Decision variables: slot_var = day * num_periods + period
         slot_vars = []

@@ -40,18 +40,14 @@ interface BreakDef { name?: string; start?: string; end?: string; after_period?:
  * Break uses its user-entered start/end, cursor advances to break.end.
  */
 function computeSlots(
-  firstPeriodStart: string, periodDuration: number, numPeriods: number,
-  breaks: BreakDef[], isFriday: boolean,
-  fridayFirstPeriodStart?: string, fridayDuration?: number,
+  firstPeriodStart: string, defaultDuration: number, numPeriods: number,
+  breaks: BreakDef[], lessonDurations: number[],
   schoolStartTime?: string, zeroPeriodEnabled?: boolean,
 ): SlotDef[] {
-  const startMin = parseTime(isFriday && fridayFirstPeriodStart ? fridayFirstPeriodStart : firstPeriodStart);
-  const dur = isFriday && fridayDuration ? fridayDuration : periodDuration;
+  const startMin = parseTime(firstPeriodStart);
 
-  const dayBreaks = breaks.filter(b => isFriday ? !!b.is_friday : !b.is_friday);
-  // after_period is 1-indexed from UI → convert to 0-indexed
   const breakByIdx: Record<number, BreakDef> = {};
-  for (const b of dayBreaks) {
+  for (const b of breaks) {
     if (b.after_period != null) breakByIdx[b.after_period - 1] = b;
   }
 
@@ -67,16 +63,17 @@ function computeSlots(
 
   let current = startMin;
   for (let p = 0; p < numPeriods; p++) {
+    // Per-lesson duration: use array if available, else default
+    const dur = (p < lessonDurations.length && lessonDurations[p]) ? lessonDurations[p] : defaultDuration;
     const end = current + dur;
     slots.push({ type: "period", periodIndex: p, start: fmtTime(current), end: fmtTime(end) });
     current = end;
 
     const brk = breakByIdx[p];
     if (brk) {
-      const brkStart = brk.start ? parseTime(brk.start) : current;
-      const brkEnd = brk.end ? parseTime(brk.end) : brkStart + (brk.duration_minutes || 20);
-      slots.push({ type: "break", periodIndex: -1, start: fmtTime(brkStart), end: fmtTime(brkEnd), breakName: brk.name || "Break" });
-      current = brkEnd;
+      const brkDur = brk.duration_minutes || 20;
+      slots.push({ type: "break", periodIndex: -1, start: fmtTime(current), end: fmtTime(current + brkDur), breakName: brk.name || "Break" });
+      current += brkDur;
     }
   }
   return slots;
@@ -139,11 +136,13 @@ export default function Review() {
     if (!settings) return { regularSlots: [] as SlotDef[], fridaySlots: [] as SlotDef[], hasFridayDiff: false, fridayDayIndex: 4 };
 
     const schoolStart = (settings.school_start_time as string) || "08:00";
-    const periodDuration = (settings.period_duration_minutes as number) || 45;
+    const defaultDuration = (settings.period_duration_minutes as number) || 45;
     const numPeriods = (settings.periods_per_day as number) || 7;
 
     let breaks: BreakDef[] = [];
     try { const raw = settings.breaks_json as string; if (raw) breaks = JSON.parse(raw); } catch { /* */ }
+    const regularBreaks = breaks.filter(b => !b.is_friday);
+    const fridayBreaksList = breaks.filter(b => !!b.is_friday);
 
     let bell: Record<string, unknown> = {};
     try { const raw = settings.bell_schedule_json as string; if (raw) bell = JSON.parse(raw); } catch { /* */ }
@@ -152,12 +151,17 @@ export default function Review() {
     const zeroPeriod = !!(bell.zero_period);
     const fridayDiff = !!(bell.friday_different);
     const friDayIdx = (bell.friday_day_index as number) ?? 4;
-    const friStart = (bell.friday_first_period_start as string) || undefined;
-    const friDur = (bell.friday_period_duration as number) || undefined;
+    const friStart = (bell.friday_first_period_start as string) || firstPeriodStart;
+    const friDefaultDur = (bell.friday_default_duration as number) || defaultDuration;
+    const friPeriodsPerDay = (bell.friday_periods_per_day as number) || numPeriods;
 
-    const regular = computeSlots(firstPeriodStart, periodDuration, numPeriods, breaks, false, undefined, undefined, schoolStart, zeroPeriod);
+    // Per-lesson duration arrays
+    const lessonDurations: number[] = Array.isArray(bell.lesson_durations) ? bell.lesson_durations as number[] : [];
+    const fridayLessonDurations: number[] = Array.isArray(bell.friday_lesson_durations) ? bell.friday_lesson_durations as number[] : [];
+
+    const regular = computeSlots(firstPeriodStart, defaultDuration, numPeriods, regularBreaks, lessonDurations, schoolStart, zeroPeriod);
     const friday = fridayDiff
-      ? computeSlots(firstPeriodStart, periodDuration, numPeriods, breaks, true, friStart, friDur, schoolStart, zeroPeriod)
+      ? computeSlots(friStart, friDefaultDur, friPeriodsPerDay, fridayBreaksList, fridayLessonDurations, schoolStart, zeroPeriod)
       : regular;
 
     return { regularSlots: regular, fridaySlots: friday, hasFridayDiff: fridayDiff, fridayDayIndex: friDayIdx };

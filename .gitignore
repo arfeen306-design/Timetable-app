@@ -52,3 +52,4 @@ htmlcov/
 .idea/
 *.swp
 *.swo
+online/backend/venv_new/
