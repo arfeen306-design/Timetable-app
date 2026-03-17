@@ -69,7 +69,7 @@
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  color: rgba(255,240,61,0.8);
+  color: rgba(0,206,200,0.9);
   font-size: 13px;
   font-weight: 500;
   font-family: var(--font-body, 'Inter', sans-serif);
@@ -79,13 +79,13 @@
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .top-tab:hover {
-  color: #FFF03D;
-  background: rgba(255,240,61,0.06);
+  color: #33E0DA;
+  background: rgba(0,206,200,0.06);
 }
 .top-tab.active {
   color: #fff;
-  border-bottom-color: rgba(255,240,61,0.8);
-  background: rgba(255,240,61,0.1);
+  border-bottom-color: rgba(0,206,200,0.9);
+  background: rgba(0,206,200,0.08);
 }
 
 .tab-icon  { font-size: 15px; line-height: 1; }
@@ -148,7 +148,7 @@
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  color: rgba(255,240,61,0.8);
+  color: rgba(0,206,200,0.9);
   padding: 8px 14px 4px;
   letter-spacing: 0.08em;
 }
@@ -161,19 +161,19 @@
   padding: 8px 14px;
   background: none;
   border: none;
-  color: rgba(255,240,61,0.8);
+  color: rgba(0,206,200,0.9);
   font-size: 13px;
   font-family: var(--font-body, 'Inter', sans-serif);
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
 .tab-dropdown-item:hover {
-  background: rgba(255,240,61,0.06);
-  color: #FFF03D;
+  background: rgba(0,206,200,0.06);
+  color: #33E0DA;
 }
 .tab-dropdown-item.active {
   color: #FFFFFF;
-  background: rgba(255,240,61,0.10);
+  background: rgba(0,206,200,0.10);
 }
 
 .tab-dropdown-icon {
