@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   listTeachers,
   listSubjects,
@@ -31,15 +31,42 @@ const EMPTY: ProjectProgress = {
   refresh: () => {},
 };
 
-export function useProjectProgress(projectId: number | undefined): ProjectProgress {
-  const [data, setData] = useState<Omit<ProjectProgress, "refresh">>(EMPTY);
+/* ── Lightweight in-memory cache so we don't re-fetch on every page nav ── */
+interface CacheEntry {
+  data: Omit<ProjectProgress, "refresh">;
+  ts: number;
+}
+const cache = new Map<number, CacheEntry>();
+const CACHE_TTL = 5_000; // 5 seconds
 
-  const fetch = useCallback(() => {
+export function useProjectProgress(projectId: number | undefined): ProjectProgress {
+  const [data, setData] = useState<Omit<ProjectProgress, "refresh">>(() => {
+    if (projectId && cache.has(projectId)) {
+      const c = cache.get(projectId)!;
+      return { ...c.data, loading: false };
+    }
+    return EMPTY;
+  });
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const doFetch = useCallback(() => {
     if (!projectId) {
       setData({ ...EMPTY, loading: false });
       return;
     }
-    setData((prev) => ({ ...prev, loading: true }));
+
+    // If we have fresh cache, skip the fetch
+    const cached = cache.get(projectId);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      setData({ ...cached.data, loading: false });
+      return;
+    }
+
+    // Only show loading if we have no cached data at all
+    if (!cached) {
+      setData((prev) => ({ ...prev, loading: true }));
+    }
 
     Promise.all([
       listTeachers(projectId).catch(() => []),
@@ -63,13 +90,28 @@ export function useProjectProgress(projectId: number | undefined): ProjectProgre
       if (hasGenerated) done++;
       const percent = Math.round((done / 5) * 100);
 
-      setData({ teachers, subjects, classes, lessons, hasGenerated, loading: false, percent });
+      const result = { teachers, subjects, classes, lessons, hasGenerated, loading: false, percent };
+      cache.set(projectId, { data: result, ts: Date.now() });
+      setData(result);
     });
   }, [projectId]);
 
-  useEffect(() => {
-    fetch();
-  }, [fetch]);
+  // Debounced refresh — prevents hammering API when adding items quickly
+  const refresh = useCallback(() => {
+    // Invalidate cache so next fetch is fresh
+    if (projectId) {
+      cache.delete(projectId);
+    }
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(doFetch, 300);
+  }, [projectId, doFetch]);
 
-  return { ...data, refresh: fetch };
+  useEffect(() => {
+    doFetch();
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [doFetch]);
+
+  return { ...data, refresh };
 }

@@ -318,7 +318,7 @@ export default function AppShell() {
         <div className="roadmap-strip">
           {(() => {
             const STEPS = [
-              { key: "myzynca",     label: "Myzynca",     link: "zynca" },
+              { key: "myzynca",     label: "Myzynca",     link: "zynca",       done: true },
               { key: "school",      label: "School",      link: "settings",    done: true },
               { key: "classrooms",  label: "Classrooms",  link: "rooms",       done: true },
               { key: "teachers",    label: "Teachers",    link: "teachers",    done: progress.teachers > 0 },
@@ -329,12 +329,8 @@ export default function AppShell() {
               { key: "generate",    label: "Generate",    link: "generate",    done: progress.hasGenerated },
               { key: "review",      label: "Review",      link: "review",      done: progress.hasGenerated },
             ];
-            // First step (Myzynca) is always "done" since it's the starting page
-            STEPS[0].done = true;
             const currentIdx = STEPS.findIndex(s => !s.done);
             const doneCount = STEPS.filter(s => s.done).length;
-
-            // Detect which step is active based on current URL
             const activeKey = STEPS.find(s => location.pathname.includes(`/${s.link}`))?.key;
 
             return (
@@ -345,20 +341,22 @@ export default function AppShell() {
                     const isCurrent = i === currentIdx;
                     const isActive = step.key === activeKey;
                     return (
-                      <div key={step.key} className="roadmap-step-group" style={{ flex: 1 }}>
+                      <div key={step.key} className="roadmap-step-group">
                         {i > 0 && (
                           <div className={`roadmap-line ${isDone ? "done" : ""}`} />
                         )}
-                        <button
-                          className={`roadmap-dot ${isDone ? "done" : ""} ${isCurrent ? "current" : ""} ${isActive ? "active" : ""}`}
-                          onClick={() => navigate(`/project/${projectId}/${step.link}`)}
-                          title={step.label}
-                        >
-                          {isDone ? "✓" : (i + 1)}
-                        </button>
-                        <span className={`roadmap-label ${isDone ? "done" : ""} ${isActive ? "active" : ""}`}>
-                          {step.label}
-                        </span>
+                        <div className="roadmap-dot-wrap">
+                          <button
+                            className={`roadmap-dot ${isDone ? "done" : ""} ${isCurrent ? "current" : ""} ${isActive ? "active" : ""}`}
+                            onClick={() => navigate(`/project/${projectId}/${step.link}`)}
+                            title={step.label}
+                          >
+                            {isDone ? "✓" : (i + 1)}
+                          </button>
+                          <span className={`roadmap-label ${isDone ? "done" : ""} ${isActive ? "active" : ""}`}>
+                            {step.label}
+                          </span>
+                        </div>
                       </div>
                     );
                   })}
