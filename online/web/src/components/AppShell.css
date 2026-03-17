@@ -4,7 +4,7 @@
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
-  background: var(--surface-page, #F8FAFC);
+  background: var(--surface-page, #BDC4D4);
 }
 
 /* ── Top tab bar ──────────────────────────────────────────────── */
@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   height: 52px;
-  background: #1A2B56;
+  background: #1C2E4A;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   flex-shrink: 0;
   z-index: 100;
@@ -135,7 +135,7 @@
   top: 100%;
   left: 0;
   min-width: 220px;
-  background: #1A2B56;
+  background: #1C2E4A;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
   padding: 8px 0;

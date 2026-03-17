@@ -114,7 +114,7 @@ export default function Dashboard() {
           @keyframes heroFloat1 { 0%,100%{transform:translate(0,0) rotate(0deg)} 50%{transform:translate(12px,-18px) rotate(8deg)} }
           @keyframes heroFloat2 { 0%,100%{transform:translate(0,0) rotate(0deg)} 50%{transform:translate(-14px,12px) rotate(-6deg)} }
           @keyframes heroFloat3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(8px,-10px) scale(1.1)} }
-          @keyframes heroPulse  { 0%,100%{box-shadow:0 0 0 0 rgba(79,70,229,0.3)} 50%{box-shadow:0 0 0 18px rgba(79,70,229,0)} }
+          @keyframes heroPulse  { 0%,100%{box-shadow:0 0 0 0 rgba(28,46,74,0.3)} 50%{box-shadow:0 0 0 18px rgba(28,46,74,0)} }
           @keyframes heroSlide  { from{opacity:0;transform:translateY(26px)} to{opacity:1;transform:translateY(0)} }
           @keyframes ringDraw   { from{stroke-dashoffset:314} to{stroke-dashoffset:314} }
           @keyframes cardHover  { 0%{transform:translateY(0)} 50%{transform:translateY(-3px)} 100%{transform:translateY(0)} }
@@ -127,16 +127,16 @@ export default function Dashboard() {
           display: "flex", flexDirection: "column", alignItems: "center",
           textAlign: "center", padding: "3rem 2rem 2.5rem",
           borderRadius: 24, position: "relative", overflow: "hidden",
-          background: "linear-gradient(145deg, #0F172A 0%, #1E293B 40%, #312E81 100%)",
-          border: "1px solid rgba(99,102,241,0.15)",
-          boxShadow: "0 20px 60px rgba(15,23,42,0.35)",
+          background: "linear-gradient(145deg, #0F1A2B 0%, #1C2E4A 40%, #2B3E55 100%)",
+          border: "1px solid rgba(82,103,125,0.2)",
+          boxShadow: "0 20px 60px rgba(15,26,43,0.35)",
         }}>
           {/* Floating shapes */}
           <div style={{ position:"absolute",top:-30,right:-20,width:140,height:140,borderRadius:"50%",
-            background:"radial-gradient(circle, rgba(99,102,241,0.2) 0%, transparent 70%)",
+            background:"radial-gradient(circle, rgba(82,103,125,0.2) 0%, transparent 70%)",
             animation:"heroFloat1 8s ease-in-out infinite" }} />
           <div style={{ position:"absolute",bottom:-40,left:-30,width:180,height:180,borderRadius:"50%",
-            background:"radial-gradient(circle, rgba(20,184,166,0.15) 0%, transparent 70%)",
+            background:"radial-gradient(circle, rgba(82,103,125,0.15) 0%, transparent 70%)",
             animation:"heroFloat2 10s ease-in-out infinite" }} />
           <div style={{ position:"absolute",top:40,left:"15%",width:60,height:60,borderRadius:16,
             background:"rgba(245,158,11,0.1)", transform:"rotate(20deg)",
@@ -148,9 +148,9 @@ export default function Dashboard() {
           {/* Shield logo with pulse */}
           <div style={{
             width: 80, height: 80, borderRadius: 20, marginBottom: 24,
-            background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 50%, #4338CA 100%)",
+            background: "linear-gradient(135deg, #1C2E4A 0%, #52677D 50%, #1C2E4A 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 8px 32px rgba(99,102,241,0.4)",
+            boxShadow: "0 8px 32px rgba(28,46,74,0.4)",
             animation: "heroSlide 0.6s ease, heroPulse 3s ease-in-out infinite 1s",
           }}>
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
@@ -165,7 +165,7 @@ export default function Dashboard() {
             letterSpacing: "-0.03em", lineHeight: 1.2,
             animation: "heroSlide 0.6s ease 0.1s both",
           }}>
-            Welcome to <span style={{ color:"#818CF8" }}>Myzynca</span>
+            Welcome to <span style={{ color:"#BDC4D4" }}>Myzynca</span>
           </h1>
           <p style={{
             margin: "0.6rem 0 0", fontSize: "1rem", color: "rgba(255,255,255,0.55)",
@@ -182,7 +182,7 @@ export default function Dashboard() {
           }}>
             <svg width="100" height="100" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
-              <circle cx="50" cy="50" r="42" fill="none" stroke="#6366F1" strokeWidth="8"
+              <circle cx="50" cy="50" r="42" fill="none" stroke="#52677D" strokeWidth="8"
                 strokeDasharray="264" strokeDashoffset="264"
                 strokeLinecap="round" transform="rotate(-90 50 50)"
                 style={{ transition: "stroke-dashoffset 1.5s ease" }} />
@@ -206,9 +206,9 @@ export default function Dashboard() {
               style={{
                 fontSize: "0.95rem", padding: "0.75rem 1.8rem", fontWeight: 700,
                 borderRadius: 12, border: "none", cursor: "pointer",
-                background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
-                color: "#fff", fontFamily: "var(--font-sans)",
-                boxShadow: "0 6px 24px rgba(99,102,241,0.4)",
+                background: "linear-gradient(135deg, #1C2E4A 0%, #0F1A2B 100%)",
+                color: "#BDC4D4", fontFamily: "var(--font-sans)",
+                boxShadow: "0 6px 24px rgba(28,46,74,0.4)",
                 transition: "all 0.2s",
               }}>
               ✨ Create Your First Timetable

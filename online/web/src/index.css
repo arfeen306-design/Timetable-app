@@ -60,10 +60,10 @@ a:hover { text-decoration: underline; color: var(--blue-600); }
 }
 .sidebar-logo-icon {
   width: 32px; height: 32px; border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #3B82F6, #2563EB);
+  background: linear-gradient(135deg, #1C2E4A, #0F1A2B);
   display: flex; align-items: center; justify-content: center;
   font-size: 0.9rem;
-  box-shadow: 0 2px 8px rgba(59,130,246,0.3);
+  box-shadow: 0 2px 8px rgba(28,46,74,0.3);
 }
 .sidebar-logo-text {
   font-size: 1.05rem; font-weight: 800; color: #fff;
@@ -231,7 +231,7 @@ table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .data-table tbody tr:hover { background: var(--slate-50); }
 .data-table tbody tr.selected { background: var(--blue-50); }
 th, td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--slate-100); }
-th { background: var(--primary-600); font-weight: 600; color: #fff; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+th { background: #1C2E4A; font-weight: 600; color: #BDC4D4; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* ═══════ Alerts ═══════ */
 .error { color: var(--danger-600); font-size: 0.82rem; margin-top: 0.25rem; }

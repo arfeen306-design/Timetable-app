@@ -9,18 +9,17 @@
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
 
-  /* ── Slate palette (backgrounds, text, borders) ── */
-  --slate-50:  #f8fafc;
-  --slate-100: #f1f5f9;
-  --slate-200: #e2e8f0;
-  --slate-300: #cbd5e1;
-  --slate-400: #94a3b8;
-  --slate-500: #64748b;
-  --slate-600: #475569;
-  --slate-700: #334155;
-  --slate-800: #1B2838;
-  --slate-900: #131E2E;
-  --slate-950: #0C1520;
+  --slate-50:  #E8ECF2;
+  --slate-100: #D5DBE5;
+  --slate-200: #BDC4D4;
+  --slate-300: #8E9BB2;
+  --slate-400: #6B7A94;
+  --slate-500: #52677D;
+  --slate-600: #3D4F66;
+  --slate-700: #2B3E55;
+  --slate-800: #1C2E4A;
+  --slate-900: #0F1A2B;
+  --slate-950: #080F1A;
 
   /* ── Primary (Cobalt Blue) ── */
   --primary-50:  #eff6ff;
@@ -55,20 +54,20 @@
   --color-brand-dark:   var(--primary-700);
 
   /* ── Surfaces ── */
-  --surface-page:       #F7FAFC;
+  --surface-page:       #BDC4D4;
   --surface-card:       #FFFFFF;
-  --surface-raised:     #F1F5F9;
+  --surface-raised:     #D5DBE5;
 
   /* ── Text ── */
-  --text-primary:       #0F172A;
-  --text-secondary:     #475569;
-  --text-muted:         #94A3B8;
-  --text-hint:          #CBD5E1;
+  --text-primary:       #0F1A2B;
+  --text-secondary:     #3D4F66;
+  --text-muted:         #6B7A94;
+  --text-hint:          #8E9BB2;
 
   /* ── Borders ── */
-  --border-subtle:      #F1F5F9;
-  --border-default:     #E2E8F0;
-  --border-strong:      #CBD5E1;
+  --border-subtle:      #D5DBE5;
+  --border-default:     #BDC4D4;
+  --border-strong:      #8E9BB2;
 
   /* ── Semantic colors ── */
   --success-50:  #f0fdf4;
@@ -150,18 +149,18 @@
 
   /* ── Sidebar ── */
   --sidebar-w:     240px;
-  --sidebar-bg:    #1A2B56;
-  --sidebar-text:  #8899AA;
-  --sidebar-hover: rgba(255,255,255,0.08);
-  --sidebar-active-bg:   rgba(56,132,255,0.15);
-  --sidebar-active-text: #60A5FA;
-  --sidebar-active-pill: #3B82F6;
+  --sidebar-bg:    #1C2E4A;
+  --sidebar-text:  #BDC4D4;
+  --sidebar-hover: rgba(189,196,212,0.10);
+  --sidebar-active-bg:   rgba(189,196,212,0.15);
+  --sidebar-active-text: #FFFFFF;
+  --sidebar-active-pill: #BDC4D4;
 
   /* ── Layout ── */
   --topbar-h:     48px;
-  --content-bg:   var(--slate-50);
+  --content-bg:   #BDC4D4;
   --card-bg:      #fff;
-  --card-border:  rgba(0,0,0,0.04);
+  --card-border:  rgba(28,46,74,0.08);
 
   /* ── Transitions ── */
   --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
