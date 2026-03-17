@@ -657,31 +657,21 @@ def export_substitution_pdf(
     project=Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
-    """Generate daily substitution PDF."""
-    from io import BytesIO
-    from datetime import datetime as dt_mod
-    from fastapi.responses import Response
+    """Generate daily substitution PDF using shared PDFEngine."""
     from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from backend.models.school import School, SchoolMembership
-    from backend.models.project import Project
+    from reportlab.platypus import Paragraph, Spacer
+    from utils.pdf_engine import PDFEngine
 
     target_date = date.fromisoformat(dt)
     wk_number = resolve_week_number(target_date)
-    academic_year = f"{target_date.year}-{str(target_date.year + 1)[-2:]}" if target_date.month >= 8 else f"{target_date.year - 1}-{str(target_date.year)[-2:]}"
+    academic_year = (
+        f"{target_date.year}-{str(target_date.year + 1)[-2:]}"
+        if target_date.month >= 8
+        else f"{target_date.year - 1}-{str(target_date.year)[-2:]}"
+    )
 
-    # Get school name
-    proj = db.query(Project).filter(Project.id == project_id).first()
-    school_name = "School"
-    if proj:
-        membership = db.query(SchoolMembership).filter(SchoolMembership.user_id == proj.user_id).first()
-        if membership:
-            school = db.query(School).filter(School.id == membership.school_id).first()
-            if school:
-                school_name = school.name or "School"
+    engine = PDFEngine(db, project)
 
     # Get absences + substitutions
     absences = db.query(TeacherAbsence).filter(
@@ -694,7 +684,6 @@ def export_substitution_pdf(
         Substitution.date == target_date,
     ).order_by(Substitution.period_index).all()
 
-    # Group subs by absent teacher
     subs_by_teacher: dict[int, list] = {}
     for s in all_subs:
         subs_by_teacher.setdefault(s.absent_teacher_id, []).append(s)
@@ -714,26 +703,13 @@ def export_substitution_pdf(
         .all()
     )
 
-    # Build PDF
-    buf = BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15*mm, rightMargin=15*mm, topMargin=15*mm, bottomMargin=15*mm)
-    styles = getSampleStyleSheet()
-    elements = []
-
-    # Title style
-    title_style = ParagraphStyle("title", parent=styles["Heading1"], fontSize=14, spaceAfter=2*mm)
-    subtitle_style = ParagraphStyle("subtitle", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#6366f1"))
-    small_style = ParagraphStyle("small", parent=styles["Normal"], fontSize=8, textColor=colors.grey)
-    normal_style = ParagraphStyle("normal", parent=styles["Normal"], fontSize=9)
-
-    # Header
-    elements.append(Paragraph(f"<b>{school_name}</b>", title_style))
-    elements.append(Paragraph("Daily Substitution Schedule", subtitle_style))
-    elements.append(Spacer(1, 2*mm))
-    date_str = target_date.strftime("%d/%m/%Y")
-    now_str = dt_mod.now().strftime("%d/%m/%Y %I:%M %p")
-    elements.append(Paragraph(f"Academic Year {academic_year} · Week {wk_number} &nbsp;&nbsp; | &nbsp;&nbsp; Generated: {now_str}", small_style))
-    elements.append(Spacer(1, 5*mm))
+    # Build story
+    date_str = target_date.strftime("%A, %d %B %Y")
+    story = engine.header(
+        "Daily Substitution Schedule",
+        subtitle=f"Academic Year {academic_year} · Week {wk_number}",
+        date_str=date_str,
+    )
 
     # Absent teachers summary
     if absences:
@@ -742,9 +718,9 @@ def export_substitution_pdf(
             tname = f"{a.teacher.first_name} {a.teacher.last_name}".strip() if a.teacher else ""
             absent_parts.append(f"• {tname} — {a.reason or 'No reason'}")
         absent_text = "&nbsp;&nbsp;&nbsp;".join(absent_parts)
-        elements.append(Paragraph(f'<font color="#dc2626"><b>TEACHERS ABSENT TODAY</b></font>', normal_style))
-        elements.append(Paragraph(f'<font color="#dc2626">{absent_text}</font>', small_style))
-        elements.append(Spacer(1, 5*mm))
+        story.append(Paragraph(f'<font color="#dc2626"><b>TEACHERS ABSENT TODAY</b></font>', engine.body_style))
+        story.append(Paragraph(f'<font color="#dc2626">{absent_text}</font>', engine.small_style))
+        story.append(Spacer(1, 5 * mm))
 
     # Per-teacher tables
     for absence in absences:
@@ -754,15 +730,17 @@ def export_substitution_pdf(
         tname = f"{teacher.first_name} {teacher.last_name}".strip()
         teacher_subs = subs_by_teacher.get(teacher.id, [])
 
-        elements.append(Paragraph(f"<b>{tname}</b> &nbsp; <font color='#6366f1'>{absence.reason or ''}</font>", normal_style))
-        elements.append(Spacer(1, 2*mm))
+        story.append(Paragraph(
+            f"<b>{tname}</b> &nbsp; <font color='#6366f1'>{absence.reason or ''}</font>",
+            engine.body_style,
+        ))
+        story.append(Spacer(1, 2 * mm))
 
         if not teacher_subs:
-            elements.append(Paragraph("<i>No substitutions assigned</i>", small_style))
-            elements.append(Spacer(1, 5*mm))
+            story.append(Paragraph("<i>No substitutions assigned</i>", engine.small_style))
+            story.append(Spacer(1, 5 * mm))
             continue
 
-        # Table header
         header = ["PERIOD", "CLASS", "ROOM", "SUBSTITUTED BY", "SUB'S SUBJECT", "SUBS THIS WEEK"]
         rows = [header]
 
@@ -774,13 +752,11 @@ def export_substitution_pdf(
                 subj = db.query(SubjectModel).filter(SubjectModel.id == s.lesson.subject_id).first()
                 sub_subject = subj.name if subj else ""
 
-            # Class name
             class_name = ""
             if s.lesson and s.lesson.class_id:
                 cls = db.query(SchoolClass).filter(SchoolClass.id == s.lesson.class_id).first()
                 class_name = cls.name if cls else ""
 
-            # Room name
             room_name = ""
             if s.room_id:
                 room = db.query(Room).filter(Room.id == s.room_id).first()
@@ -790,8 +766,6 @@ def export_substitution_pdf(
             subs_label = f"{stw} of 2"
             if s.is_override:
                 subs_label = f"{stw} of 2 ⚠"
-
-            if s.is_override:
                 sub_name = f"{sub_name}\nOVERRIDE"
 
             rows.append([
@@ -803,65 +777,25 @@ def export_substitution_pdf(
                 subs_label,
             ])
 
-        col_widths = [35, 65, 55, 110, 80, 70]
-        t = Table(rows, colWidths=col_widths)
-
-        style_cmds = [
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#64748b")),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("FONTSIZE", (0, 0), (-1, 0), 7),
-            ("ALIGN", (0, 0), (-1, 0), "LEFT"),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ]
-
-        # Color override rows red
+        # Build extra styles for overrides and period column coloring
+        extra = []
         for i, s in enumerate(teacher_subs):
             if s.is_override:
-                style_cmds.append(("TEXTCOLOR", (3, i + 1), (3, i + 1), colors.HexColor("#dc2626")))
-                style_cmds.append(("FONTNAME", (3, i + 1), (3, i + 1), "Helvetica-Bold"))
-                style_cmds.append(("TEXTCOLOR", (5, i + 1), (5, i + 1), colors.HexColor("#dc2626")))
-
-        # Color period column
+                extra.append(("TEXTCOLOR", (3, i + 1), (3, i + 1), colors.HexColor("#dc2626")))
+                extra.append(("FONTNAME", (3, i + 1), (3, i + 1), "Helvetica-Bold"))
+                extra.append(("TEXTCOLOR", (5, i + 1), (5, i + 1), colors.HexColor("#dc2626")))
         for i in range(1, len(rows)):
-            style_cmds.append(("TEXTCOLOR", (0, i), (0, i), colors.HexColor("#6366f1")))
-            style_cmds.append(("FONTNAME", (0, i), (0, i), "Helvetica-Bold"))
+            extra.append(("TEXTCOLOR", (0, i), (0, i), colors.HexColor("#6366f1")))
+            extra.append(("FONTNAME", (0, i), (0, i), "Helvetica-Bold"))
 
-        t.setStyle(TableStyle(style_cmds))
-        elements.append(t)
-        elements.append(Spacer(1, 6*mm))
+        col_widths = [35, 65, 55, 110, 80, 70]
+        tbl = engine.smart_fit_table(rows, col_widths, extra_styles=extra)
+        story.append(tbl)
+        story.append(Spacer(1, 6 * mm))
 
-    # Signature lines
-    elements.append(Spacer(1, 15*mm))
-    sig_data = [["", "", ""], ["_" * 25, "_" * 25, "_" * 25], ["Prepared by", "Vice Principal / HOD", "Principal"]]
-    sig_table = Table(sig_data, colWidths=[140, 140, 140])
-    sig_table.setStyle(TableStyle([
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("TEXTCOLOR", (0, 2), (-1, 2), colors.grey),
-        ("TOPPADDING", (0, 0), (-1, -1), 2),
-    ]))
-    elements.append(sig_table)
-
-    # Footer
-    elements.append(Spacer(1, 8*mm))
-    elements.append(Paragraph(f"Schedulr — School OS · Generated automatically &nbsp;&nbsp;&nbsp;&nbsp; Page 1 of 1", small_style))
-
-    from utils.pdf_branding import MyznycaBrandingFlowable
-    from reportlab.lib.units import cm
-    elements.append(Spacer(1, 0.4 * cm))
-    elements.append(MyznycaBrandingFlowable())
-    doc.build(elements)
-    pdf_bytes = buf.getvalue()
+    story += engine.signature_block()
+    story += engine.footer()
 
     filename = f"substitution_{target_date.strftime('%d-%m-%Y')}.pdf"
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
+    return engine.build(story, filename=filename)
+

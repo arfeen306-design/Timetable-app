@@ -601,14 +601,11 @@ def export_exam_duties_pdf(
         except ValueError:
             raise HTTPException(422, "date must be YYYY-MM-DD")
 
-    try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib import colors
-        from reportlab.lib.units import mm
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    except ImportError:
-        raise HTTPException(501, "reportlab not installed on server.")
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Spacer
+    from utils.pdf_engine import PDFEngine
+
+    engine = PDFEngine(db, project)
 
     q = db.query(ExamSession).filter(ExamSession.project_id == project.id)
     if date_obj:
@@ -620,23 +617,15 @@ def export_exam_duties_pdf(
     room_map = {r.id: r for r in db.query(Room).filter(Room.project_id == project.id).all()}
     teach_map = {t.id: t for t in db.query(Teacher).filter(Teacher.project_id == project.id).all()}
 
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=20*mm, rightMargin=20*mm,
-                            topMargin=20*mm, bottomMargin=20*mm)
-    styles = getSampleStyleSheet()
-    title_s = ParagraphStyle("T", parent=styles["Heading1"], fontSize=14, spaceAfter=2)
-    sub_s   = ParagraphStyle("S", parent=styles["Normal"],   fontSize=9,  spaceAfter=8, textColor=colors.grey)
     date_label = date_obj.strftime('%A, %d %B %Y') if date_obj else "All Sessions"
-    story   = [
-        Paragraph(f"{project.name} — Exam Duty Roster", title_s),
-        Paragraph(date_label, sub_s),
-    ]
+    story = engine.header("Exam Duty Roster", date_str=date_label)
 
     if not sessions:
-        story.append(Paragraph("No exam sessions found.", styles["Normal"]))
+        from reportlab.platypus import Paragraph
+        story.append(Paragraph("No exam sessions found.", engine.body_style))
     else:
         header = ["Paper", "Room", "Teacher", "Time"]
-        rows   = [header]
+        rows = [header]
         for sess in sessions:
             subj = subj_map.get(sess.subject_id)
             subj_name = subj.name if subj else f"Subject #{sess.subject_id}"
@@ -657,32 +646,12 @@ def export_exam_duties_pdf(
                         time_label if i == 0 else "",
                     ])
 
-        col_w = [55*mm, 40*mm, 60*mm, 30*mm]
-        tbl = Table(rows, colWidths=col_w, repeatRows=1)
-        tbl.setStyle(TableStyle([
-            ("BACKGROUND",  (0, 0), (-1, 0),  colors.HexColor("#4f46e5")),
-            ("TEXTCOLOR",   (0, 0), (-1, 0),  colors.white),
-            ("FONTNAME",    (0, 0), (-1, 0),  "Helvetica-Bold"),
-            ("FONTSIZE",    (0, 0), (-1, -1), 9),
-            ("ALIGN",       (0, 0), (-1, -1), "LEFT"),
-            ("VALIGN",      (0, 0), (-1, -1), "MIDDLE"),
-            ("ROWPADDING",  (0, 0), (-1, -1), 5),
-            ("GRID",        (0, 0), (-1, -1), 0.4, colors.HexColor("#e2e8f0")),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
-        ]))
-        story.extend([Spacer(1, 4*mm), tbl, Spacer(1, 12*mm)])
-        story.append(Paragraph(
-            f"Signature: _________________ &nbsp;&nbsp; (Principal) &nbsp;&nbsp;&nbsp;&nbsp;"
-            f"Generated: {_dt.datetime.utcnow().strftime('%d %b %Y %H:%M')} UTC",
-            styles["Normal"]
-        ))
+        col_w = [55 * mm, 40 * mm, 60 * mm, 30 * mm]
+        tbl = engine.smart_fit_table(rows, col_w)
+        story.extend([Spacer(1, 4 * mm), tbl])
 
-    from utils.pdf_branding import MyznycaBrandingFlowable
-    from reportlab.lib.units import cm
-    story.append(Spacer(1, 0.4 * cm))
-    story.append(MyznycaBrandingFlowable())
-    doc.build(story)
-    buf.seek(0)
-    fname = f"exam_duties_{date}.pdf"
-    return StreamingResponse(buf, media_type="application/pdf",
-                             headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+    story += engine.signature_block()
+    story += engine.footer()
+
+    fname = f"exam_duties_{date or 'all'}.pdf"
+    return engine.build(story, filename=fname)

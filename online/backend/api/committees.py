@@ -95,16 +95,11 @@ def export_committees_pdf(
     project: Project = Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
-    try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib import colors
-        from reportlab.lib.units import mm
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    except ImportError:
-        raise HTTPException(501, "reportlab not installed on server.")
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Paragraph, Spacer
+    from utils.pdf_engine import PDFEngine
 
-    from utils.pdf_branding import MyznycaBrandingFlowable
+    engine = PDFEngine(db, project)
 
     committees = (
         db.query(Committee)
@@ -114,41 +109,20 @@ def export_committees_pdf(
     )
     teach_map = {t.id: t for t in db.query(Teacher).filter(Teacher.project_id == project.id).all()}
 
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=20*mm, rightMargin=20*mm,
-                            topMargin=20*mm, bottomMargin=20*mm)
-    styles = getSampleStyleSheet()
-    INDIGO = colors.HexColor("#4F46E5")
-    SLATE  = colors.HexColor("#0F172A")
-    MUTED  = colors.HexColor("#475569")
-    LIGHT  = colors.HexColor("#EEF2FF")
-
-    title_s = ParagraphStyle("T", parent=styles["Normal"], fontSize=16, fontName="Helvetica-Bold",
-                              textColor=SLATE, spaceAfter=2)
-    sub_s   = ParagraphStyle("S", parent=styles["Normal"], fontSize=9, fontName="Helvetica",
-                              textColor=MUTED, spaceAfter=8)
-    comm_s  = ParagraphStyle("C", parent=styles["Normal"], fontSize=11, fontName="Helvetica-Bold",
-                              textColor=SLATE, spaceBefore=8, spaceAfter=3)
-    body_s  = ParagraphStyle("B", parent=styles["Normal"], fontSize=9, fontName="Helvetica",
-                              textColor=SLATE, leading=13)
-
-    story = [
-        Paragraph(f"{project.name}", title_s),
-        Paragraph(f"School Committees  ·  {_dt.date.today().strftime('%d %B %Y')}", sub_s),
-    ]
+    story = engine.header("School Committees")
 
     if not committees:
-        story.append(Paragraph("No committees found.", body_s))
+        story.append(Paragraph("No committees found.", engine.body_style))
     else:
         for committee in committees:
-            story.append(Paragraph(committee.name, comm_s))
+            story.append(Paragraph(committee.name, engine.section_style))
             if committee.description:
-                story.append(Paragraph(committee.description, body_s))
-                story.append(Spacer(1, 2*mm))
+                story.append(Paragraph(committee.description, engine.body_style))
+                story.append(Spacer(1, 2 * mm))
 
             if not committee.members:
-                story.append(Paragraph("No members assigned.", body_s))
-                story.append(Spacer(1, 3*mm))
+                story.append(Paragraph("No members assigned.", engine.body_style))
+                story.append(Spacer(1, 3 * mm))
                 continue
 
             table_data = [["#", "Teacher", "Role"]]
@@ -157,33 +131,16 @@ def export_committees_pdf(
                 tname = f"{t.first_name} {t.last_name}".strip() if t else f"Teacher #{member.teacher_id}"
                 table_data.append([str(i), tname, member.role or "Member"])
 
-            col_w = [12*mm, 110*mm, 50*mm]
-            tbl = Table(table_data, colWidths=col_w, repeatRows=1)
-            tbl.setStyle(TableStyle([
-                ("BACKGROUND",    (0,0),(-1,0), INDIGO),
-                ("TEXTCOLOR",     (0,0),(-1,0), colors.white),
-                ("FONTNAME",      (0,0),(-1,0), "Helvetica-Bold"),
-                ("FONTSIZE",      (0,0),(-1,-1), 9),
-                ("ALIGN",         (0,0),(0,-1),  "CENTER"),
-                ("TOPPADDING",    (0,0),(-1,-1), 5),
-                ("BOTTOMPADDING", (0,0),(-1,-1), 5),
-                ("LEFTPADDING",   (0,0),(-1,-1), 8),
-                ("BACKGROUND",    (0,1),(0,-1),  LIGHT),
-                ("GRID",          (0,0),(-1,-1), 0.5, colors.HexColor("#E2E8F0")),
-                *[("BACKGROUND",  (0,r),(-1,r), colors.HexColor("#F8FAFC"))
-                  for r in range(2, len(table_data), 2)],
-            ]))
+            col_w = [12 * mm, 110 * mm, 50 * mm]
+            tbl = engine.table(table_data, col_w)
             story.append(tbl)
-            story.append(Spacer(1, 4*mm))
+            story.append(Spacer(1, 4 * mm))
 
-    story.append(Spacer(1, 4*mm))
-    story.append(MyznycaBrandingFlowable())
+    story += engine.signature_block()
+    story += engine.footer()
 
-    doc.build(story)
-    buf.seek(0)
-    fname = f"committees_{project.name.replace(' ','_')}.pdf"
-    return StreamingResponse(buf, media_type="application/pdf",
-                             headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+    fname = f"committees_{project.name.replace(' ', '_')}.pdf"
+    return engine.build(story, filename=fname)
 
 
 @router.get("/{committee_id}", response_model=CommitteeResponse)
