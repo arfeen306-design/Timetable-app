@@ -13,7 +13,7 @@ interface Props {
   teachers: Teacher[];
   classes: SchoolClass[];
   rooms: Room[];
-  settings: { days_per_week: number; periods_per_day: number } | null;
+  settings: { days_per_week: number; periods_per_day: number; weekend_days?: string; bell_schedule_json?: string } | null;
   onChange: (c: Constraint[]) => void;
   onNext: () => void;
 }
@@ -33,9 +33,36 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
-  const numDays = settings?.days_per_week ?? 5;
   const numPeriods = settings?.periods_per_day ?? 7;
-  const days = DAY_NAMES.slice(0, numDays);
+
+  // Compute working day indices: start with 0..days_per_week-1, exclude weekends, include exceptional day
+  const workingDayIndices = useMemo(() => {
+    let maxDay = (settings?.days_per_week ?? 5) - 1;
+
+    // Parse weekend days
+    const weekendSet = new Set<number>();
+    const wd = settings?.weekend_days || "5,6";
+    wd.split(",").filter(Boolean).forEach(d => weekendSet.add(parseInt(d.trim())));
+
+    // Parse exceptional day from bell_schedule_json
+    let exceptionalDayIdx = -1;
+    try {
+      const bell = JSON.parse(settings?.bell_schedule_json || "{}");
+      if (bell.friday_different) {
+        exceptionalDayIdx = bell.friday_day_index ?? 4;
+        if (exceptionalDayIdx > maxDay) maxDay = exceptionalDayIdx;
+      }
+    } catch { /* ignore */ }
+
+    // Build working day indices: 0..maxDay, excluding weekends
+    const indices: number[] = [];
+    for (let d = 0; d <= maxDay; d++) {
+      if (!weekendSet.has(d)) indices.push(d);
+    }
+    return indices;
+  }, [settings]);
+
+  const days = workingDayIndices.map(i => DAY_NAMES[i] || `Day${i + 1}`);
 
   /* ── Entity list ── */
   const entityList = useMemo(() => {
@@ -237,8 +264,8 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
               <thead>
                 <tr>
                   <th style={{ textAlign: "left", minWidth: 160 }}></th>
-                  {days.map((d, i) => (
-                    <th key={i} style={{ textAlign: "center", minWidth: 70 }}>{d}</th>
+                  {workingDayIndices.map((dayIdx, ci) => (
+                    <th key={dayIdx} style={{ textAlign: "center", minWidth: 70 }}>{days[ci]}</th>
                   ))}
                 </tr>
               </thead>
@@ -246,7 +273,7 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
                 {/* Unavailable whole day row */}
                 <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
                   <td style={{ fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Unavailable whole day</td>
-                  {days.map((_, dayIdx) => (
+                  {workingDayIndices.map((dayIdx) => (
                     <td key={dayIdx} style={{ textAlign: "center" }}>
                       <input type="checkbox" checked={isWholeDayUnavailable(dayIdx)} onChange={() => toggleWholeDay(dayIdx)}
                         style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#3b82f6" }} />
@@ -257,7 +284,7 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
                 {Array.from({ length: numPeriods }, (_, pIdx) => (
                   <tr key={pIdx}>
                     <td style={{ fontWeight: 500, color: "#334155", fontSize: "0.9rem" }}>Lesson {pIdx + 1}</td>
-                    {days.map((_, dayIdx) => (
+                    {workingDayIndices.map((dayIdx) => (
                       <td key={dayIdx} style={{ textAlign: "center" }}>
                         <input type="checkbox" checked={isAvailable(dayIdx, pIdx)} onChange={() => toggleSlot(dayIdx, pIdx)}
                           style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#3b82f6" }} />
