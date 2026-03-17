@@ -113,8 +113,7 @@ def get_project_counts(
     from backend.models.class_model import SchoolClass
     from backend.models.lesson_model import Lesson
     from backend.models.timetable_model import TimetableRun
-
-    # Subject is in project.py itself
+    from backend.models.project import Subject
     teachers = db.query(Teacher).filter(Teacher.project_id == project_id).count()
     subjects = db.query(Subject).filter(Subject.project_id == project_id).count()
     classes = db.query(SchoolClass).filter(SchoolClass.project_id == project_id).count()
