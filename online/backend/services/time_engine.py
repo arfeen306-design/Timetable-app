@@ -86,13 +86,15 @@ def generate_period_slots_for_day(
     bell = _parse_bell_schedule(bell_schedule_json)
 
     # ── Determine start time and per-lesson durations for this day ────────
-    if is_saturday and saturday_start_time and saturday_end_time:
-        start_min = _parse_time(saturday_start_time)
-        end_min = _parse_time(saturday_end_time)
-    elif is_friday and bell.get("friday_different"):
+    if is_friday and bell.get("friday_different"):
+        # Exceptional day: use bell_schedule_json settings
         fp_start = bell.get("friday_first_period_start")
         start_min = _parse_time(fp_start) if fp_start else _parse_time(friday_start_time or school_start_time)
         end_min = _parse_time(friday_end_time or school_end_time)
+    elif is_saturday and saturday_start_time and saturday_end_time:
+        # Legacy Saturday override (deprecated — prefer bell_schedule_json)
+        start_min = _parse_time(saturday_start_time)
+        end_min = _parse_time(saturday_end_time)
     else:
         fp_start = bell.get("first_period_start")
         start_min = _parse_time(fp_start) if fp_start else _parse_time(school_start_time)
@@ -132,7 +134,12 @@ def generate_period_slots_for_day(
             break_after[ap] = b
 
     # ── How many periods? ────────────────────────────────────────────────
-    max_periods = periods_per_day if periods_per_day > 0 else 50
+    if is_friday and bell.get("friday_different"):
+        # Use exceptional day's period count
+        fri_pcount = bell.get("friday_periods_per_day")
+        max_periods = int(fri_pcount) if fri_pcount else (periods_per_day if periods_per_day > 0 else 50)
+    else:
+        max_periods = periods_per_day if periods_per_day > 0 else 50
 
     # ── Generate slots ───────────────────────────────────────────────────
     result: List[PeriodSlot] = []
@@ -191,7 +198,7 @@ def generate_week_slots(settings: dict) -> dict:
               breaks_json, bell_schedule_json, friday_start_time, friday_end_time,
               saturday_start_time, saturday_end_time, working_days, periods_per_day.
     """
-    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     working = set()
     wd = settings.get("working_days") or "1,2,3,4,5"
     for x in str(wd).split(","):
@@ -200,10 +207,16 @@ def generate_week_slots(settings: dict) -> dict:
         except ValueError:
             pass
 
+    # Determine exceptional day from bell_schedule_json
+    bell_raw = settings.get("bell_schedule_json") or "{}"
+    bell = _parse_bell_schedule(bell_raw)
+    exceptional_day_idx = bell.get("friday_day_index", 4) if bell.get("friday_different") else -1
+
     days_out = []
-    for day_index in range(6):
+    for day_index in range(7):
         if day_index not in working:
             continue
+        is_exceptional = (day_index == exceptional_day_idx)
         slots = generate_period_slots_for_day(
             day_index=day_index,
             school_start_time=settings.get("school_start_time") or "08:00",
@@ -211,17 +224,17 @@ def generate_week_slots(settings: dict) -> dict:
             period_duration_minutes=int(settings.get("period_duration_minutes") or 45),
             breaks_json=settings.get("breaks_json") or "[]",
             periods_per_day=int(settings.get("periods_per_day") or 0),
-            bell_schedule_json=settings.get("bell_schedule_json") or "{}",
+            bell_schedule_json=bell_raw,
             friday_start_time=settings.get("friday_start_time"),
             friday_end_time=settings.get("friday_end_time"),
-            is_friday=(day_index == 4),
-            is_saturday=(day_index == 5),
+            is_friday=is_exceptional,
+            is_saturday=False,
             saturday_start_time=settings.get("saturday_start_time"),
             saturday_end_time=settings.get("saturday_end_time"),
         )
         days_out.append({
             "day_index": day_index,
-            "day_name": day_names[day_index],
+            "day_name": day_names[day_index] if day_index < len(day_names) else f"Day {day_index + 1}",
             "slots": [
                 {
                     "period_index": s.period_index,

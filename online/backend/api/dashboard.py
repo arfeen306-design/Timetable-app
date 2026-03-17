@@ -56,15 +56,14 @@ def get_dashboard(
 
     # ── Weekend / Holiday detection ──
     weekend_days_str = getattr(settings, 'weekend_days', '5,6') or '5,6'
-    python_weekday = today.weekday()  # 0=Mon..6=Sun
-    settings_day = (python_weekday + 1) % 7  # 0=Sun, 1=Mon, ..., 6=Sat
+    python_weekday = today.weekday()  # 0=Mon..6=Sun — matches weekend_days encoding
     weekend_set = set()
     for wd in weekend_days_str.split(','):
         try:
             weekend_set.add(int(wd.strip()))
         except ValueError:
             pass
-    is_off_day = settings_day in weekend_set
+    is_off_day = python_weekday in weekend_set
 
     # ── Generate real lesson slots from bell schedule ──
     from backend.services.time_engine import generate_period_slots_for_day
@@ -73,6 +72,17 @@ def get_dashboard(
     current_lesson_start = ""
     current_lesson_end = ""
 
+    # ── Determine exceptional day from bell_schedule_json ──
+    import json as _json
+    _bell = {}
+    try:
+        _bell_raw = getattr(settings, 'bell_schedule_json', '{}') or '{}'
+        _bell = _json.loads(_bell_raw) if isinstance(_bell_raw, str) else (_bell_raw if isinstance(_bell_raw, dict) else {})
+    except Exception:
+        pass
+    _exceptional_day_idx = _bell.get('friday_day_index', 4) if _bell.get('friday_different') else -1
+    _is_exceptional_day = (python_weekday == _exceptional_day_idx)
+
     if not is_off_day:
         slots = generate_period_slots_for_day(
             day_index=python_weekday,
@@ -80,10 +90,12 @@ def get_dashboard(
             school_end_time=getattr(settings, 'school_end_time', '15:00') or '15:00',
             period_duration_minutes=getattr(settings, 'period_duration_minutes', 45) or 45,
             breaks_json=getattr(settings, 'breaks_json', '[]') or '[]',
+            periods_per_day=num_periods,
+            bell_schedule_json=_bell_raw,
             friday_start_time=getattr(settings, 'friday_start_time', None),
             friday_end_time=getattr(settings, 'friday_end_time', None),
-            is_friday=(python_weekday == 4),
-            is_saturday=(python_weekday == 5),
+            is_friday=_is_exceptional_day,
+            is_saturday=False,  # deprecated: exceptional day handled via is_friday
             saturday_start_time=getattr(settings, 'saturday_start_time', None),
             saturday_end_time=getattr(settings, 'saturday_end_time', None),
         )
