@@ -10,13 +10,22 @@ from backend.config import get_settings
 settings = get_settings()
 _url = settings.database_url
 _connect_args = {}
+_pool_kwargs = {}
 if _url.startswith("sqlite"):
     _connect_args["check_same_thread"] = False
+else:
+    # PostgreSQL pool tuning for multi-user
+    _pool_kwargs = {
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_recycle": 300,
+    }
 engine = create_engine(
     _url,
     pool_pre_ping=True,
     echo=settings.debug,
     connect_args=_connect_args,
+    **_pool_kwargs,
 )
 Base = declarative_base()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

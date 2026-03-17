@@ -1,11 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  listTeachers,
-  listSubjects,
-  listClasses,
-  listLessons,
-  getTimetableHistory,
-} from "../api";
+import { getProjectCounts } from "../api";
 
 export interface ProjectProgress {
   teachers: number;
@@ -68,32 +62,30 @@ export function useProjectProgress(projectId: number | undefined): ProjectProgre
       setData((prev) => ({ ...prev, loading: true }));
     }
 
-    Promise.all([
-      listTeachers(projectId).catch(() => []),
-      listSubjects(projectId).catch(() => []),
-      listClasses(projectId).catch(() => []),
-      listLessons(projectId).catch(() => []),
-      getTimetableHistory(projectId).catch(() => []),
-    ]).then(([t, s, c, l, h]) => {
-      const teachers = Array.isArray(t) ? t.length : 0;
-      const subjects = Array.isArray(s) ? s.length : 0;
-      const classes = Array.isArray(c) ? c.length : 0;
-      const lessons = Array.isArray(l) ? l.length : 0;
-      const hasGenerated = Array.isArray(h) && h.length > 0;
+    // Single fast API call instead of 5 list calls
+    getProjectCounts(projectId)
+      .then((counts) => {
+        const { teachers, subjects, classes, lessons, has_generated: hasGenerated } = counts;
 
-      // 5 steps: teachers, subjects, classes, lessons, generated
-      let done = 0;
-      if (teachers > 0) done++;
-      if (subjects > 0) done++;
-      if (classes > 0) done++;
-      if (lessons > 0) done++;
-      if (hasGenerated) done++;
-      const percent = Math.round((done / 5) * 100);
+        // 5 steps: teachers, subjects, classes, lessons, generated
+        let done = 0;
+        if (teachers > 0) done++;
+        if (subjects > 0) done++;
+        if (classes > 0) done++;
+        if (lessons > 0) done++;
+        if (hasGenerated) done++;
+        const percent = Math.round((done / 5) * 100);
 
-      const result = { teachers, subjects, classes, lessons, hasGenerated, loading: false, percent };
-      cache.set(projectId, { data: result, ts: Date.now() });
-      setData(result);
-    });
+        const result = { teachers, subjects, classes, lessons, hasGenerated, loading: false, percent };
+        cache.set(projectId, { data: result, ts: Date.now() });
+        setData(result);
+      })
+      .catch(() => {
+        // Fallback: keep existing data if available
+        if (!cached) {
+          setData({ ...EMPTY, loading: false });
+        }
+      });
   }, [projectId]);
 
   // Debounced refresh — prevents hammering API when adding items quickly

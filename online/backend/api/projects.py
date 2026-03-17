@@ -95,7 +95,39 @@ def get_project(
     return ProjectResponse.model_validate(project)
 
 
-# ─── DELETE ──────────────────────────────────────────────────────────────────
+# ─── COUNTS (lightweight progress check) ────────────────────────────────────
+
+@router.get("/{project_id}/counts")
+def get_project_counts(
+    project_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return entity counts for a project — single fast query instead of 5 list calls."""
+    school_id = current_user.get("school_id")
+    project = get_by_id_and_school(db, project_id, school_id) if school_id else None
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    from backend.models.teacher_model import Teacher
+    from backend.models.class_model import SchoolClass
+    from backend.models.lesson_model import Lesson
+    from backend.models.timetable_model import TimetableRun
+
+    # Subject is in project.py itself
+    teachers = db.query(Teacher).filter(Teacher.project_id == project_id).count()
+    subjects = db.query(Subject).filter(Subject.project_id == project_id).count()
+    classes = db.query(SchoolClass).filter(SchoolClass.project_id == project_id).count()
+    lessons = db.query(Lesson).filter(Lesson.project_id == project_id).count()
+    has_generated = db.query(TimetableRun).filter(TimetableRun.project_id == project_id).count() > 0
+
+    return {
+        "teachers": teachers,
+        "subjects": subjects,
+        "classes": classes,
+        "lessons": lessons,
+        "has_generated": has_generated,
+    }
 
 @router.delete("/{project_id}")
 def delete_project(

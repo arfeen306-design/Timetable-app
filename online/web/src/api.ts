@@ -270,6 +270,11 @@ export function listLessons(projectId: number) {
   return api<{ id: number; teacher_id: number; subject_id: number; class_id: number; periods_per_week: number }[]>(`/api/projects/${projectId}/lessons`);
 }
 
+// Project counts (lightweight — returns numbers only)
+export function getProjectCounts(projectId: number) {
+  return api<{ teachers: number; subjects: number; classes: number; lessons: number; has_generated: boolean }>(`/api/projects/${projectId}/counts`);
+}
+
 export function createLesson(projectId: number, data: { teacher_id: number; subject_id: number; class_id: number; periods_per_week?: number }) {
   return api<{ id: number }>(`/api/projects/${projectId}/lessons`, { method: "POST", body: JSON.stringify(data) });
 }

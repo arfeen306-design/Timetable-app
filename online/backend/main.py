@@ -58,6 +58,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# GZip compression — reduces JSON response sizes by 3-5×
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 app.include_router(api_router, prefix="/api")
 
 @app.get("/health")
