@@ -7,7 +7,7 @@ const METRICS = [
   { label: "Teachers Assigned", pct: 87, color: "#2563EB", track: "rgba(37,99,235,0.10)" },
   { label: "Rooms Utilized",    pct: 72, color: "#0891B2", track: "rgba(8,145,178,0.10)" },
   { label: "Clashes Resolved",  pct: 100, color: "#16A34A", track: "rgba(22,163,74,0.10)" },
-  { label: "Periods Covered",   pct: 94, color: "#D97706", track: "rgba(217,119,6,0.10)" },
+  { label: "Lessons Covered",   pct: 94, color: "#D97706", track: "rgba(217,119,6,0.10)" },
 ];
 
 function AnimatedRing({ pct, color, trackColor, delay }: { pct: number; color: string; trackColor: string; delay: number }) {
@@ -128,7 +128,7 @@ export default function ZyncaWelcome() {
         </p>
         <button className="mz-cta-btn" onClick={handleCTA}>
           <span className="mz-cta-btn-icon">→</span>
-          Make your first lesson plan
+          Make your first timetable
         </button>
         <p className="mz-cta-footnote">
           Designed for principals, coordinators, and school administration teams worldwide.
