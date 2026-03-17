@@ -111,7 +111,14 @@ export function getSchoolSettings(projectId: number) {
   }>(`/api/projects/${projectId}/school-settings`);
 }
 
-export function updateSchoolSettings(projectId: number, data: Partial<{ name: string; academic_year: string; days_per_week: number; periods_per_day: number; weekend_days: string; bell_schedule_json: string }>) {
+export function updateSchoolSettings(projectId: number, data: Partial<{
+  name: string; academic_year: string; days_per_week: number; periods_per_day: number;
+  period_duration_minutes: number; weekend_days: string; working_days: string;
+  school_start_time: string; school_end_time: string;
+  friday_start_time: string | null; friday_end_time: string | null;
+  saturday_start_time: string | null; saturday_end_time: string | null;
+  bell_schedule_json: string; breaks_json: string;
+}>) {
   return api(`/api/projects/${projectId}/school-settings`, { method: "PUT", body: JSON.stringify(data) });
 }
 

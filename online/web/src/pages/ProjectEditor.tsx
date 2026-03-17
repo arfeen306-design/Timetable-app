@@ -86,7 +86,7 @@ export default function ProjectEditor() {
 }
 
 /* ══════════════════════════════════════════════════
-   Utilities for time validation
+   Utilities for time computation
    ══════════════════════════════════════════════════ */
 function parseTime(t: string): number {
   if (!t || !t.includes(":")) return 8 * 60;
@@ -99,8 +99,92 @@ function fmtTimeHelper(mins: number): string {
 }
 
 /* ══════════════════════════════════════════════════
-   Settings Tab — kept inline
+   Settings Tab — Bell Schedule with per-lesson durations
    ══════════════════════════════════════════════════ */
+
+interface BreakItem { name: string; after_period: number; duration_minutes: number; }
+type ScheduleRow = { type: "lesson" | "break"; index: number; start: string; end: string; duration: number; name?: string };
+
+const TIME_OPTIONS: string[] = [];
+for (let h = 6; h <= 23; h++) for (let m = 0; m < 60; m += 5) TIME_OPTIONS.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+const DURATION_OPTIONS = [20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90];
+const BREAK_DURATION_OPTIONS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60];
+
+/** Compute the full schedule from inputs — auto-cascading times */
+function computeSchedule(
+  numPeriods: number, startTime: string, defDur: number,
+  durations: number[], brks: BreakItem[]
+): ScheduleRow[] {
+  const rows: ScheduleRow[] = [];
+  let current = parseTime(startTime);
+  const breakMap: Record<number, BreakItem> = {};
+  for (const b of brks) breakMap[b.after_period] = b;
+
+  for (let p = 0; p < numPeriods; p++) {
+    const dur = (p < durations.length && durations[p]) ? durations[p] : defDur;
+    rows.push({ type: "lesson", index: p + 1, start: fmtTimeHelper(current), end: fmtTimeHelper(current + dur), duration: dur });
+    current += dur;
+    const brk = breakMap[p + 1];
+    if (brk) {
+      rows.push({ type: "break", index: -1, start: fmtTimeHelper(current), end: fmtTimeHelper(current + brk.duration_minutes), duration: brk.duration_minutes, name: brk.name || "Break" });
+      current += brk.duration_minutes;
+    }
+  }
+  return rows;
+}
+
+/** Interactive schedule table */
+function ScheduleTable({ rows, editable, onEditDur }: {
+  rows: ScheduleRow[];
+  editable?: boolean;
+  onEditDur?: (lessonIndex: number, val: number) => void;
+}) {
+  return (
+    <table className="data-table" style={{ marginTop: "0.75rem", maxWidth: 540 }}>
+      <thead><tr>
+        <th style={{ width: 36 }}>#</th>
+        <th>Type</th>
+        <th style={{ width: 70 }}>Start</th>
+        <th style={{ width: 70 }}>End</th>
+        <th style={{ width: 120 }}>Duration</th>
+      </tr></thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i} style={r.type === "break" ? { background: "#f0fdf4" } : undefined}>
+            <td style={{ color: r.type === "break" ? "#16a34a" : undefined, fontWeight: 600, textAlign: "center" }}>
+              {r.type === "lesson" ? r.index : "☕"}
+            </td>
+            <td style={{ fontWeight: 500 }}>
+              {r.type === "lesson" ? `Lesson ${r.index}` : (r.name || "Break")}
+            </td>
+            <td style={{ fontFamily: "monospace", fontSize: "0.9rem" }}>{r.start}</td>
+            <td style={{ fontFamily: "monospace", fontSize: "0.9rem" }}>{r.end}</td>
+            <td>
+              {editable && r.type === "lesson" && onEditDur ? (
+                <select
+                  value={r.duration}
+                  onChange={e => onEditDur(r.index - 1, Number(e.target.value))}
+                  style={{ width: 100, fontSize: "0.82rem" }}
+                >
+                  {DURATION_OPTIONS.map(d => <option key={d} value={d}>{d} min</option>)}
+                </select>
+              ) : (
+                <span style={{ color: r.type === "break" ? "#16a34a" : undefined }}>{r.duration} min</span>
+              )}
+            </td>
+          </tr>
+        ))}
+        {rows.length > 0 && (
+          <tr style={{ borderTop: "2px solid #e2e8f0" }}>
+            <td colSpan={3} style={{ fontWeight: 600, fontSize: "0.9rem" }}>🏫 School ends</td>
+            <td style={{ fontFamily: "monospace", fontWeight: 700, fontSize: "0.9rem" }}>{rows[rows.length - 1].end}</td>
+            <td></td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
 
 function SettingsTab({
   pid,
@@ -115,42 +199,58 @@ function SettingsTab({
   const toast = useToast();
   const [saving, setSaving] = useState(false);
 
+  // ── School info ──
   const [name, setName] = useState("");
   const [academicYear, setAcademicYear] = useState("");
+
+  // ── Schedule structure ──
   const [daysPerWeek, setDaysPerWeek] = useState(5);
   const [periodsPerDay, setPeriodsPerDay] = useState(7);
-  const [periodDuration, setPeriodDuration] = useState(45);
-  const [schoolStartTime, setSchoolStartTime] = useState("08:00");
-  const [firstPeriodStart, setFirstPeriodStart] = useState("08:30");
-  const [zeroPeroid, setZeroPeriod] = useState(false);
 
-  interface BreakItem { name: string; start: string; end: string; after_period: number; duration_minutes: number; }
+  // ── Bell schedule ──
+  const [defaultDuration, setDefaultDuration] = useState(45);
+  const [firstPeriodStart, setFirstPeriodStart] = useState("08:30");
+  const [lessonDurations, setLessonDurations] = useState<number[]>([]);
+  const [zeroPeroid, setZeroPeriod] = useState(false);
+  const [schoolStartTime, setSchoolStartTime] = useState("08:00");
+
+  // ── Breaks ──
   const [numBreaks, setNumBreaks] = useState(0);
   const [breaks, setBreaks] = useState<BreakItem[]>([]);
+
+  // ── Exceptional day ──
+  const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const [fridayDifferent, setFridayDifferent] = useState(false);
   const [fridayDayIndex, setFridayDayIndex] = useState(4);
   const [fridayFirstPeriodStart, setFridayFirstPeriodStart] = useState("08:10");
-  const [fridayPeriodDuration, setFridayPeriodDuration] = useState(50);
+  const [fridayDefaultDuration, setFridayDefaultDuration] = useState(40);
+  const [fridayLessonDurations, setFridayLessonDurations] = useState<number[]>([]);
   const [fridayNumBreaks, setFridayNumBreaks] = useState(0);
   const [fridayBreaks, setFridayBreaks] = useState<BreakItem[]>([]);
-  const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  // ── Weekend ──
   const [weekendDays, setWeekendDays] = useState<Set<number>>(new Set([5, 6]));
 
+  // ── Load from settings ──
   useEffect(() => {
     if (!settings) return;
-    setName(settings.name || ""); setAcademicYear(settings.academic_year || "");
-    setDaysPerWeek(settings.days_per_week); setPeriodsPerDay(settings.periods_per_day);
-    setPeriodDuration((settings as Record<string, unknown>).period_duration_minutes as number || 45);
+    setName(settings.name || "");
+    setAcademicYear(settings.academic_year || "");
+    setDaysPerWeek(settings.days_per_week);
+    setPeriodsPerDay(settings.periods_per_day);
+    setDefaultDuration((settings as Record<string, unknown>).period_duration_minutes as number || 45);
     setSchoolStartTime((settings as Record<string, unknown>).school_start_time as string || "08:00");
     try {
       const bell = JSON.parse(settings.bell_schedule_json || "{}");
       if (typeof bell === "object" && !Array.isArray(bell)) {
         setFirstPeriodStart(bell.first_period_start || "08:30");
         setZeroPeriod(!!bell.zero_period);
+        if (Array.isArray(bell.lesson_durations)) setLessonDurations(bell.lesson_durations);
         setFridayDifferent(!!bell.friday_different);
         setFridayDayIndex(bell.friday_day_index ?? 4);
         setFridayFirstPeriodStart(bell.friday_first_period_start || "08:10");
-        setFridayPeriodDuration(bell.friday_period_duration || 50);
+        setFridayDefaultDuration(bell.friday_default_duration || 40);
+        if (Array.isArray(bell.friday_lesson_durations)) setFridayLessonDurations(bell.friday_lesson_durations);
       }
     } catch { /* ignore */ }
     try {
@@ -159,33 +259,79 @@ function SettingsTab({
         const regular = parsed.filter((b: BreakItem & { is_friday?: boolean }) => !b.is_friday);
         const friday = parsed.filter((b: BreakItem & { is_friday?: boolean }) => b.is_friday);
         setNumBreaks(regular.length);
-        setBreaks(regular.map((b: BreakItem) => ({ name: b.name || "", start: b.start || "10:00", end: b.end || "10:20", after_period: b.after_period || 2, duration_minutes: b.duration_minutes || 20 })));
+        setBreaks(regular.map((b: BreakItem) => ({ name: b.name || "", after_period: b.after_period ?? 2, duration_minutes: b.duration_minutes || 20 })));
         setFridayNumBreaks(friday.length);
-        setFridayBreaks(friday.map((b: BreakItem) => ({ name: b.name || "", start: b.start || "10:40", end: b.end || "11:00", after_period: b.after_period || 3, duration_minutes: b.duration_minutes || 20 })));
+        setFridayBreaks(friday.map((b: BreakItem) => ({ name: b.name || "", after_period: b.after_period ?? 3, duration_minutes: b.duration_minutes || 20 })));
       }
     } catch { /* ignore */ }
     const wd = (settings as Record<string, unknown>).weekend_days as string || "5,6";
     setWeekendDays(new Set(wd.split(",").filter(Boolean).map(Number)));
   }, [settings]);
 
-  useEffect(() => { setBreaks(prev => { if (prev.length < numBreaks) { const a = [...prev]; for (let i = prev.length; i < numBreaks; i++) a.push({ name: "", start: "10:00", end: "10:20", after_period: i + 2, duration_minutes: 20 }); return a; } return prev.slice(0, numBreaks); }); }, [numBreaks]);
-  useEffect(() => { setFridayBreaks(prev => { if (prev.length < fridayNumBreaks) { const a = [...prev]; for (let i = prev.length; i < fridayNumBreaks; i++) a.push({ name: "", start: "10:40", end: "11:00", after_period: i + 3, duration_minutes: 20 }); return a; } return prev.slice(0, fridayNumBreaks); }); }, [fridayNumBreaks]);
+  // Sync break array length
+  useEffect(() => { setBreaks(prev => { if (prev.length < numBreaks) { const a = [...prev]; for (let i = prev.length; i < numBreaks; i++) a.push({ name: i === 0 ? "Short Break" : "Lunch Break", after_period: i + 2, duration_minutes: 20 }); return a; } return prev.slice(0, numBreaks); }); }, [numBreaks]);
+  useEffect(() => { setFridayBreaks(prev => { if (prev.length < fridayNumBreaks) { const a = [...prev]; for (let i = prev.length; i < fridayNumBreaks; i++) a.push({ name: "Break", after_period: i + 2, duration_minutes: 20 }); return a; } return prev.slice(0, fridayNumBreaks); }); }, [fridayNumBreaks]);
 
   function updateBreak(i: number, f: keyof BreakItem, v: string | number) { setBreaks(prev => prev.map((b, idx) => idx === i ? { ...b, [f]: v } : b)); }
   function updateFridayBreak(i: number, f: keyof BreakItem, v: string | number) { setFridayBreaks(prev => prev.map((b, idx) => idx === i ? { ...b, [f]: v } : b)); }
   function toggleWeekend(d: number) { setWeekendDays(prev => { const n = new Set(prev); n.has(d) ? n.delete(d) : n.add(d); return n; }); }
 
-  const TIME_OPTIONS: string[] = [];
-  for (let h = 6; h <= 23; h++) for (let m = 0; m < 60; m += 5) TIME_OPTIONS.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+  // ── Compute schedules ──
+  const schedule = computeSchedule(periodsPerDay, firstPeriodStart, defaultDuration, lessonDurations, breaks);
+  const schoolEnd = schedule.length > 0 ? schedule[schedule.length - 1].end : firstPeriodStart;
+
+  const fridaySchedule = fridayDifferent
+    ? computeSchedule(periodsPerDay, fridayFirstPeriodStart, fridayDefaultDuration, fridayLessonDurations, fridayBreaks)
+    : [];
+  const fridayEnd = fridaySchedule.length > 0 ? fridaySchedule[fridaySchedule.length - 1].end : "";
+
+  function setLessonDur(index: number, val: number) {
+    setLessonDurations(prev => {
+      const arr = [...prev];
+      while (arr.length < periodsPerDay) arr.push(0);
+      arr[index] = val;
+      return arr;
+    });
+  }
+  function setFridayLessonDur(index: number, val: number) {
+    setFridayLessonDurations(prev => {
+      const arr = [...prev];
+      while (arr.length < periodsPerDay) arr.push(0);
+      arr[index] = val;
+      return arr;
+    });
+  }
 
   async function save(andNext?: boolean) {
     setSaving(true);
     try {
-      const bellSchedule = JSON.stringify({ first_period_start: firstPeriodStart, zero_period: zeroPeroid, friday_different: fridayDifferent, friday_day_index: fridayDayIndex, friday_first_period_start: fridayFirstPeriodStart, friday_period_duration: fridayPeriodDuration });
-      const allBreaks = [...breaks.map(b => ({ ...b, is_friday: false })), ...(fridayDifferent ? fridayBreaks.map(b => ({ ...b, is_friday: true })) : [])];
+      const bellSchedule = JSON.stringify({
+        first_period_start: firstPeriodStart,
+        default_duration: defaultDuration,
+        lesson_durations: lessonDurations,
+        zero_period: zeroPeroid,
+        friday_different: fridayDifferent,
+        friday_day_index: fridayDayIndex,
+        friday_first_period_start: fridayFirstPeriodStart,
+        friday_default_duration: fridayDefaultDuration,
+        friday_lesson_durations: fridayLessonDurations,
+      });
+      const allBreaks = [
+        ...breaks.map(b => ({ ...b, is_friday: false })),
+        ...(fridayDifferent ? fridayBreaks.map(b => ({ ...b, is_friday: true })) : []),
+      ];
       const weekendStr = Array.from(weekendDays).sort().join(",");
-      await api.updateSchoolSettings(pid, { name, academic_year: academicYear, days_per_week: daysPerWeek, periods_per_day: periodsPerDay, bell_schedule_json: bellSchedule, weekend_days: weekendStr });
-      await fetch(`/api/projects/${pid}/school-settings`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("timetable_token")}` }, body: JSON.stringify({ period_duration_minutes: periodDuration, school_start_time: schoolStartTime, breaks_json: JSON.stringify(allBreaks) }) });
+      await api.updateSchoolSettings(pid, {
+        name, academic_year: academicYear,
+        days_per_week: daysPerWeek, periods_per_day: periodsPerDay,
+        period_duration_minutes: defaultDuration,
+        school_start_time: schoolStartTime,
+        school_end_time: schoolEnd,
+        bell_schedule_json: bellSchedule,
+        breaks_json: JSON.stringify(allBreaks),
+        weekend_days: weekendStr,
+        ...(fridayDifferent ? { friday_start_time: fridayFirstPeriodStart, friday_end_time: fridayEnd } : { friday_start_time: null, friday_end_time: null }),
+      });
       onSave();
       toast("success", "School settings saved.");
       if (andNext) navigate(`/project/${pid}/subjects`);
@@ -200,127 +346,110 @@ function SettingsTab({
       <h2>School Settings</h2>
       <p className="subheading">Configure your school's basic information and schedule structure.</p>
 
+      {/* ═══ SCHOOL INFO ═══ */}
       <h3 className="settings-section-title">School Information</h3>
       <div className="settings-field"><label className="settings-label required">School Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Islamabad Model School" /></div>
       <div className="settings-field"><label className="settings-label">Academic Year</label><input value={academicYear} onChange={e => setAcademicYear(e.target.value)} placeholder="2025-2026" /></div>
 
+      {/* ═══ SCHEDULE STRUCTURE ═══ */}
       <div className="settings-section">
         <h3 className="settings-section-title">Schedule Structure</h3>
         <div className="settings-field"><label className="settings-label">Working Days per Week</label><select value={daysPerWeek} onChange={e => setDaysPerWeek(Number(e.target.value))} style={inputNarrow}>{[1,2,3,4,5,6,7].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
         <div className="settings-field"><label className="settings-label">Lessons per Day</label><select value={periodsPerDay} onChange={e => setPeriodsPerDay(Number(e.target.value))} style={inputNarrow}>{Array.from({length:16},(_,i) => <option key={i} value={i}>{i}</option>)}</select></div>
       </div>
 
+      {/* ═══ BELL SCHEDULE ═══ */}
       <div className="settings-section">
         <h3 className="settings-section-title">Bell Schedule — Lesson Timing</h3>
-        <div className="settings-field"><label className="settings-label">Lesson duration (minutes)</label><select value={periodDuration} onChange={e => setPeriodDuration(Number(e.target.value))} style={inputNarrow}>{[25,30,35,40,45,50,55,60,70,80,90].map(m => <option key={m} value={m}>{m} minutes</option>)}</select></div>
         <div className="settings-field"><label className="settings-label">School start time</label><select value={schoolStartTime} onChange={e => setSchoolStartTime(e.target.value)} style={{width:120}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-        <div className="settings-field"><label className="settings-label">First lesson start time</label><select value={firstPeriodStart} onChange={e => setFirstPeriodStart(e.target.value)} style={{width:120}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+        <div className="settings-field"><label className="settings-label">First lesson starts at</label><select value={firstPeriodStart} onChange={e => setFirstPeriodStart(e.target.value)} style={{width:120}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+        <div className="settings-field"><label className="settings-label">Default lesson duration</label><select value={defaultDuration} onChange={e => setDefaultDuration(Number(e.target.value))} style={inputNarrow}>{DURATION_OPTIONS.map(m => <option key={m} value={m}>{m} min</option>)}</select></div>
         <div className="settings-hint"><label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}><input type="checkbox" checked={zeroPeroid} onChange={e => setZeroPeriod(e.target.checked)} style={{width:"auto",accentColor:"#3b82f6"}} />Include zero lesson (class teacher time: school start → first lesson)</label></div>
       </div>
 
+      {/* ═══ BREAKS ═══ */}
       <div className="settings-section">
         <h3 className="settings-section-title">Breaks</h3>
-        <div className="settings-field"><label className="settings-label">Number of breaks (0–9)</label><select value={numBreaks} onChange={e => setNumBreaks(Number(e.target.value))} style={inputNarrow}>{Array.from({length:10},(_,i) => <option key={i} value={i}>{i}</option>)}</select></div>
-        {breaks.map((b, i) => {
-          // Compute expected break start: first_period_start + sum of period durations + previous break durations
-          const fpStart = parseTime(firstPeriodStart);
-          let expectedStart = fpStart;
-          // after_period is 1-indexed: after_period=2 means after 2 periods
-          expectedStart += periodDuration * b.after_period;
-          // Add durations of earlier breaks that come before this one
-          for (const prev of breaks) {
-            if (prev !== b && prev.after_period < b.after_period) {
-              expectedStart += (parseTime(prev.end) - parseTime(prev.start));
-            }
-          }
-          const expectedStartStr = fmtTimeHelper(expectedStart);
-          const userStart = b.start;
-          const userEnd = b.end;
-          const startMismatch = userStart && expectedStartStr !== userStart;
-          const endBeforeStart = userStart && userEnd && parseTime(userEnd) <= parseTime(userStart);
-
-          return (
-            <div key={i}>
-              <div className="break-card" style={startMismatch || endBeforeStart ? { border: "2px solid #ef4444", background: "#fef2f2" } : undefined}>
-                <div className="break-card-title">Break {i + 1}</div>
-                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Name</label><input value={b.name} onChange={e => updateBreak(i,"name",e.target.value)} placeholder="e.g. Short Break" style={{width:200}} /></div>
-                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Start time</label><select value={b.start} onChange={e => updateBreak(i,"start",e.target.value)} style={{width:110, borderColor: startMismatch ? "#ef4444" : undefined}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>End time</label><select value={b.end} onChange={e => updateBreak(i,"end",e.target.value)} style={{width:110, borderColor: endBeforeStart ? "#ef4444" : undefined}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>After lesson</label><select value={b.after_period} onChange={e => updateBreak(i,"after_period",Number(e.target.value))} style={inputNarrow}>{Array.from({length:periodsPerDay},(_,p) => <option key={p+1} value={p+1}>{p+1} (after lesson)</option>)}</select></div>
-                {startMismatch && (
-                  <div style={{ background: "#fef2f2", border: "1px solid #ef4444", borderRadius: 6, padding: "0.5rem 0.75rem", marginTop: "0.5rem", fontSize: "0.8rem", color: "#dc2626" }}>
-                    ⚠️ <strong>Time conflict!</strong> Lesson {b.after_period} ends at <strong>{expectedStartStr}</strong>, but break starts at <strong>{userStart}</strong>.
-                    Please set break start time to <strong>{expectedStartStr}</strong>.
-                  </div>
-                )}
-                {endBeforeStart && (
-                  <div style={{ background: "#fef2f2", border: "1px solid #ef4444", borderRadius: 6, padding: "0.5rem 0.75rem", marginTop: "0.5rem", fontSize: "0.8rem", color: "#dc2626" }}>
-                    ⚠️ <strong>Invalid!</strong> Break end time ({userEnd}) is before or equal to start time ({userStart}).
-                  </div>
-                )}
-              </div>
+        <div className="settings-field"><label className="settings-label">Number of breaks</label><select value={numBreaks} onChange={e => setNumBreaks(Number(e.target.value))} style={inputNarrow}>{Array.from({length:10},(_,i) => <option key={i} value={i}>{i}</option>)}</select></div>
+        {breaks.map((b, i) => (
+          <div key={i} className="break-card" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", padding: "0.75rem 1rem", marginBottom: "0.5rem" }}>
+            <span style={{ fontWeight: 600, minWidth: 65, color: "#16a34a" }}>☕ Break {i + 1}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: "0.82rem", color: "#64748b" }}>After lesson</span>
+              <select value={b.after_period} onChange={e => updateBreak(i, "after_period", Number(e.target.value))} style={{ width: 56 }}>
+                {Array.from({length: periodsPerDay}, (_, p) => <option key={p+1} value={p+1}>{p+1}</option>)}
+              </select>
             </div>
-          );
-        })}
-        <p className="settings-hint">Lesson length (single, double, etc.) is set per lesson in the Lessons tab.</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: "0.82rem", color: "#64748b" }}>Duration</span>
+              <select value={b.duration_minutes} onChange={e => updateBreak(i, "duration_minutes", Number(e.target.value))} style={{ width: 78 }}>
+                {BREAK_DURATION_OPTIONS.map(m => <option key={m} value={m}>{m} min</option>)}
+              </select>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: "0.82rem", color: "#64748b" }}>Name</span>
+              <input value={b.name} onChange={e => updateBreak(i, "name", e.target.value)} placeholder="Short Break" style={{ width: 140 }} />
+            </div>
+          </div>
+        ))}
+        <p className="settings-hint" style={{ marginTop: 8 }}>Break times are computed automatically based on lesson durations. No manual time entry needed.</p>
       </div>
 
+      {/* ═══ AUTO-COMPUTED SCHEDULE TABLE ═══ */}
+      {periodsPerDay > 0 && (
+        <div className="settings-section">
+          <h3 className="settings-section-title">📋 Regular Day Schedule</h3>
+          <p className="settings-hint" style={{ marginBottom: 4 }}>Times auto-calculate. Change any lesson's duration below — all following times adjust automatically.</p>
+          <ScheduleTable rows={schedule} editable onEditDur={setLessonDur} />
+        </div>
+      )}
+
+      {/* ═══ EXCEPTIONAL DAY ═══ */}
       <div className="settings-section">
         <h3 className="friday-section-title">
           <select value={fridayDayIndex} onChange={e => setFridayDayIndex(Number(e.target.value))} style={{width:120,fontWeight:600}}>{DAY_LABELS.map((d,i) => <option key={i} value={i}>{d}</option>)}</select>
-          <span>— Different Schedule (Optional)</span>
+          <span> — Different Schedule (Optional)</span>
         </h3>
         <div className="settings-field" style={{marginLeft:20}}>
           <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontWeight:500,fontSize:"0.875rem"}}><input type="checkbox" checked={fridayDifferent} onChange={e => setFridayDifferent(e.target.checked)} style={{width:"auto",accentColor:"#f59e0b"}} />{DAY_LABELS[fridayDayIndex]} has different timing</label>
         </div>
         {fridayDifferent && (
           <div style={{marginLeft:20,marginTop:"0.75rem"}}>
-            <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} first lesson start</label><select value={fridayFirstPeriodStart} onChange={e => setFridayFirstPeriodStart(e.target.value)} style={{width:120}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-            <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} lesson duration</label><select value={fridayPeriodDuration} onChange={e => setFridayPeriodDuration(Number(e.target.value))} style={inputNarrow}>{[25,30,35,40,45,50,55,60,70,80,90].map(m => <option key={m} value={m}>{m} minutes</option>)}</select></div>
-            <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} breaks (0–9)</label><select value={fridayNumBreaks} onChange={e => setFridayNumBreaks(Number(e.target.value))} style={inputNarrow}>{Array.from({length:10},(_,i) => <option key={i} value={i}>{i}</option>)}</select></div>
-            {fridayBreaks.map((b, i) => {
-              // Compute expected break start using FRIDAY timing
-              const fpStart = parseTime(fridayFirstPeriodStart);
-              let expectedStart = fpStart;
-              expectedStart += fridayPeriodDuration * b.after_period;
-              for (const prev of fridayBreaks) {
-                if (prev !== b && prev.after_period < b.after_period) {
-                  expectedStart += (parseTime(prev.end) - parseTime(prev.start));
-                }
-              }
-              const expectedStartStr = fmtTimeHelper(expectedStart);
-              const userStart = b.start;
-              const userEnd = b.end;
-              const startMismatch = userStart && expectedStartStr !== userStart;
-              const endBeforeStart = userStart && userEnd && parseTime(userEnd) <= parseTime(userStart);
-
-              return (
-                <div key={i}>
-                  <div className="break-card-friday" style={startMismatch || endBeforeStart ? { border: "2px solid #ef4444", background: "#fef2f2" } : undefined}>
-                    <div className="break-card-title">{DAY_LABELS[fridayDayIndex]} Break {i + 1}</div>
-                    <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Name</label><input value={b.name} onChange={e => updateFridayBreak(i,"name",e.target.value)} placeholder="e.g. Break" style={{width:200}} /></div>
-                    <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>Start time</label><select value={b.start} onChange={e => updateFridayBreak(i,"start",e.target.value)} style={{width:110, borderColor: startMismatch ? "#ef4444" : undefined}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                    <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>End time</label><select value={b.end} onChange={e => updateFridayBreak(i,"end",e.target.value)} style={{width:110, borderColor: endBeforeStart ? "#ef4444" : undefined}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                    <div className="settings-field"><label className="settings-label" style={{minWidth:140}}>After lesson</label><select value={b.after_period} onChange={e => updateFridayBreak(i,"after_period",Number(e.target.value))} style={inputNarrow}>{Array.from({length:periodsPerDay},(_,p) => <option key={p+1} value={p+1}>{p+1} (after lesson)</option>)}</select></div>
-                    {startMismatch && (
-                      <div style={{ background: "#fef2f2", border: "1px solid #ef4444", borderRadius: 6, padding: "0.5rem 0.75rem", marginTop: "0.5rem", fontSize: "0.8rem", color: "#dc2626" }}>
-                        ⚠️ <strong>Time conflict!</strong> Lesson {b.after_period} ends at <strong>{expectedStartStr}</strong>, but break starts at <strong>{userStart}</strong>.
-                        Please set break start time to <strong>{expectedStartStr}</strong>.
-                      </div>
-                    )}
-                    {endBeforeStart && (
-                      <div style={{ background: "#fef2f2", border: "1px solid #ef4444", borderRadius: 6, padding: "0.5rem 0.75rem", marginTop: "0.5rem", fontSize: "0.8rem", color: "#dc2626" }}>
-                        ⚠️ <strong>Invalid!</strong> Break end time ({userEnd}) is before or equal to start time ({userStart}).
-                      </div>
-                    )}
-                  </div>
+            <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} first lesson starts at</label><select value={fridayFirstPeriodStart} onChange={e => setFridayFirstPeriodStart(e.target.value)} style={{width:120}}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+            <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} default lesson duration</label><select value={fridayDefaultDuration} onChange={e => setFridayDefaultDuration(Number(e.target.value))} style={inputNarrow}>{DURATION_OPTIONS.map(m => <option key={m} value={m}>{m} min</option>)}</select></div>
+            <div className="settings-field"><label className="settings-label">{DAY_LABELS[fridayDayIndex]} breaks</label><select value={fridayNumBreaks} onChange={e => setFridayNumBreaks(Number(e.target.value))} style={inputNarrow}>{Array.from({length:10},(_,i) => <option key={i} value={i}>{i}</option>)}</select></div>
+            {fridayBreaks.map((b, i) => (
+              <div key={i} className="break-card-friday" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", padding: "0.75rem 1rem", marginBottom: "0.5rem" }}>
+                <span style={{ fontWeight: 600, minWidth: 90, color: "#d97706" }}>☕ {DAY_LABELS[fridayDayIndex]} Break {i + 1}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: "0.82rem" }}>After lesson</span>
+                  <select value={b.after_period} onChange={e => updateFridayBreak(i, "after_period", Number(e.target.value))} style={{ width: 56 }}>
+                    {Array.from({length: periodsPerDay}, (_, p) => <option key={p+1} value={p+1}>{p+1}</option>)}
+                  </select>
                 </div>
-              );
-            })}
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: "0.82rem" }}>Duration</span>
+                  <select value={b.duration_minutes} onChange={e => updateFridayBreak(i, "duration_minutes", Number(e.target.value))} style={{ width: 78 }}>
+                    {BREAK_DURATION_OPTIONS.map(m => <option key={m} value={m}>{m} min</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: "0.82rem" }}>Name</span>
+                  <input value={b.name} onChange={e => updateFridayBreak(i, "name", e.target.value)} placeholder="Break" style={{ width: 120 }} />
+                </div>
+              </div>
+            ))}
+            {periodsPerDay > 0 && (
+              <>
+                <h4 style={{ marginTop: "1rem", marginBottom: 4, fontWeight: 600 }}>📋 {DAY_LABELS[fridayDayIndex]} Schedule</h4>
+                <ScheduleTable rows={fridaySchedule} editable onEditDur={setFridayLessonDur} />
+              </>
+            )}
           </div>
         )}
       </div>
 
+      {/* ═══ WEEKEND DAYS ═══ */}
       <div className="settings-section">
         <h3 className="settings-section-title">Weekend Days</h3>
         <div className="weekend-row">
@@ -332,40 +461,11 @@ function SettingsTab({
         </div>
       </div>
 
-      {(() => {
-        // Compute whether any time conflicts exist
-        const hasConflict = (() => {
-          for (const b of breaks) {
-            const fp = parseTime(firstPeriodStart);
-            let exp = fp + periodDuration * b.after_period;
-            for (const prev of breaks) { if (prev !== b && prev.after_period < b.after_period) exp += (parseTime(prev.end) - parseTime(prev.start)); }
-            if (b.start && fmtTimeHelper(exp) !== b.start) return true;
-            if (b.start && b.end && parseTime(b.end) <= parseTime(b.start)) return true;
-          }
-          if (fridayDifferent) {
-            for (const b of fridayBreaks) {
-              const fp = parseTime(fridayFirstPeriodStart);
-              let exp = fp + fridayPeriodDuration * b.after_period;
-              for (const prev of fridayBreaks) { if (prev !== b && prev.after_period < b.after_period) exp += (parseTime(prev.end) - parseTime(prev.start)); }
-              if (b.start && fmtTimeHelper(exp) !== b.start) return true;
-              if (b.start && b.end && parseTime(b.end) <= parseTime(b.start)) return true;
-            }
-          }
-          return false;
-        })();
-
-        return (
-          <div className="settings-footer">
-            {hasConflict && (
-              <div style={{ background: "#fef2f2", border: "1px solid #ef4444", borderRadius: 8, padding: "0.5rem 1rem", fontSize: "0.82rem", color: "#dc2626", fontWeight: 600, marginBottom: "0.5rem" }}>
-                🚫 Fix all time conflicts above before saving.
-              </div>
-            )}
-            <button type="button" className="btn btn-primary" onClick={() => save()} disabled={saving || hasConflict}>{saving ? "Saving…" : "💾 Save Settings"}</button>
-            <button type="button" className="btn" onClick={() => save(true)} disabled={saving || hasConflict}>Next: Subjects →</button>
-          </div>
-        );
-      })()}
+      {/* ═══ SAVE FOOTER ═══ */}
+      <div className="settings-footer">
+        <button type="button" className="btn btn-primary" onClick={() => save()} disabled={saving}>{saving ? "Saving…" : "💾 Save Settings"}</button>
+        <button type="button" className="btn" onClick={() => save(true)} disabled={saving}>Next: Subjects →</button>
+      </div>
     </div>
   );
 }
