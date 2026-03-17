@@ -56,6 +56,11 @@ class TimetableSolver:
         else:
             friday_num_periods = None  # same as regular
 
+        # Auto-expand grid to include the exceptional day if it's beyond days_per_week
+        if friday_different and int(friday_day_index) >= num_days:
+            num_days = int(friday_day_index) + 1
+            self.messages.append(f"Grid expanded to {num_days} day columns to include exceptional day (index {friday_day_index}).")
+
         num_periods = num_periods_base + (1 if zero_period else 0)
         # Use the maximum to keep a uniform grid
         if friday_num_periods and friday_num_periods > num_periods:
