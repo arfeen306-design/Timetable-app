@@ -55,7 +55,8 @@ def validate_for_generation(data: TimetableDataProvider) -> ValidationResult:
     bell = {}
     try:
         raw = school.get("bell_schedule_json") or "{}"
-        bell = _json.loads(raw) if isinstance(raw, str) else raw
+        parsed = _json.loads(raw) if isinstance(raw, str) else raw
+        bell = parsed if isinstance(parsed, dict) else {}
     except (ValueError, TypeError):
         pass
     friday_different = bool(bell.get("friday_different", False))
