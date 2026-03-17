@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     app_url: str = "http://localhost:5173"  # frontend URL for verification links
 
+    # OAuth: Google
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    # OAuth: Microsoft
+    microsoft_client_id: str = ""
+    microsoft_client_secret: str = ""
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
