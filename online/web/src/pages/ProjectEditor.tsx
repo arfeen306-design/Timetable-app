@@ -204,7 +204,7 @@ function SettingsTab({
   const [academicYear, setAcademicYear] = useState("");
 
   // ── Schedule structure ──
-  const [daysPerWeek, setDaysPerWeek] = useState(5);
+  const [, setDaysPerWeek] = useState(5);
   const [periodsPerDay, setPeriodsPerDay] = useState(7);
 
   // ── Bell schedule ──
@@ -325,15 +325,22 @@ function SettingsTab({
         ...(fridayDifferent ? fridayBreaks.map(b => ({ ...b, is_friday: true })) : []),
       ];
       const weekendStr = Array.from(weekendDays).sort().join(",");
+      // Compute working_days as inverse of weekendDays (1-based: 1=Mon..7=Sun)
+      const workingDaysArr: number[] = [];
+      for (let d = 0; d < 7; d++) {
+        if (!weekendDays.has(d)) workingDaysArr.push(d + 1);
+      }
+      const workingDaysStr = workingDaysArr.join(",");
       await api.updateSchoolSettings(pid, {
         name, academic_year: academicYear,
-        days_per_week: daysPerWeek, periods_per_day: periodsPerDay,
+        days_per_week: workingDaysArr.length, periods_per_day: periodsPerDay,
         period_duration_minutes: defaultDuration,
         school_start_time: schoolStartTime,
         school_end_time: schoolEnd,
         bell_schedule_json: bellSchedule,
         breaks_json: JSON.stringify(allBreaks),
         weekend_days: weekendStr,
+        working_days: workingDaysStr,
         ...(fridayDifferent ? { friday_start_time: fridayFirstPeriodStart, friday_end_time: fridayEnd } : { friday_start_time: null, friday_end_time: null }),
       });
       onSave();
@@ -358,8 +365,23 @@ function SettingsTab({
       {/* ═══ SCHEDULE STRUCTURE ═══ */}
       <div className="settings-section">
         <h3 className="settings-section-title">Schedule Structure</h3>
-        <div className="settings-field"><label className="settings-label">Working Days per Week</label><select value={daysPerWeek} onChange={e => setDaysPerWeek(Number(e.target.value))} style={inputNarrow}>{[1,2,3,4,5,6,7].map(n => <option key={n} value={n}>{n}</option>)}</select></div>
         <div className="settings-field"><label className="settings-label">Lessons per Day</label><select value={periodsPerDay} onChange={e => setPeriodsPerDay(Number(e.target.value))} style={inputNarrow}>{Array.from({length:16},(_,i) => <option key={i} value={i}>{i}</option>)}</select></div>
+      </div>
+
+      {/* ═══ OFF DAYS ═══ */}
+      <div className="settings-section">
+        <h3 className="settings-section-title">Off Days</h3>
+        <p className="settings-hint" style={{ marginBottom: 8 }}>Select the days your school is closed. The remaining days become working days.</p>
+        <div className="weekend-row">
+          {DAY_LABELS.map((day, i) => (
+            <label key={i} className={`weekend-checkbox${weekendDays.has(i) ? " checked" : ""}`}>
+              <input type="checkbox" checked={weekendDays.has(i)} onChange={() => toggleWeekend(i)} style={{width:"auto"}} />{day}
+            </label>
+          ))}
+        </div>
+        <p className="settings-hint" style={{ marginTop: 8, fontWeight: 500, color: "#334155" }}>
+          {7 - weekendDays.size} working day{7 - weekendDays.size !== 1 ? "s" : ""} · {weekendDays.size} off
+        </p>
       </div>
 
       {/* ═══ BELL SCHEDULE ═══ */}
@@ -411,7 +433,7 @@ function SettingsTab({
       {/* ═══ EXCEPTIONAL DAY ═══ */}
       <div className="settings-section">
         <h3 className="friday-section-title">
-          <select value={fridayDayIndex} onChange={e => setFridayDayIndex(Number(e.target.value))} style={{width:120,fontWeight:600}}>{DAY_LABELS.map((d,i) => <option key={i} value={i}>{d}</option>)}</select>
+          <select value={fridayDayIndex} onChange={e => setFridayDayIndex(Number(e.target.value))} style={{width:120,fontWeight:600}}>{DAY_LABELS.map((d,i) => !weekendDays.has(i) ? <option key={i} value={i}>{d}</option> : null)}</select>
           <span> — Different Schedule (Optional)</span>
         </h3>
         <div className="settings-field" style={{marginLeft:20}}>
@@ -454,17 +476,7 @@ function SettingsTab({
         )}
       </div>
 
-      {/* ═══ WEEKEND DAYS ═══ */}
-      <div className="settings-section">
-        <h3 className="settings-section-title">Weekend Days</h3>
-        <div className="weekend-row">
-          {DAY_LABELS.map((day, i) => (
-            <label key={i} className={`weekend-checkbox${weekendDays.has(i) ? " checked" : ""}`}>
-              <input type="checkbox" checked={weekendDays.has(i)} onChange={() => toggleWeekend(i)} style={{width:"auto"}} />{day}
-            </label>
-          ))}
-        </div>
-      </div>
+
 
       {/* ═══ SAVE FOOTER ═══ */}
       <div className="settings-footer">

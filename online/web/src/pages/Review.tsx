@@ -95,7 +95,7 @@ export default function Review() {
   const [teacherId, setTeacherId] = useState(0);
   const [roomId, setRoomId] = useState(0);
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [gridDays, setGridDays] = useState(5);
+  const [, setGridDays] = useState(5);
   const [gridPeriods, setGridPeriods] = useState(7);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -131,13 +131,18 @@ export default function Review() {
 
   useEffect(() => { loadTimetable(); }, [loadTimetable]);
 
-  /* ── Compute slot sequences ── */
-  const { regularSlots, fridaySlots, hasFridayDiff, fridayDayIndex } = useMemo(() => {
-    if (!settings) return { regularSlots: [] as SlotDef[], fridaySlots: [] as SlotDef[], hasFridayDiff: false, fridayDayIndex: 4 };
+  /* ── Compute slot sequences + working day indices ── */
+  const { regularSlots, fridaySlots, hasFridayDiff, fridayDayIndex, workingDayIndices } = useMemo(() => {
+    if (!settings) return { regularSlots: [] as SlotDef[], fridaySlots: [] as SlotDef[], hasFridayDiff: false, fridayDayIndex: 4, workingDayIndices: [0,1,2,3,4] };
 
     const schoolStart = (settings.school_start_time as string) || "08:00";
     const defaultDuration = (settings.period_duration_minutes as number) || 45;
     const numPeriods = (settings.periods_per_day as number) || 7;
+
+    // Compute working day indices from weekend_days
+    const wdStr = (settings.weekend_days as string) || "5,6";
+    const offSet = new Set(wdStr.split(",").filter(Boolean).map(Number));
+    const workDays = Array.from({ length: 7 }, (_, i) => i).filter(i => !offSet.has(i));
 
     let breaks: BreakDef[] = [];
     try { const raw = settings.breaks_json as string; if (raw) breaks = JSON.parse(raw); } catch { /* */ }
@@ -164,7 +169,7 @@ export default function Review() {
       ? computeSlots(friStart, friDefaultDur, friPeriodsPerDay, fridayBreaksList, fridayLessonDurations, schoolStart, zeroPeriod)
       : regular;
 
-    return { regularSlots: regular, fridaySlots: friday, hasFridayDiff: fridayDiff, fridayDayIndex: friDayIdx };
+    return { regularSlots: regular, fridaySlots: friday, hasFridayDiff: fridayDiff, fridayDayIndex: friDayIdx, workingDayIndices: workDays };
   }, [settings]);
 
   /* ── Drag & Drop ── */
@@ -304,7 +309,7 @@ export default function Review() {
               </tr>
             </thead>
             <tbody>
-              {Array.from({ length: gridDays }, (_, dayIdx) => {
+              {workingDayIndices.map(dayIdx => {
                 const isFridayRow = dayIdx === fridayDayIndex;
                 const useSlots = isFridayRow && hasFridayDiff ? fridaySlots : colSlots;
                 const headerCols = colSlots.length;
@@ -333,7 +338,7 @@ export default function Review() {
                     )}
 
                     {/* Day row — uses this day's OWN slot sequence */}
-                    <tr key={dayIdx} style={{ borderBottom: dayIdx < gridDays - 1 ? "1px solid #e2e8f0" : undefined }}>
+                    <tr key={dayIdx} style={{ borderBottom: dayIdx < workingDayIndices[workingDayIndices.length - 1] ? "1px solid #e2e8f0" : undefined }}>
                       <td style={{
                         padding: "0.5rem 0.5rem", fontWeight: 700, color: "#1e293b", fontSize: "0.85rem",
                         background: isFridayRow && hasFridayDiff ? "#fffbeb" : "#f8fafc",

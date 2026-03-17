@@ -56,24 +56,28 @@ class TimetableSolver:
         else:
             friday_num_periods = None  # same as regular
 
-        # Auto-expand grid to include the exceptional day if it's beyond days_per_week
+        # ── Compute working day indices from Off Days ──
+        # This is the SINGLE SOURCE OF TRUTH for which days are active
+        weekend_str = school.get("weekend_days", "5,6") or "5,6"
+        off_days = set()
+        for x in str(weekend_str).split(","):
+            x = x.strip()
+            if x:
+                try: off_days.add(int(x))
+                except ValueError: pass
+        working_day_indices = sorted(d for d in range(7) if d not in off_days)
+
+        # num_days = grid width; must cover all working day indices
+        if working_day_indices:
+            num_days = max(working_day_indices) + 1
+        else:
+            num_days = school["days_per_week"]
+
+        # Also expand grid for exceptional day if beyond current num_days
         if friday_different and int(friday_day_index) >= num_days:
             num_days = int(friday_day_index) + 1
-            self.messages.append(f"Grid expanded to {num_days} day columns to include exceptional day (index {friday_day_index}).")
 
-        # Auto-expand grid to include ALL non-weekend days (e.g. Sunday index 6)
-        weekend_str_pre = school.get("weekend_days", "")
-        if weekend_str_pre:
-            try:
-                weekend_pre = {int(d.strip()) for d in str(weekend_str_pre).split(",") if d.strip()}
-            except (ValueError, TypeError):
-                weekend_pre = set()
-            # Check days 0..6: any non-weekend day beyond current num_days?
-            for d in range(7):
-                if d >= num_days and d not in weekend_pre:
-                    num_days = d + 1
-            if num_days > school["days_per_week"]:
-                self.messages.append(f"Grid expanded to {num_days} days to include all working days.")
+        self.messages.append(f"Working days: {working_day_indices} ({len(working_day_indices)} days, grid width {num_days}).") 
 
         num_periods = num_periods_base + (1 if zero_period else 0)
         # Use the maximum to keep a uniform grid
@@ -169,22 +173,16 @@ class TimetableSolver:
             for occ_set in occ_forbidden_slots:
                 occ_set.update(friday_forbidden)
 
-        # Forbid ALL slots on weekend days (e.g. "4,6" for Fri+Sun)
-        weekend_str = school.get("weekend_days", "")
-        if weekend_str:
-            try:
-                weekend_indices = {int(d.strip()) for d in str(weekend_str).split(",") if d.strip()}
-            except (ValueError, TypeError):
-                weekend_indices = set()
-            weekend_forbidden = set()
-            for wd in weekend_indices:
-                if 0 <= wd < num_days:
-                    for p in range(num_periods):
-                        weekend_forbidden.add(wd * num_periods + p)
-            if weekend_forbidden:
-                for occ_set in occ_forbidden_slots:
-                    occ_set.update(weekend_forbidden)
-                self.messages.append(f"Weekend days {sorted(weekend_indices)}: all slots forbidden.")
+        # Forbid ALL slots on off days (already computed as off_days above)
+        weekend_forbidden = set()
+        for wd in off_days:
+            if 0 <= wd < num_days:
+                for p in range(num_periods):
+                    weekend_forbidden.add(wd * num_periods + p)
+        if weekend_forbidden:
+            for occ_set in occ_forbidden_slots:
+                occ_set.update(weekend_forbidden)
+            self.messages.append(f"Off days {sorted(off_days)}: all slots forbidden.")
 
         # Decision variables: slot_var = day * num_periods + period
         slot_vars = []

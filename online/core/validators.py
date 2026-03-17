@@ -38,7 +38,37 @@ def validate_for_generation(data: TimetableDataProvider) -> ValidationResult:
 
     days = school["days_per_week"]
     periods = school["periods_per_day"]
-    total_slots = days * periods
+
+    # Compute actual working day indices from weekend_days (Off Days)
+    import json as _json
+    weekend_str = school.get("weekend_days", "5,6") or "5,6"
+    off_days = set()
+    for x in str(weekend_str).split(","):
+        x = x.strip()
+        if x:
+            try: off_days.add(int(x))
+            except ValueError: pass
+    working_days = sorted(d for d in range(7) if d not in off_days)
+    num_working_days = len(working_days)
+
+    # Check for exceptional day with different period count
+    bell = {}
+    try:
+        raw = school.get("bell_schedule_json") or "{}"
+        bell = _json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError):
+        pass
+    friday_different = bool(bell.get("friday_different", False))
+    friday_day_index = int(bell.get("friday_day_index", 4))
+    friday_periods = int(bell.get("friday_periods_per_day", periods) or periods)
+
+    # Calculate actual available slots
+    if friday_different and friday_day_index in working_days:
+        # Exceptional day has different number of periods
+        num_standard_days = num_working_days - 1
+        total_slots = (num_standard_days * periods) + friday_periods
+    else:
+        total_slots = num_working_days * periods
 
     # Check entities exist
     subjects = data.get_subjects()
@@ -117,10 +147,10 @@ def validate_for_generation(data: TimetableDataProvider) -> ValidationResult:
 
         # Check if daily max is feasible
         min_days_needed = -(-total_needed // max_day)  # ceiling division
-        if min_days_needed > days:
+        if min_days_needed > num_working_days:
             result.add_error(
                 f"Teacher {teacher_map[teacher['id']]} needs at least {min_days_needed} "
-                f"days for {total_needed} periods (max {max_day}/day) but only {days} days available.",
+                f"days for {total_needed} periods (max {max_day}/day) but only {num_working_days} days available.",
                 "Teacher overload",
             )
 

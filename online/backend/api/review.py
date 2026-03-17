@@ -13,6 +13,18 @@ from backend.repositories.school_settings_repo import get_by_project
 router = APIRouter()
 
 
+def _working_day_indices(settings) -> list[int]:
+    """Return sorted 0-based day indices that are working days (not off days)."""
+    wd_str = getattr(settings, 'weekend_days', '5,6') or '5,6'
+    off = set()
+    for x in str(wd_str).split(','):
+        x = x.strip()
+        if x:
+            try: off.add(int(x))
+            except ValueError: pass
+    return sorted(d for d in range(7) if d not in off)
+
+
 def _get_run_id_or_404(db: Session, project_id: int) -> int:
     run = get_latest_run(db, project_id)
     if not run or run.status != "completed":
@@ -60,7 +72,8 @@ def get_class_timetable(
     entries = get_entries_with_joins(db, project.id, run_id=run_id, class_id=class_id)
     # Verify class belongs to project (entries are already scoped)
     settings = get_by_project(db, project.id)
-    days = getattr(settings, "days_per_week", 5) if settings else 5
+    work_days = _working_day_indices(settings) if settings else [0,1,2,3,4]
+    days = (max(work_days) + 1) if work_days else 5
     periods = getattr(settings, "periods_per_day", 7) if settings else 7
     # Build grid: [day][period] -> entry
     grid = [[None] * periods for _ in range(days)]
@@ -68,7 +81,7 @@ def get_class_timetable(
         d, p = e["day_index"], e["period_index"]
         if 0 <= d < days and 0 <= p < periods:
             grid[d][p] = e
-    return {"class_id": class_id, "entries": entries, "grid": grid, "days": days, "periods": periods}
+    return {"class_id": class_id, "entries": entries, "grid": grid, "days": days, "periods": periods, "working_day_indices": work_days}
 
 
 @router.get("/teacher/{teacher_id}")
@@ -81,14 +94,15 @@ def get_teacher_timetable(
     run_id = _get_run_id_or_404(db, project.id)
     entries = get_entries_with_joins(db, project.id, run_id=run_id, teacher_id=teacher_id)
     settings = get_by_project(db, project.id)
-    days = getattr(settings, "days_per_week", 5) if settings else 5
+    work_days = _working_day_indices(settings) if settings else [0,1,2,3,4]
+    days = (max(work_days) + 1) if work_days else 5
     periods = getattr(settings, "periods_per_day", 7) if settings else 7
     grid = [[None] * periods for _ in range(days)]
     for e in entries:
         d, p = e["day_index"], e["period_index"]
         if 0 <= d < days and 0 <= p < periods:
             grid[d][p] = e
-    return {"teacher_id": teacher_id, "entries": entries, "grid": grid, "days": days, "periods": periods}
+    return {"teacher_id": teacher_id, "entries": entries, "grid": grid, "days": days, "periods": periods, "working_day_indices": work_days}
 
 
 @router.get("/room/{room_id}")
@@ -101,14 +115,15 @@ def get_room_timetable(
     run_id = _get_run_id_or_404(db, project.id)
     entries = get_entries_with_joins(db, project.id, run_id=run_id, room_id=room_id)
     settings = get_by_project(db, project.id)
-    days = getattr(settings, "days_per_week", 5) if settings else 5
+    work_days = _working_day_indices(settings) if settings else [0,1,2,3,4]
+    days = (max(work_days) + 1) if work_days else 5
     periods = getattr(settings, "periods_per_day", 7) if settings else 7
     grid = [[None] * periods for _ in range(days)]
     for e in entries:
         d, p = e["day_index"], e["period_index"]
         if 0 <= d < days and 0 <= p < periods:
             grid[d][p] = e
-    return {"room_id": room_id, "entries": entries, "grid": grid, "days": days, "periods": periods}
+    return {"room_id": room_id, "entries": entries, "grid": grid, "days": days, "periods": periods, "working_day_indices": work_days}
 
 
 @router.get("/master")
@@ -120,14 +135,15 @@ def get_master_timetable(
     run_id = _get_run_id_or_404(db, project.id)
     entries = get_entries_with_joins(db, project.id, run_id=run_id)
     settings = get_by_project(db, project.id)
-    days = getattr(settings, "days_per_week", 5) if settings else 5
+    work_days = _working_day_indices(settings) if settings else [0,1,2,3,4]
+    days = (max(work_days) + 1) if work_days else 5
     periods = getattr(settings, "periods_per_day", 7) if settings else 7
     grid = [[[] for _ in range(periods)] for _ in range(days)]
     for e in entries:
         d, p = e["day_index"], e["period_index"]
         if 0 <= d < days and 0 <= p < periods:
             grid[d][p].append(e)
-    return {"entries": entries, "grid": grid, "days": days, "periods": periods}
+    return {"entries": entries, "grid": grid, "days": days, "periods": periods, "working_day_indices": work_days}
 
 
 @router.get("/workload")

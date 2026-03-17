@@ -17,6 +17,18 @@ DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
+def _get_working_day_indices(settings) -> list[int]:
+    """Return sorted 0-based day indices that are working days."""
+    wd_str = getattr(settings, 'weekend_days', '5,6') or '5,6'
+    off = set()
+    for x in str(wd_str).split(','):
+        x = x.strip()
+        if x:
+            try: off.add(int(x))
+            except ValueError: pass
+    return sorted(d for d in range(7) if d not in off)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Slot computation — matches frontend computeSlots() exactly
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -198,6 +210,8 @@ def export_excel(
         by_class.setdefault(e.get("class_name", "?"), []).append(e)
         by_teacher.setdefault(e.get("teacher_name", "?"), []).append(e)
 
+    working_days = _get_working_day_indices(sett)
+
     wb = Workbook()
     hdr_font = Font(bold=True, size=9, color="FFFFFF")
     hdr_fill = PatternFill("solid", fgColor="2C3E50")
@@ -240,7 +254,7 @@ def export_excel(
             row += 1
 
             # Day rows — each day uses its OWN slot sequence
-            for d in range(days):
+            for d in working_days:
                 is_fri = d == fri_day_idx and fri_cols
 
                 # Friday times row BEFORE friday data
@@ -393,6 +407,8 @@ def export_csv(
         by_class.setdefault(e.get("class_name", "?"), []).append(e)
         by_teacher.setdefault(e.get("teacher_name", "?"), []).append(e)
 
+    working_days = _get_working_day_indices(sett)
+
     for cn in sorted(by_class.keys()):
         for e in sorted(by_class[cn], key=lambda x: (x["day_index"], x["period_index"])):
             is_fri = e["day_index"] == fri_day_idx and fri_cols
@@ -430,7 +446,7 @@ def export_csv(
 # PDF helpers
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _build_pdf_table(entries_group, cols, days, fri_day_idx, fri_cols, label_key):
+def _build_pdf_table(entries_group, cols, working_days, fri_day_idx, fri_cols, label_key):
     """Build a table data array for one entity.
     Break columns from regular days are BLANKED on Friday rows (and vice versa),
     so breaks only appear on the days that actually have them.
@@ -448,7 +464,7 @@ def _build_pdf_table(entries_group, cols, days, fri_day_idx, fri_cols, label_key
         if c["type"] == "break":
             reg_break_cols.add(ci)
 
-    for d in range(days):
+    for d in working_days:
         is_fri = d == fri_day_idx and fri_cols
 
         if is_fri:
@@ -586,6 +602,7 @@ def export_pdf_current(
     entries = _get_all_entries(db, project.id, run.id)
     sett = _full_settings(db, project.id)
     days = getattr(sett, "days_per_week", 5)
+    working_days = _get_working_day_indices(sett)
     school_name = getattr(sett, "name", "") or ""
     cols = _compute_col_headers(sett)
     fri_cols = _compute_friday_headers(sett)
@@ -616,8 +633,8 @@ def export_pdf_current(
         label_key = "teacher_name"
         title = "All Classes"
 
-    data = _build_pdf_table(filtered, cols, days, fri_day_idx, fri_cols, label_key)
-    has_fri = fri_cols is not None and fri_day_idx < days
+    data = _build_pdf_table(filtered, cols, working_days, fri_day_idx, fri_cols, label_key)
+    has_fri = fri_cols is not None and fri_day_idx in working_days
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4), topMargin=12*mm, bottomMargin=12*mm, leftMargin=8*mm, rightMargin=8*mm)
@@ -673,6 +690,7 @@ def export_pdf_all_classes(
     entries = _get_all_entries(db, project.id, run.id)
     sett = _full_settings(db, project.id)
     days = getattr(sett, "days_per_week", 5)
+    working_days = _get_working_day_indices(sett)
     school_name = getattr(sett, "name", "") or ""
     cols = _compute_col_headers(sett)
     fri_cols = _compute_friday_headers(sett)
@@ -695,13 +713,13 @@ def export_pdf_all_classes(
     page_w = landscape(A4)[0] - 16*mm
     day_w = 22*mm
     col_w = (page_w - day_w) / max(max_data_cols, 1)
-    has_fri = fri_cols is not None and fri_day_idx < days
+    has_fri = fri_cols is not None and fri_day_idx in working_days
 
     for idx, cn in enumerate(sorted(by_class.keys())):
         elements.append(Paragraph(school_name, title_s))
         elements.append(Paragraph(f"Class: {cn}", sub_s))
         elements.append(Spacer(1, 3))
-        data = _build_pdf_table(by_class[cn], cols, days, fri_day_idx, fri_cols, "teacher_name")
+        data = _build_pdf_table(by_class[cn], cols, working_days, fri_day_idx, fri_cols, "teacher_name")
         tbl = Table(data, colWidths=[day_w] + [col_w] * max_data_cols, repeatRows=1)
         _style_pdf_table(tbl, cols, has_fri, fri_day_idx, fri_cols)
         elements.append(tbl)
@@ -741,6 +759,7 @@ def export_pdf_all_teachers(
     entries = _get_all_entries(db, project.id, run.id)
     sett = _full_settings(db, project.id)
     days = getattr(sett, "days_per_week", 5)
+    working_days = _get_working_day_indices(sett)
     school_name = getattr(sett, "name", "") or ""
     cols = _compute_col_headers(sett)
     fri_cols = _compute_friday_headers(sett)
@@ -763,7 +782,7 @@ def export_pdf_all_teachers(
     page_w = landscape(A4)[0] - 16*mm
     day_w = 22*mm
     col_w = (page_w - day_w) / max(max_data_cols, 1)
-    has_fri = fri_cols is not None and fri_day_idx < days
+    has_fri = fri_cols is not None and fri_day_idx in working_days
 
     # Compute workload per teacher
     teacher_lesson_count: dict[str, int] = {}
@@ -780,7 +799,7 @@ def export_pdf_all_teachers(
         lesson_count = teacher_lesson_count.get(tn, 0)
         elements.append(Paragraph(f"Weekly load: {lesson_count} lessons/week", badge_s))
         elements.append(Spacer(1, 3))
-        data = _build_pdf_table(by_teacher[tn], cols, days, fri_day_idx, fri_cols, "class_name")
+        data = _build_pdf_table(by_teacher[tn], cols, working_days, fri_day_idx, fri_cols, "class_name")
         tbl = Table(data, colWidths=[day_w] + [col_w] * max_data_cols, repeatRows=1)
         _style_pdf_table(tbl, cols, has_fri, fri_day_idx, fri_cols)
         elements.append(tbl)

@@ -131,10 +131,18 @@ def move_entry(
 
     # Validate slot bounds
     settings = get_by_project(db, project.id)
-    days = settings.days_per_week if settings else 5
     periods = settings.periods_per_day if settings else 7
-    if body.new_day_index < 0 or body.new_day_index >= days:
-        raise HTTPException(status_code=400, detail=f"day_index must be 0-{days - 1}")
+    # Compute working day indices from weekend_days
+    wd_str = getattr(settings, 'weekend_days', '5,6') or '5,6'
+    off = set()
+    for x in str(wd_str).split(','):
+        x = x.strip()
+        if x:
+            try: off.add(int(x))
+            except ValueError: pass
+    work_days = sorted(d for d in range(7) if d not in off)
+    if body.new_day_index not in work_days:
+        raise HTTPException(status_code=400, detail=f"day_index {body.new_day_index} is an off day")
     if body.new_period_index < 0 or body.new_period_index >= periods:
         raise HTTPException(status_code=400, detail=f"period_index must be 0-{periods - 1}")
 
@@ -187,23 +195,32 @@ def get_valid_slots(
         raise HTTPException(status_code=404, detail="Entry not found.")
 
     settings = get_by_project(db, project.id)
-    days = settings.days_per_week if settings else 5
     periods = settings.periods_per_day if settings else 7
+    # Compute working day indices
+    wd_str = getattr(settings, 'weekend_days', '5,6') or '5,6'
+    off = set()
+    for x in str(wd_str).split(','):
+        x = x.strip()
+        if x:
+            try: off.add(int(x))
+            except ValueError: pass
+    work_days = sorted(d for d in range(7) if d not in off)
 
-    # Build grid: for each (day, period), check conflicts
+    # Build grid: for each working day + period, check conflicts
     grid = []
-    for d in range(days):
+    for d in work_days:
         row = []
         for p in range(periods):
             if d == entry.day_index and p == entry.period_index:
-                row.append({"valid": True, "current": True, "conflicts": []})
+                row.append({"valid": True, "current": True, "conflicts": [], "day_index": d})
             else:
                 conflicts = _find_conflicts(db, project.id, run.id, entry, d, p)
                 row.append({
                     "valid": len(conflicts) == 0,
                     "current": False,
                     "conflicts": [c["message"] for c in conflicts],
+                    "day_index": d,
                 })
         grid.append(row)
 
-    return {"entry_id": entry_id, "days": days, "periods": periods, "slots": grid}
+    return {"entry_id": entry_id, "days": len(work_days), "periods": periods, "slots": grid, "working_day_indices": work_days}

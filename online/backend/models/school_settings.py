@@ -20,7 +20,7 @@ class SchoolSettings(Base):
     period_duration_minutes = Column(Integer, nullable=False, default=45)
     assembly_duration_minutes = Column(Integer, nullable=False, default=0)
     weekend_days = Column(String(50), nullable=False, default="5,6")
-    working_days = Column(String(50), nullable=False, default="1,2,3,4,5")  # 0=Sun, 1=Mon, ...
+    working_days = Column(String(50), nullable=False, default="1,2,3,4,5")  # 1=Mon, 2=Tue, ..., 7=Sun
     school_start_time = Column(String(10), nullable=False, default="08:00")
     school_end_time = Column(String(10), nullable=False, default="15:00")
     friday_start_time = Column(String(10), nullable=True)
