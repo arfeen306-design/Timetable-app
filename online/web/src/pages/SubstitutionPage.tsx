@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import SearchableSelect from "../components/SearchableSelect";
 import {
   listTeachers, listAcademicWeeks,
   markAbsent, getFreeTeachers, assignSubstitute,
   listSubstitutions, listAbsences, deleteSubstitution, removeAbsence,
-  getTeacherSlots, listPendingSlots,
+  getTeacherSlots, listPendingWithSuggestions,
   type AbsentSlot, type FreeTeacher, type SubstitutionRecord, type AbsenceRecord, type AcademicWeekInfo,
+  type SuggestionTeacher,
 } from "../api";
+import { cachedFetch, invalidateCachePrefix } from "../hooks/prefetchCache";
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 function fmtDate(d: string) { return new Date(d + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); }
@@ -69,12 +71,15 @@ export default function SubstitutionPage() {
   const [subs, setSubs] = useState<SubstitutionRecord[]>([]);
   const [freeMap, setFreeMap] = useState<Record<string, FreeTeacher[]>>({});
   const [freeCount, setFreeCount] = useState<Record<string, number>>({});
+  const [suggestionsMap, setSuggestionsMap] = useState<Record<string, SuggestionTeacher[]>>({});
   const [expandedSlot, setExpandedSlot] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [teacherSearch, setTeacherSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [removingChips, setRemovingChips] = useState<Set<number>>(new Set());
+  const [assigningKeys, setAssigningKeys] = useState<Set<string>>(new Set());
+  const msgTimer = useRef<ReturnType<typeof setTimeout>>();
   // Confirmation step
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   // Override warning
@@ -100,13 +105,34 @@ export default function SubstitutionPage() {
 
   const loadDayData = useCallback(() => {
     if (!pid) return;
-    listAbsences(pid, date).then(setAbsences).catch(console.error);
-    listSubstitutions(pid, date).then(setSubs).catch(console.error);
-    // Load pending (unassigned) slots from DB — survives navigation
-    listPendingSlots(pid, date).then(setAbsentSlots).catch(console.error);
+    // Use stale-while-revalidate cache — instant tab switches
+    cachedFetch(`abs-${pid}-${date}`, () => listAbsences(pid, date), 30_000).then(setAbsences).catch(console.error);
+    cachedFetch(`subs-${pid}-${date}`, () => listSubstitutions(pid, date), 30_000).then(setSubs).catch(console.error);
+    // Batch: pending slots + top-3 suggestions per slot in ONE call
+    cachedFetch(`pending-${pid}-${date}`, () => listPendingWithSuggestions(pid, date), 30_000)
+      .then(res => {
+        setAbsentSlots(res.slots);
+        setSuggestionsMap(res.suggestions);
+      })
+      .catch(console.error);
   }, [pid, date]);
 
   useEffect(() => { loadDayData(); }, [loadDayData]);
+
+  /** Invalidate cache and reload fresh data */
+  const refreshData = useCallback(() => {
+    invalidateCachePrefix(`abs-${pid}`);
+    invalidateCachePrefix(`subs-${pid}`);
+    invalidateCachePrefix(`pending-${pid}`);
+    loadDayData();
+  }, [pid, loadDayData]);
+
+  /** Flash a message that auto-clears */
+  const flash = useCallback((m: string) => {
+    setMsg(m);
+    if (msgTimer.current) clearTimeout(msgTimer.current);
+    msgTimer.current = setTimeout(() => setMsg(""), 4000);
+  }, []);
 
   const teacherName = (id: number) => {
     const t = teachers.find(t => t.id === id);
@@ -124,11 +150,45 @@ export default function SubstitutionPage() {
         const newOnes = res.slots.filter(s => !existing.has(`${s.teacher_id}-${s.period_index}`));
         return [...prev, ...newOnes];
       });
-      setMsg(`✅ ${res.absences_created.length} teacher(s) marked absent. ${res.slots.length} period(s) need coverage.`);
+      flash(`✅ ${res.absences_created.length} teacher(s) marked absent. ${res.slots.length} period(s) need coverage.`);
       setSelectedAbsent([]); setReason("");
-      loadDayData();
-    } catch (e) { setMsg(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+      refreshData();
+    } catch (e) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
     finally { setLoading(false); }
+  }
+
+  /** Optimistic one-click assign: UI updates instantly, API in background */
+  async function handleDirectAssign(slot: AbsentSlot, teacher: { teacher_id: number; teacher_name: string }, force = false) {
+    const slotKey = `${slot.teacher_id}-${slot.period_index}`;
+    // 1. Optimistic: remove slot from pending immediately
+    setAssigningKeys(prev => new Set(prev).add(slotKey));
+    const prevSlots = absentSlots;
+    setAbsentSlots(prev => prev.filter(s => !(s.teacher_id === slot.teacher_id && s.period_index === slot.period_index)));
+    setExpandedSlot(null); setConfirm(null);
+    flash(`⚡ Assigning ${teacher.teacher_name} to L${slot.period_index + 1}...`);
+
+    try {
+      const res = await assignSubstitute(pid, {
+        date, period_index: slot.period_index, absent_teacher_id: slot.teacher_id,
+        sub_teacher_id: teacher.teacher_id, lesson_id: slot.lesson_id, room_id: slot.room_id,
+        force_override: force,
+      });
+      flash(`✅ ${res.message}`);
+      refreshData();
+    } catch (e: unknown) {
+      // Rollback on error
+      setAbsentSlots(prevSlots);
+      const err = e as { status?: number; detail?: { code?: string; teacher_name?: string; sub_count?: number } };
+      if (err.status === 409 && err.detail?.code === "LIMIT_EXCEEDED") {
+        if (window.confirm(`${err.detail.teacher_name} has ${err.detail.sub_count} subs this week (limit 2). Override?`)) {
+          await handleDirectAssign(slot, teacher, true);
+        }
+      } else {
+        flash(`❌ ${e instanceof Error ? e.message : "Assignment failed"}`);
+      }
+    } finally {
+      setAssigningKeys(prev => { const s = new Set(prev); s.delete(slotKey); return s; });
+    }
   }
 
   async function handleFindFree(period: number, absentTeacherId: number) {
@@ -167,13 +227,13 @@ export default function SubstitutionPage() {
         sub_teacher_id: confirm.subTeacher.teacher_id, lesson_id: confirm.lessonId, room_id: confirm.roomId,
         force_override: forceOverride,
       });
-      setMsg(`✅ ${res.message}`);
+      flash(`✅ ${res.message}`);
       // Remove the assigned slot from absentSlots in-place
       setAbsentSlots(prev => prev.filter(
         s => !(s.teacher_id === confirm.absentTeacherId && s.period_index === confirm.period)
       ));
       setExpandedSlot(null); setConfirm(null); setOverrideWarning(null);
-      loadDayData();
+      refreshData();
     } catch (e: unknown) {
       const err = e as { status?: number; detail?: { code?: string; teacher_name?: string; sub_count?: number } };
       if (err.status === 409 && err.detail?.code === "LIMIT_EXCEEDED") {
@@ -479,6 +539,9 @@ export default function SubstitutionPage() {
             const numFree = freeCount[key] || 0;
             const assigned = subs.find(s => s.absent_teacher_id === Number(tId) && s.period_index === slot.period_index);
             const isConfirming = confirm?.period === slot.period_index && confirm?.absentTeacherId === Number(tId);
+            const suggested = suggestionsMap[key] || [];
+            const bestFit = suggested.find(s => s.best_fit) || suggested[0];
+            const isAssigning = assigningKeys.has(key);
 
             return (
               <div key={slot.period_index} className="card" style={{ padding: 0, marginBottom: 8, overflow: "hidden" }}>
@@ -487,7 +550,7 @@ export default function SubstitutionPage() {
                   onClick={() => !assigned && handleFindFree(slot.period_index, Number(tId))}>
                   <div style={{
                     width: 38, height: 38, borderRadius: "50%",
-                    background: assigned ? "var(--success-50)" : isConfirming ? "var(--warning-50)" : "var(--primary-50)",
+                    background: assigned ? "var(--success-50)" : isAssigning ? "var(--primary-100)" : isConfirming ? "var(--warning-50)" : "var(--primary-50)",
                     color: assigned ? "var(--success-600)" : isConfirming ? "var(--warning-600)" : "var(--primary-600)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: "0.75rem", fontWeight: 700, fontFamily: "var(--font-mono)", flexShrink: 0,
@@ -506,6 +569,30 @@ export default function SubstitutionPage() {
                   </div>
                   {assigned ? (
                     <span style={{ padding: "3px 10px", borderRadius: "var(--radius-full)", background: "var(--success-50)", border: "1px solid var(--success-100)", fontSize: "0.72rem", fontWeight: 700, color: "var(--success-600)" }}>Assigned</span>
+                  ) : isAssigning ? (
+                    <span style={{ padding: "3px 10px", borderRadius: "var(--radius-full)", background: "var(--primary-50)", border: "1px solid var(--primary-200)", fontSize: "0.72rem", fontWeight: 700, color: "var(--primary-600)" }}>⚡ Assigning…</span>
+                  ) : bestFit && !isExpanded && !isConfirming ? (
+                    /* ★ Inline auto-suggest: one-click assign */
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDirectAssign(slot, bestFit); }}
+                        style={{
+                          padding: "5px 14px", borderRadius: "var(--radius-md)", border: "none", cursor: "pointer",
+                          background: "var(--primary-500)", color: "#fff", fontSize: "0.72rem", fontWeight: 700,
+                          display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
+                        }}
+                      >
+                        ⚡ Assign {bestFit.teacher_name.split(" ")[0]}
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleFindFree(slot.period_index, Number(tId)); }}
+                        style={{
+                          padding: "5px 8px", borderRadius: "var(--radius-md)", border: "1px solid var(--slate-300)",
+                          background: "var(--slate-50)", cursor: "pointer", fontSize: "0.68rem", fontWeight: 600,
+                          color: "var(--slate-500)", whiteSpace: "nowrap",
+                        }}
+                      >More ▾</button>
+                    </div>
                   ) : isConfirming ? (
                     <span style={{ padding: "3px 10px", borderRadius: "var(--radius-full)", background: "var(--warning-50)", border: "1px solid var(--warning-200)", fontSize: "0.72rem", fontWeight: 700, color: "var(--warning-600)" }}>Confirming…</span>
                   ) : (

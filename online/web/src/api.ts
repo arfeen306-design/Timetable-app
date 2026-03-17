@@ -567,6 +567,21 @@ export function listPendingSlots(projectId: number, dt: string) {
   return api<AbsentSlot[]>(`/api/projects/${projectId}/substitutions/pending?date=${dt}`);
 }
 
+export type SuggestionTeacher = {
+  teacher_id: number; teacher_name: string; initials: string;
+  subject: string; periods_today: number; subs_this_week: number;
+  sub_limit_reached: boolean; best_fit: boolean;
+};
+
+export type PendingWithSuggestions = {
+  slots: AbsentSlot[];
+  suggestions: Record<string, SuggestionTeacher[]>;
+};
+
+export function listPendingWithSuggestions(projectId: number, dt: string) {
+  return api<PendingWithSuggestions>(`/api/projects/${projectId}/substitutions/pending-with-suggestions?date=${dt}`);
+}
+
 export function exportWorkloadPDF(projectId: number, week?: string) {
   const qs = week ? `?week=${week}` : "";
   window.open(`/api/projects/${projectId}/workload/export-pdf${qs}`, "_blank");

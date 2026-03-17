@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, getFreeTeachers, assignSubstitute, type FreeTeacher } from "../api";
+import { cachedFetch, invalidateCachePrefix } from "../hooks/prefetchCache";
 import { useLivePeriod } from "../hooks/useLivePeriod";
 
 /* ── Types ── */
@@ -138,7 +139,8 @@ export default function ProjectDashboard() {
     if (!pid) return;
     setLoading(true);
     const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    api<DashboardData>(`/api/projects/${pid}/dashboard?tz=${encodeURIComponent(clientTz)}`)
+    const url = `/api/projects/${pid}/dashboard?tz=${encodeURIComponent(clientTz)}`;
+    cachedFetch(`dash-${pid}`, () => api<DashboardData>(url), 30_000)
       .then(setData).catch(console.error).finally(() => setLoading(false));
   }, [pid]);
 
@@ -164,6 +166,13 @@ export default function ProjectDashboard() {
 
   async function handleQaAssign(u: DashboardData["unassigned"][0], ft: FreeTeacher, force = false) {
     setQaAssigning(true);
+    // Optimistic: remove from unassigned immediately
+    const prevData = data;
+    if (data) {
+      setData({ ...data, unassigned: data.unassigned.filter(x => !(x.teacher_id === u.teacher_id && x.period_index === u.period_index)) });
+    }
+    setQaExpanded(null);
+    setQaMsg(`⚡ Assigning ${ft.teacher_name} to L${u.period_index + 1}...`);
     try {
       await assignSubstitute(pid, {
         date: data?.date || "",
@@ -175,13 +184,15 @@ export default function ProjectDashboard() {
         force_override: force,
       });
       setQaMsg(`✅ ${ft.teacher_name} assigned to L${u.period_index + 1}`);
-      setQaExpanded(null);
-      // Refresh dashboard data
+      // Refresh dashboard data in background
+      invalidateCachePrefix(`dash-${pid}`);
       const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       api<DashboardData>(`/api/projects/${pid}/dashboard?tz=${encodeURIComponent(clientTz)}`)
         .then(setData).catch(console.error);
       setTimeout(() => setQaMsg(""), 3000);
     } catch (e: unknown) {
+      // Rollback on error
+      if (prevData) setData(prevData);
       const err = e as { status?: number; detail?: { code?: string; teacher_name?: string; sub_count?: number } };
       if (err.status === 409 && err.detail?.code === "LIMIT_EXCEEDED") {
         if (window.confirm(`${err.detail.teacher_name} has ${err.detail.sub_count} subs this week (limit 2). Override?`)) {

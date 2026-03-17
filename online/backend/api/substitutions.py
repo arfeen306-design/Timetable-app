@@ -427,6 +427,185 @@ def pending_periods(
     ]
 
 
+# ─── Pending with Suggestions (batch) ────────────────────────────────────────
+
+@router.get("/pending-with-suggestions")
+def pending_with_suggestions(
+    project_id: int = Path(...),
+    dt: str = Query(..., alias="date", description="YYYY-MM-DD"),
+    project=Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    """Return pending slots + top-3 suggested free teachers for each, in ONE call.
+    Replaces N separate free-teachers API calls with a single batch request."""
+    from sqlalchemy import func as sqla_func
+
+    target_date = date.fromisoformat(dt)
+    day_index = target_date.weekday()
+
+    # 1. Absent teachers
+    absences = db.query(TeacherAbsence).filter(
+        TeacherAbsence.project_id == project_id,
+        TeacherAbsence.date == target_date,
+    ).all()
+    absent_ids = [a.teacher_id for a in absences]
+    if not absent_ids:
+        return {"slots": [], "suggestions": {}}
+
+    # 2. Timetable entries for absent teachers
+    entries = (
+        db.query(
+            TimetableEntry.id.label("entry_id"),
+            TimetableEntry.period_index,
+            TimetableEntry.room_id,
+            Lesson.id.label("lesson_id"),
+            Lesson.teacher_id,
+            Lesson.subject_id,
+            Lesson.class_id,
+            Subject.name.label("subject_name"),
+            SchoolClass.name.label("class_name"),
+            Room.name.label("room_name"),
+        )
+        .join(Lesson, TimetableEntry.lesson_id == Lesson.id)
+        .outerjoin(Subject, Lesson.subject_id == Subject.id)
+        .outerjoin(SchoolClass, Lesson.class_id == SchoolClass.id)
+        .outerjoin(Room, TimetableEntry.room_id == Room.id)
+        .filter(
+            TimetableEntry.project_id == project_id,
+            TimetableEntry.day_index == day_index,
+            Lesson.teacher_id.in_(absent_ids),
+        )
+        .order_by(Lesson.teacher_id, TimetableEntry.period_index)
+        .all()
+    )
+
+    # 3. Already-assigned substitutions
+    subs_today = db.query(Substitution).filter(
+        Substitution.project_id == project_id,
+        Substitution.date == target_date,
+    ).all()
+    assigned_keys = {(s.absent_teacher_id, s.period_index) for s in subs_today}
+
+    # Unassigned slots
+    pending = [
+        {
+            "entry_id": e.entry_id, "period_index": e.period_index,
+            "room_id": e.room_id, "lesson_id": e.lesson_id,
+            "teacher_id": e.teacher_id, "subject_id": e.subject_id,
+            "class_id": e.class_id, "subject_name": e.subject_name or "",
+            "class_name": e.class_name or "", "room_name": e.room_name or "",
+        }
+        for e in entries
+        if (e.teacher_id, e.period_index) not in assigned_keys
+    ]
+
+    if not pending:
+        return {"slots": [], "suggestions": {}}
+
+    # 4. Batch-compute suggestions: one set of queries for ALL periods
+    all_teachers = db.query(Teacher).filter(Teacher.project_id == project_id).all()
+    teachers_by_id = {t.id: t for t in all_teachers}
+
+    # Busy map: period_index → set of teacher_ids busy at that period
+    busy_q = (
+        db.query(TimetableEntry.period_index, Lesson.teacher_id)
+        .join(Lesson, TimetableEntry.lesson_id == Lesson.id)
+        .filter(
+            TimetableEntry.project_id == project_id,
+            TimetableEntry.day_index == day_index,
+        )
+        .all()
+    )
+    busy_map: dict[int, set[int]] = {}
+    for row in busy_q:
+        busy_map.setdefault(row.period_index, set()).add(row.teacher_id)
+
+    # Sub-busy map: teachers already covering subs at each period today
+    sub_busy_q = db.query(Substitution.period_index, Substitution.sub_teacher_id).filter(
+        Substitution.project_id == project_id,
+        Substitution.date == target_date,
+    ).all()
+    sub_busy_map: dict[int, set[int]] = {}
+    for row in sub_busy_q:
+        sub_busy_map.setdefault(row.period_index, set()).add(row.sub_teacher_id)
+
+    absent_set = set(absent_ids)
+
+    # Periods today per teacher
+    periods_today_q = (
+        db.query(Lesson.teacher_id, sqla_func.count(TimetableEntry.id).label("cnt"))
+        .join(TimetableEntry, TimetableEntry.lesson_id == Lesson.id)
+        .filter(TimetableEntry.project_id == project_id, TimetableEntry.day_index == day_index)
+        .group_by(Lesson.teacher_id)
+        .all()
+    )
+    periods_today_map = {r.teacher_id: r.cnt for r in periods_today_q}
+
+    # Subs this week per teacher
+    wk_start = target_date - __import__("datetime").timedelta(days=target_date.weekday())
+    wk_end = wk_start + __import__("datetime").timedelta(days=6)
+    subs_week_q = (
+        db.query(Substitution.sub_teacher_id, sqla_func.count(Substitution.id).label("cnt"))
+        .filter(
+            Substitution.project_id == project_id,
+            Substitution.date >= wk_start,
+            Substitution.date <= wk_end,
+        )
+        .group_by(Substitution.sub_teacher_id)
+        .all()
+    )
+    subs_week_map = {r.sub_teacher_id: r.cnt for r in subs_week_q}
+
+    # Teacher subject lookup
+    from backend.models.teacher_model import TeacherSubject
+    subject_q = (
+        db.query(TeacherSubject.teacher_id, Subject.name)
+        .join(Subject, TeacherSubject.subject_id == Subject.id)
+        .filter(TeacherSubject.teacher_id.in_([t.id for t in all_teachers]))
+        .all()
+    )
+    subject_map: dict[int, str] = {}
+    for tid, sname in subject_q:
+        if tid not in subject_map:
+            subject_map[tid] = sname
+
+    # 5. For each pending period, find top-3 free teachers
+    suggestions: dict[str, list] = {}
+    for slot in pending:
+        pi = slot["period_index"]
+        busy_at_period = busy_map.get(pi, set())
+        sub_busy_at_period = sub_busy_map.get(pi, set())
+        excluded = busy_at_period | sub_busy_at_period | absent_set
+
+        free = []
+        for t in all_teachers:
+            if t.id in excluded:
+                continue
+            pt = periods_today_map.get(t.id, 0)
+            sw = subs_week_map.get(t.id, 0)
+            name = f"{t.first_name or ''} {t.last_name or ''}".strip()
+            free.append({
+                "teacher_id": t.id,
+                "teacher_name": name,
+                "initials": "".join(w[0] for w in name.split() if w).upper()[:2],
+                "subject": subject_map.get(t.id, ""),
+                "periods_today": pt,
+                "subs_this_week": sw,
+                "sub_limit_reached": sw >= 2,
+                "best_fit": False,
+            })
+
+        # Fairness sort
+        free.sort(key=lambda x: (x["periods_today"], x["subs_this_week"]))
+        if free:
+            free[0]["best_fit"] = True
+
+        key = f"{slot['teacher_id']}-{pi}"
+        suggestions[key] = free[:3]
+
+    return {"slots": pending, "suggestions": suggestions}
+
+
 # ─── Delete Substitution ─────────────────────────────────────────────────────
 
 @router.delete("/{sub_id}")
