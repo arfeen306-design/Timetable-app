@@ -204,7 +204,8 @@ def _handle_oauth_user(db: Session, email: str, name: str, provider: str, settin
             "school_id": school_id,
         }
         token = create_access_token(subject=user.email, payload=payload)
-        return RedirectResponse(f"{settings.app_url}/oauth-callback?token={token}")
+        log.info("OAuth login: existing user %s, redirecting with token", email)
+        return RedirectResponse(f"{settings.app_url}/oauth-callback?token={token}", status_code=302)
 
     # New user — create with is_approved=True (OAuth users are trusted)
     user = User(
@@ -246,4 +247,5 @@ def _handle_oauth_user(db: Session, email: str, name: str, provider: str, settin
         "school_id": school_id,
     }
     token = create_access_token(subject=user.email, payload=payload)
-    return RedirectResponse(f"{settings.app_url}/oauth-callback?token={token}")
+    log.info("OAuth login: new user %s created via %s, redirecting with token", email, provider)
+    return RedirectResponse(f"{settings.app_url}/oauth-callback?token={token}", status_code=302)
