@@ -563,6 +563,10 @@ export function getTeacherSlots(projectId: number, dt: string, teacherId: number
   return api<AbsentSlot[]>(`/api/projects/${projectId}/substitutions/teacher-slots?date=${dt}&teacher_id=${teacherId}`);
 }
 
+export function listPendingSlots(projectId: number, dt: string) {
+  return api<AbsentSlot[]>(`/api/projects/${projectId}/substitutions/pending?date=${dt}`);
+}
+
 export function exportWorkloadPDF(projectId: number, week?: string) {
   const qs = week ? `?week=${week}` : "";
   window.open(`/api/projects/${projectId}/workload/export-pdf${qs}`, "_blank");

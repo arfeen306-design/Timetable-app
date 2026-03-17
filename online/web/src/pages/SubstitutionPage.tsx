@@ -5,7 +5,7 @@ import {
   listTeachers, listAcademicWeeks,
   markAbsent, getFreeTeachers, assignSubstitute,
   listSubstitutions, listAbsences, deleteSubstitution, removeAbsence,
-  getTeacherSlots,
+  getTeacherSlots, listPendingSlots,
   type AbsentSlot, type FreeTeacher, type SubstitutionRecord, type AbsenceRecord, type AcademicWeekInfo,
 } from "../api";
 
@@ -102,6 +102,8 @@ export default function SubstitutionPage() {
     if (!pid) return;
     listAbsences(pid, date).then(setAbsences).catch(console.error);
     listSubstitutions(pid, date).then(setSubs).catch(console.error);
+    // Load pending (unassigned) slots from DB — survives navigation
+    listPendingSlots(pid, date).then(setAbsentSlots).catch(console.error);
   }, [pid, date]);
 
   useEffect(() => { loadDayData(); }, [loadDayData]);
@@ -116,7 +118,12 @@ export default function SubstitutionPage() {
     setLoading(true); setMsg("");
     try {
       const res = await markAbsent(pid, { date, teacher_ids: selectedAbsent, reason });
-      setAbsentSlots(res.slots);
+      // Merge new slots into existing (de-duplicate by teacher_id + period_index)
+      setAbsentSlots(prev => {
+        const existing = new Set(prev.map(s => `${s.teacher_id}-${s.period_index}`));
+        const newOnes = res.slots.filter(s => !existing.has(`${s.teacher_id}-${s.period_index}`));
+        return [...prev, ...newOnes];
+      });
       setMsg(`✅ ${res.absences_created.length} teacher(s) marked absent. ${res.slots.length} period(s) need coverage.`);
       setSelectedAbsent([]); setReason("");
       loadDayData();
@@ -161,6 +168,10 @@ export default function SubstitutionPage() {
         force_override: forceOverride,
       });
       setMsg(`✅ ${res.message}`);
+      // Remove the assigned slot from absentSlots in-place
+      setAbsentSlots(prev => prev.filter(
+        s => !(s.teacher_id === confirm.absentTeacherId && s.period_index === confirm.period)
+      ));
       setExpandedSlot(null); setConfirm(null); setOverrideWarning(null);
       loadDayData();
     } catch (e: unknown) {

@@ -349,6 +349,84 @@ def list_absences(
     ]
 
 
+# ─── Pending (Unassigned) Periods ─────────────────────────────────────────────
+
+@router.get("/pending")
+def pending_periods(
+    project_id: int = Path(...),
+    dt: str = Query(..., alias="date", description="YYYY-MM-DD"),
+    project=Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    """Return all unassigned slots for a date — absent teachers' timetable
+    entries that have no substitution yet. Survives page navigation."""
+    target_date = date.fromisoformat(dt)
+    day_index = target_date.weekday()
+
+    # 1. Who is absent?
+    absences = db.query(TeacherAbsence).filter(
+        TeacherAbsence.project_id == project_id,
+        TeacherAbsence.date == target_date,
+    ).all()
+    absent_ids = [a.teacher_id for a in absences]
+    if not absent_ids:
+        return []
+
+    # 2. Their timetable entries for that day
+    entries = (
+        db.query(
+            TimetableEntry.id.label("entry_id"),
+            TimetableEntry.period_index,
+            TimetableEntry.room_id,
+            Lesson.id.label("lesson_id"),
+            Lesson.teacher_id,
+            Lesson.subject_id,
+            Lesson.class_id,
+            Subject.name.label("subject_name"),
+            SchoolClass.name.label("class_name"),
+            Room.name.label("room_name"),
+        )
+        .join(Lesson, TimetableEntry.lesson_id == Lesson.id)
+        .outerjoin(Subject, Lesson.subject_id == Subject.id)
+        .outerjoin(SchoolClass, Lesson.class_id == SchoolClass.id)
+        .outerjoin(Room, TimetableEntry.room_id == Room.id)
+        .filter(
+            TimetableEntry.project_id == project_id,
+            TimetableEntry.day_index == day_index,
+            Lesson.teacher_id.in_(absent_ids),
+        )
+        .order_by(Lesson.teacher_id, TimetableEntry.period_index)
+        .all()
+    )
+
+    # 3. Already-assigned substitutions
+    assigned_keys = set()
+    subs = db.query(Substitution).filter(
+        Substitution.project_id == project_id,
+        Substitution.date == target_date,
+    ).all()
+    for s in subs:
+        assigned_keys.add((s.absent_teacher_id, s.period_index))
+
+    # 4. Return unassigned only
+    return [
+        {
+            "entry_id": e.entry_id,
+            "period_index": e.period_index,
+            "room_id": e.room_id,
+            "lesson_id": e.lesson_id,
+            "teacher_id": e.teacher_id,
+            "subject_id": e.subject_id,
+            "class_id": e.class_id,
+            "subject_name": e.subject_name or "",
+            "class_name": e.class_name or "",
+            "room_name": e.room_name or "",
+        }
+        for e in entries
+        if (e.teacher_id, e.period_index) not in assigned_keys
+    ]
+
+
 # ─── Delete Substitution ─────────────────────────────────────────────────────
 
 @router.delete("/{sub_id}")

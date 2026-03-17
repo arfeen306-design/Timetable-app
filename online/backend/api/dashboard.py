@@ -238,12 +238,38 @@ def get_dashboard(
             .all()
         )
         assigned_keys = {(s.absent_teacher_id, s.period_index) for s in subs_today}
+
+        # Batch-load subject/class names for unassigned entries
+        unassigned_subject_ids = set()
+        unassigned_class_ids = set()
+        for entry, lesson in absent_entries:
+            key = (lesson.teacher_id, entry.period_index)
+            if key not in assigned_keys:
+                if lesson.subject_id:
+                    unassigned_subject_ids.add(lesson.subject_id)
+                if lesson.class_id:
+                    unassigned_class_ids.add(lesson.class_id)
+
+        ua_subjects = {}
+        ua_classes = {}
+        if unassigned_subject_ids:
+            from backend.models.project import Subject as SubjectModel
+            ua_subjects = {s.id: s.name for s in db.query(SubjectModel).filter(SubjectModel.id.in_(unassigned_subject_ids)).all()}
+        if unassigned_class_ids:
+            ua_classes = {c.id: c.name for c in db.query(SchoolClass).filter(SchoolClass.id.in_(unassigned_class_ids)).all()}
+
         for entry, lesson in absent_entries:
             key = (lesson.teacher_id, entry.period_index)
             if key not in assigned_keys:
                 unassigned.append({
+                    "teacher_id": lesson.teacher_id,
                     "teacher_name": teacher_name(lesson.teacher_id),
                     "period_index": entry.period_index,
+                    "lesson_id": lesson.id,
+                    "subject_name": ua_subjects.get(lesson.subject_id, ""),
+                    "class_name": ua_classes.get(lesson.class_id, ""),
+                    "room_id": entry.room_id,
+                    "room_name": "",
                 })
 
     # ── Busy/free teachers right now ──

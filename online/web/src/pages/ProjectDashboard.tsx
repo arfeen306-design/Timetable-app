@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api } from "../api";
+import { api, getFreeTeachers, assignSubstitute, type FreeTeacher } from "../api";
 import { useLivePeriod } from "../hooks/useLivePeriod";
 
 /* ── Types ── */
@@ -27,7 +27,7 @@ interface DashboardData {
     total_grades: number; total_lessons: number; attendance_pct: number;
   };
   class_breakdown: { grade: string; sections: number }[];
-  unassigned: { teacher_name: string; period_index: number }[];
+  unassigned: { teacher_id: number; teacher_name: string; period_index: number; lesson_id: number; subject_name: string; class_name: string; room_id: number | null; room_name: string }[];
   substitutions_today: {
     id: number; period_index: number; sub_teacher_name: string;
     sub_teacher_initials: string; absent_teacher_name: string;
@@ -141,6 +141,59 @@ export default function ProjectDashboard() {
     api<DashboardData>(`/api/projects/${pid}/dashboard?tz=${encodeURIComponent(clientTz)}`)
       .then(setData).catch(console.error).finally(() => setLoading(false));
   }, [pid]);
+
+  /* ── Quick Assign state ── */
+  const [qaExpanded, setQaExpanded] = useState<string | null>(null);
+  const [qaFree, setQaFree] = useState<FreeTeacher[]>([]);
+  const [qaLoading, setQaLoading] = useState(false);
+  const [qaAssigning, setQaAssigning] = useState(false);
+  const [qaMsg, setQaMsg] = useState("");
+
+  async function handleQaExpand(u: DashboardData["unassigned"][0]) {
+    const key = `${u.teacher_id}-${u.period_index}`;
+    if (qaExpanded === key) { setQaExpanded(null); return; }
+    setQaLoading(true);
+    try {
+      const absentIds = data?.absent_teachers?.map(a => a.teacher_id) || [];
+      const free = await getFreeTeachers(pid, data?.date || "", u.period_index, absentIds);
+      setQaFree(free);
+      setQaExpanded(key);
+    } catch { setQaFree([]); }
+    finally { setQaLoading(false); }
+  }
+
+  async function handleQaAssign(u: DashboardData["unassigned"][0], ft: FreeTeacher, force = false) {
+    setQaAssigning(true);
+    try {
+      await assignSubstitute(pid, {
+        date: data?.date || "",
+        period_index: u.period_index,
+        absent_teacher_id: u.teacher_id,
+        sub_teacher_id: ft.teacher_id,
+        lesson_id: u.lesson_id,
+        room_id: u.room_id,
+        force_override: force,
+      });
+      setQaMsg(`✅ ${ft.teacher_name} assigned to L${u.period_index + 1}`);
+      setQaExpanded(null);
+      // Refresh dashboard data
+      const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      api<DashboardData>(`/api/projects/${pid}/dashboard?tz=${encodeURIComponent(clientTz)}`)
+        .then(setData).catch(console.error);
+      setTimeout(() => setQaMsg(""), 3000);
+    } catch (e: unknown) {
+      const err = e as { status?: number; detail?: { code?: string; teacher_name?: string; sub_count?: number } };
+      if (err.status === 409 && err.detail?.code === "LIMIT_EXCEEDED") {
+        if (window.confirm(`${err.detail.teacher_name} has ${err.detail.sub_count} subs this week (limit 2). Override?`)) {
+          await handleQaAssign(u, ft, true);
+        }
+      } else {
+        setQaMsg(`❌ ${e instanceof Error ? e.message : "Assignment failed"}`);
+        setTimeout(() => setQaMsg(""), 4000);
+      }
+    }
+    finally { setQaAssigning(false); }
+  }
 
   // ── useLivePeriod must be called unconditionally (Rules of Hooks) ──
   const slots = data?.lesson_slots ?? E_SLOTS;
@@ -427,33 +480,96 @@ export default function ProjectDashboard() {
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: "0.55rem", color: "#fff", fontWeight: 700, flexShrink: 0,
             }}>!</div>
-            <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#8A1526" }}>Unassigned periods — absent teacher classes with no substitute</div>
+            <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#8A1526" }}>Unassigned periods — Quick Assign available</div>
             <div style={{
               marginLeft: "auto", background: "#E8334A", color: "#fff",
               fontSize: "0.6rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
             }}>{uncovered} urgent</div>
           </div>
+          {qaMsg && (
+            <div style={{ padding: "8px 18px", background: qaMsg.startsWith("✅") ? "#F0FDF4" : "#FEF2F2", fontSize: "0.75rem", fontWeight: 600, color: qaMsg.startsWith("✅") ? "#166534" : "#991B1B" }}>
+              {qaMsg}
+            </div>
+          )}
           <div>
-            {unassigned.map((u, i) => (
-              <div key={i} style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "10px 18px", borderBottom: i < unassigned.length - 1 ? "1px solid #FEE8EB" : "none",
-              }}>
-                <span style={{
-                  fontFamily: "var(--font-mono)", fontSize: "0.68rem", fontWeight: 700,
-                  background: "#FDEAED", color: "#E8334A", padding: "2px 7px", borderRadius: 4,
-                  whiteSpace: "nowrap",
-                }}>L{u.period_index + 1}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--slate-900)" }}>{u.teacher_name}</div>
-                  <div style={{ fontSize: "0.68rem", color: "var(--slate-400)" }}>Absent — no substitute assigned</div>
+            {unassigned.map((u, i) => {
+              const key = `${u.teacher_id}-${u.period_index}`;
+              const isExpanded = qaExpanded === key;
+              return (
+                <div key={i}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 18px", borderBottom: (i < unassigned.length - 1 || isExpanded) ? "1px solid #FEE8EB" : "none",
+                    cursor: "pointer",
+                  }} onClick={() => handleQaExpand(u)}>
+                    <span style={{
+                      fontFamily: "var(--font-mono)", fontSize: "0.68rem", fontWeight: 700,
+                      background: "#FDEAED", color: "#E8334A", padding: "2px 7px", borderRadius: 4,
+                      whiteSpace: "nowrap",
+                    }}>L{u.period_index + 1}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--slate-900)" }}>{u.teacher_name}</div>
+                      <div style={{ fontSize: "0.68rem", color: "var(--slate-400)" }}>
+                        {u.subject_name ? `${u.subject_name} · ${u.class_name}` : "Absent — no substitute assigned"}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleQaExpand(u); }}
+                      style={{
+                        padding: "5px 12px", background: isExpanded ? "var(--slate-200)" : "#5B4EE8", color: isExpanded ? "var(--slate-700)" : "#fff", border: "none", borderRadius: 6,
+                        fontSize: "0.68rem", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+                      }}
+                    >{isExpanded ? "Close" : "Quick Assign"}</button>
+                  </div>
+                  {/* Inline free teachers panel */}
+                  {isExpanded && (
+                    <div style={{ padding: "8px 18px 12px", background: "#FAFBFE", borderBottom: "1px solid #FEE8EB" }}>
+                      {qaLoading ? (
+                        <div style={{ fontSize: "0.75rem", color: "var(--slate-400)", padding: "8px 0" }}>⏳ Finding free teachers...</div>
+                      ) : qaFree.length === 0 ? (
+                        <div style={{ fontSize: "0.75rem", color: "var(--slate-400)", padding: "8px 0" }}>No free teachers available for this period.</div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", marginBottom: 2 }}>
+                            {qaFree.length} teachers available · Click to assign
+                          </div>
+                          {qaFree.slice(0, 5).map(ft => (
+                            <div key={ft.teacher_id} style={{
+                              display: "flex", alignItems: "center", gap: 10,
+                              padding: "6px 10px", borderRadius: 8,
+                              background: ft.best_fit ? "#EEF2FF" : "#fff",
+                              border: ft.best_fit ? "1.5px solid #818CF8" : "1px solid var(--slate-200)",
+                              cursor: qaAssigning ? "wait" : "pointer",
+                            }} onClick={() => !qaAssigning && handleQaAssign(u, ft)}>
+                              <div style={{
+                                width: 26, height: 26, borderRadius: "50%", background: av(ft.teacher_id),
+                                fontSize: "0.55rem", fontWeight: 700, color: "#fff",
+                                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                              }}>{ft.teacher_name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase()}</div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--slate-900)", display: "flex", alignItems: "center", gap: 5 }}>
+                                  {ft.teacher_name}
+                                  {ft.best_fit && <span style={{ fontSize: "0.55rem", fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: "#4F46E5", color: "#fff" }}>Best fit</span>}
+                                  {ft.sub_limit_reached && <span style={{ fontSize: "0.55rem", fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: "#FEE2E2", color: "#DC2626" }}>At limit</span>}
+                                </div>
+                                <div style={{ fontSize: "0.62rem", color: "var(--slate-400)" }}>
+                                  {ft.subject || ""} · {ft.periods_today} periods today · {ft.subs_this_week}/2 subs
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {qaFree.length > 5 && (
+                            <Link to={`/project/${pid}/substitutions`} style={{ fontSize: "0.68rem", color: "#5B4EE8", fontWeight: 600, textAlign: "center", padding: "4px 0" }}>
+                              View all {qaFree.length} teachers →
+                            </Link>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <Link to={`/project/${pid}/substitutions`} style={{
-                  padding: "5px 12px", background: "#5B4EE8", color: "#fff", border: "none", borderRadius: 6,
-                  fontSize: "0.68rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap",
-                }}>Assign</Link>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
