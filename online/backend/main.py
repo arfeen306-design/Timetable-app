@@ -24,6 +24,20 @@ async def lifespan(app: FastAPI):
         init_db()
     except Exception as e:
         print(f"Warning: init_db failed: {e}")
+
+    # Auto-migrate: add is_approved column if it doesn't exist
+    try:
+        from backend.models.base import engine
+        from sqlalchemy import text, inspect
+        insp = inspect(engine)
+        cols = [c["name"] for c in insp.get_columns("users")]
+        if "is_approved" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_approved BOOLEAN NOT NULL DEFAULT false"))
+            print("Migration: added is_approved column to users table.")
+    except Exception as e:
+        print(f"Warning: is_approved migration skipped: {e}")
+
     yield
 
 

@@ -106,8 +106,8 @@ export default function Login() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
-        if (data.requires_verification) {
-          setSuccess(data.message || "Account created! Check your email to verify.");
+        if (data.requires_approval || data.requires_verification) {
+          setSuccess(data.message || "Registration successful! Your account is pending admin approval.");
           setIsSignUp(false);
         } else if (data.access_token) {
           localStorage.setItem("timetable_token", data.access_token);

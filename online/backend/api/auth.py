@@ -125,14 +125,15 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     settings = get_settings()
     smtp_configured = bool(settings.smtp_host)
 
-    # Create user (inactive if SMTP configured, active if not)
+    # Create user — is_approved=False means admin must approve before login works
     user = User(
         email=email,
         password_hash=get_password_hash(data.password),
         name=data.school_name.strip(),
         role="school_admin",
-        is_active=not smtp_configured,  # active immediately if no SMTP
-        email_verified_at=None if smtp_configured else datetime.utcnow(),
+        is_active=True,
+        is_approved=False,  # Requires admin approval
+        email_verified_at=datetime.utcnow(),
     )
     db.add(user)
     db.flush()
@@ -154,33 +155,11 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     db.add(membership)
     db.commit()
 
-    # Send verification email
-    if smtp_configured:
-        token = create_access_token(subject=email, payload={"purpose": "verify_email", "user_id": user.id})
-        email_sent = _send_verification_email(email, token)
-        return {
-            "ok": True,
-            "email_sent": email_sent,
-            "message": "Account created. Please check your email to verify your account." if email_sent
-                       else "Account created but email could not be sent. Contact support.",
-            "requires_verification": True,
-        }
-    else:
-        # No SMTP — auto-activate and return login token
-        school_id = school.id
-        payload = {
-            "id": user.id, "email": user.email,
-            "name": user.name or "", "role": user.role,
-            "school_id": school_id,
-        }
-        access_token = create_access_token(subject=user.email, payload=payload)
-        return {
-            "ok": True,
-            "requires_verification": False,
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user": payload,
-        }
+    return {
+        "ok": True,
+        "requires_approval": True,
+        "message": "Registration successful! Your account is pending admin approval. You will be able to sign in once approved.",
+    }
 
 
 # ─── VERIFY EMAIL ────────────────────────────────────────────────────────────
@@ -215,10 +194,12 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 
     email = data.email.strip().lower()
 
-    # Check if user exists but not active (pending verification)
+    # Check if user exists
     user_any = db.query(User).filter(User.email == email).first()
     if user_any and not user_any.is_active:
         raise HTTPException(403, "Please verify your email before signing in. Check your inbox.")
+    if user_any and not getattr(user_any, 'is_approved', True):
+        raise HTTPException(403, "Your account is pending admin approval. Please wait for the admin to approve your registration.")
 
     user = get_by_email(db, email)
     if not user or not verify_password(data.password, user.password_hash):

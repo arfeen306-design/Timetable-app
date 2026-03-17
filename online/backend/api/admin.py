@@ -84,12 +84,73 @@ def list_all_users(db: Session = Depends(get_db)):
                 "name": u.name,
                 "role": u.role,
                 "is_active": u.is_active,
+                "is_approved": getattr(u, "is_approved", True),
                 "created_at": u.created_at.isoformat() if hasattr(u, "created_at") and u.created_at else None,
             }
             for u in users
         ],
         "total": len(users),
     }
+
+
+# ── Pending users (awaiting approval) ───────────────────────────────────────
+
+@router.get("/pending", dependencies=[Depends(_require_admin)])
+def list_pending_users(db: Session = Depends(get_db)):
+    """List users who registered but haven't been approved yet."""
+    pending = db.query(User).filter(User.is_approved == False).order_by(User.created_at.desc()).all()
+    result = []
+    for u in pending:
+        # Find their school
+        membership = db.query(SchoolMembership).filter(SchoolMembership.user_id == u.id).first()
+        school = db.query(School).filter(School.id == membership.school_id).first() if membership else None
+        result.append({
+            "id": u.id,
+            "email": u.email,
+            "name": u.name,
+            "school_name": school.name if school else "No school",
+            "school_id": school.id if school else None,
+            "registered_at": u.created_at.isoformat() if u.created_at else None,
+        })
+    return {"pending": result, "total": len(result)}
+
+
+# ── Approve a user ──────────────────────────────────────────────────────────
+
+@router.post("/approve/{user_id}", dependencies=[Depends(_require_admin)])
+def approve_user(user_id: int, db: Session = Depends(get_db)):
+    """Approve a pending user registration. They can now log in."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, f"User {user_id} not found")
+    if getattr(user, "is_approved", True):
+        return {"ok": True, "message": f"User '{user.email}' is already approved."}
+
+    user.is_approved = True
+    db.commit()
+    return {"ok": True, "message": f"User '{user.email}' approved! They can now sign in."}
+
+
+# ── Reject a user ───────────────────────────────────────────────────────────
+
+@router.post("/reject/{user_id}", dependencies=[Depends(_require_admin)])
+def reject_user(user_id: int, db: Session = Depends(get_db)):
+    """Reject and delete a pending user registration (and their school)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, f"User {user_id} not found")
+
+    email = user.email
+    # Delete their school and membership
+    memberships = db.query(SchoolMembership).filter(SchoolMembership.user_id == user_id).all()
+    for m in memberships:
+        db.query(Project).filter(Project.school_id == m.school_id).delete()
+        db.query(School).filter(School.id == m.school_id).delete()
+    db.query(SchoolMembership).filter(SchoolMembership.user_id == user_id).delete()
+    db.delete(user)
+    db.commit()
+
+    return {"ok": True, "message": f"User '{email}' rejected and deleted."}
 
 
 # ── Delete a specific school ────────────────────────────────────────────────
@@ -204,9 +265,12 @@ def clear_all_data(data: ClearAllRequest, db: Session = Depends(get_db)):
 @router.get("/stats", dependencies=[Depends(_require_admin)])
 def admin_stats(db: Session = Depends(get_db)):
     """Quick overview of database contents."""
+    pending_count = db.query(User).filter(User.is_approved == False).count()
     return {
         "users": db.query(User).count(),
+        "users_pending_approval": pending_count,
         "schools": db.query(School).count(),
         "projects": db.query(Project).count(),
         "memberships": db.query(SchoolMembership).count(),
     }
+
