@@ -44,8 +44,8 @@ def google_login(request: Request):
     if not settings.google_client_id:
         raise HTTPException(501, "Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.")
 
-    # Build callback URL dynamically from the request
-    callback_url = str(request.base_url).rstrip("/") + "/api/auth/google/callback"
+    # Build callback URL from APP_URL (not request.base_url which is http behind proxy)
+    callback_url = settings.app_url.rstrip("/") + "/api/auth/google/callback"
 
     params = {
         "client_id": settings.google_client_id,
@@ -67,7 +67,7 @@ def google_callback(request: Request, code: str = "", error: str = "", db: Sessi
     if not code:
         return RedirectResponse(f"{settings.app_url}/login?error=No+code+received")
 
-    callback_url = str(request.base_url).rstrip("/") + "/api/auth/google/callback"
+    callback_url = settings.app_url.rstrip("/") + "/api/auth/google/callback"
 
     # Exchange code for tokens
     try:
@@ -121,7 +121,7 @@ def microsoft_login(request: Request):
     if not settings.microsoft_client_id:
         raise HTTPException(501, "Microsoft OAuth not configured. Set MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET.")
 
-    callback_url = str(request.base_url).rstrip("/") + "/api/auth/microsoft/callback"
+    callback_url = settings.app_url.rstrip("/") + "/api/auth/microsoft/callback"
 
     params = {
         "client_id": settings.microsoft_client_id,
@@ -143,7 +143,7 @@ def microsoft_callback(request: Request, code: str = "", error: str = "", db: Se
     if not code:
         return RedirectResponse(f"{settings.app_url}/login?error=No+code+received")
 
-    callback_url = str(request.base_url).rstrip("/") + "/api/auth/microsoft/callback"
+    callback_url = settings.app_url.rstrip("/") + "/api/auth/microsoft/callback"
 
     # Exchange code for tokens
     try:
