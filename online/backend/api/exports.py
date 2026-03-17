@@ -34,6 +34,7 @@ def _compute_col_headers(settings) -> list[dict]:
     """
     Returns list of column dicts: {type, label, sub, period_index}
     type = "period" | "break" | "zero"
+    Uses per-lesson durations from bell_schedule_json if available.
     """
     school_start = getattr(settings, "school_start_time", None) or "08:00"
     period_dur = getattr(settings, "period_duration_minutes", None) or 45
@@ -53,6 +54,7 @@ def _compute_col_headers(settings) -> list[dict]:
 
     first_period = bell.get("first_period_start") or school_start
     zero_period = bool(bell.get("zero_period"))
+    lesson_durations = bell.get("lesson_durations") or []
 
     # Regular breaks (not friday)
     day_breaks = [b for b in breaks if not b.get("is_friday")]
@@ -72,21 +74,24 @@ def _compute_col_headers(settings) -> list[dict]:
 
     current = _parse_time(first_period)
     for p in range(num_periods):
-        end = current + period_dur
+        # Per-lesson duration: use array if available, else default
+        dur = lesson_durations[p] if p < len(lesson_durations) and lesson_durations[p] else period_dur
+        end = current + dur
         cols.append({"type": "period", "label": str(p + 1), "sub": f"{_fmt_time(current)} TO {_fmt_time(end)}", "period_index": p})
         current = end
         brk = break_by_idx.get(p)
         if brk:
-            bs = _parse_time(brk.get("start", "")) if brk.get("start") else current
-            be = _parse_time(brk.get("end", "")) if brk.get("end") else bs + (brk.get("duration_minutes") or 20)
+            brk_dur = brk.get("duration_minutes") or 20
             name = brk.get("name") or "Break"
-            cols.append({"type": "break", "label": name.upper(), "sub": f"{_fmt_time(bs)} TO {_fmt_time(be)}", "period_index": -1})
-            current = be
+            cols.append({"type": "break", "label": name.upper(), "sub": f"{_fmt_time(current)} TO {_fmt_time(current + brk_dur)}", "period_index": -1})
+            current += brk_dur
 
     return cols
 
 def _compute_friday_headers(settings) -> list[dict] | None:
-    """Returns Friday-specific column headers, or None if no Friday difference."""
+    """Returns exceptional-day-specific column headers, or None if no difference.
+    Uses per-lesson durations and correct period count for the exceptional day.
+    """
     bell = {}
     try:
         raw = getattr(settings, "bell_schedule_json", None) or "{}"
@@ -101,7 +106,9 @@ def _compute_friday_headers(settings) -> list[dict] | None:
     num_periods = getattr(settings, "periods_per_day", None) or 7
 
     fri_start = bell.get("friday_first_period_start") or bell.get("first_period_start") or school_start
-    fri_dur = bell.get("friday_period_duration") or period_dur
+    fri_dur = bell.get("friday_default_duration") or period_dur
+    fri_periods = bell.get("friday_periods_per_day") or num_periods
+    fri_lesson_durations = bell.get("friday_lesson_durations") or []
     zero_period = bool(bell.get("zero_period"))
 
     breaks = []
@@ -125,17 +132,18 @@ def _compute_friday_headers(settings) -> list[dict] | None:
             cols.append({"type": "zero", "label": "0", "sub": f"{_fmt_time(ss)} TO {_fmt_time(fp)}", "period_index": -1})
 
     current = _parse_time(fri_start)
-    for p in range(num_periods):
-        end = current + fri_dur
+    for p in range(int(fri_periods)):
+        # Per-lesson duration: use array if available, else default
+        dur = fri_lesson_durations[p] if p < len(fri_lesson_durations) and fri_lesson_durations[p] else fri_dur
+        end = current + dur
         cols.append({"type": "period", "label": str(p + 1), "sub": f"{_fmt_time(current)} TO {_fmt_time(end)}", "period_index": p})
         current = end
         brk = break_by_idx.get(p)
         if brk:
-            bs = _parse_time(brk.get("start", "")) if brk.get("start") else current
-            be = _parse_time(brk.get("end", "")) if brk.get("end") else bs + (brk.get("duration_minutes") or 20)
+            brk_dur = brk.get("duration_minutes") or 20
             name = brk.get("name") or "Break"
-            cols.append({"type": "break", "label": name.upper(), "sub": f"{_fmt_time(bs)} TO {_fmt_time(be)}", "period_index": -1})
-            current = be
+            cols.append({"type": "break", "label": name.upper(), "sub": f"{_fmt_time(current)} TO {_fmt_time(current + brk_dur)}", "period_index": -1})
+            current += brk_dur
 
     return cols
 
