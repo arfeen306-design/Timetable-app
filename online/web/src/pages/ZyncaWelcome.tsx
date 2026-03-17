@@ -70,21 +70,11 @@ export default function ZyncaWelcome() {
       <div className="mz-hero">
         <div className="mz-shield-container">
           <div className="mz-shield-glow" />
-          <svg className="mz-shield-icon" viewBox="0 0 60 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="shieldGrad" x1="0" y1="0" x2="60" y2="72" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#1C2E4A" />
-                <stop offset="100%" stopColor="#52677D" />
-              </linearGradient>
-              <linearGradient id="shieldFill" x1="0" y1="0" x2="60" y2="72" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="rgba(28,46,74,0.12)" />
-                <stop offset="100%" stopColor="rgba(82,103,125,0.08)" />
-              </linearGradient>
-            </defs>
-            <path d="M30 2L4 16v20c0 18 12 28 26 32 14-4 26-14 26-32V16L30 2z"
-              stroke="url(#shieldGrad)" strokeWidth="2.5" fill="url(#shieldFill)" />
-            <text x="30" y="46" textAnchor="middle" fontSize="24" fontWeight="800"
-              fill="url(#shieldGrad)" fontFamily="'Sora', sans-serif">Z</text>
+          <svg className="mz-shield-icon" viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="64" height="64" rx="16" ry="16"
+              fill="#FFFFFF" stroke="#1C2E4A" strokeWidth="2.5" />
+            <text x="34" y="44" textAnchor="middle" fontSize="28" fontWeight="800"
+              fill="#1C2E4A" fontFamily="'Sora', sans-serif">Z</text>
           </svg>
         </div>
 
