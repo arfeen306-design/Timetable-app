@@ -69,7 +69,7 @@
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  color: var(--slate-500, #64748B);
+  color: #7DFFB3;
   font-size: 13px;
   font-weight: 500;
   font-family: var(--font-body, 'Inter', sans-serif);
@@ -79,13 +79,13 @@
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .top-tab:hover {
-  color: var(--slate-400, #94A3B8);
-  background: rgba(255,255,255,0.03);
+  color: #A8FFD0;
+  background: rgba(125,255,179,0.04);
 }
 .top-tab.active {
   color: #fff;
-  border-bottom-color: var(--primary-600, #4F46E5);
-  background: rgba(79,70,229,0.1);
+  border-bottom-color: #7DFFB3;
+  background: rgba(125,255,179,0.08);
 }
 
 .tab-icon  { font-size: 15px; line-height: 1; }
@@ -148,7 +148,7 @@
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--slate-500, #64748B);
+  color: rgba(125,255,179,0.5);
   padding: 8px 14px 4px;
   letter-spacing: 0.08em;
 }
@@ -161,19 +161,19 @@
   padding: 8px 14px;
   background: none;
   border: none;
-  color: var(--slate-400, #94A3B8);
+  color: #7DFFB3;
   font-size: 13px;
   font-family: var(--font-body, 'Inter', sans-serif);
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
 .tab-dropdown-item:hover {
-  background: rgba(255,255,255,0.04);
-  color: var(--slate-300, #CBD5E1);
+  background: rgba(125,255,179,0.06);
+  color: #A8FFD0;
 }
 .tab-dropdown-item.active {
-  color: #60A5FA;
-  background: rgba(59,130,246,0.12);
+  color: #FFFFFF;
+  background: rgba(125,255,179,0.10);
 }
 
 .tab-dropdown-icon {
