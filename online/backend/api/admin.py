@@ -27,8 +27,8 @@ def _require_admin(
     x_admin_key: Optional[str] = Header(None),
 ) -> None:
     """Allow access if user is super_admin OR if X-Admin-Key matches env ADMIN_KEY."""
-    import os
-    admin_key = os.environ.get("ADMIN_KEY", "")
+    settings = get_settings()
+    admin_key = settings.admin_key
 
     # Check header key first
     if admin_key and x_admin_key and x_admin_key == admin_key:

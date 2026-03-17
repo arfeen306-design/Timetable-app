@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production-use-openssl-rand-hex-32"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+    admin_key: str = "schedulr-admin-2026"  # Override via ADMIN_KEY env var
 
     # CORS: comma-separated list of allowed origins.
     # e.g. ALLOWED_ORIGINS=https://your-app.vercel.app,https://www.yourdomain.com
