@@ -44,6 +44,7 @@ def update(
     saturday_end_time: Optional[str] = None,
     bell_schedule_json: Optional[str] = None,
     breaks_json: Optional[str] = None,
+    daily_limits_json: Optional[str] = None,
 ) -> SchoolSettings:
     s = get_or_create(db, project_id)
     if name is not None:
@@ -80,6 +81,8 @@ def update(
         s.bell_schedule_json = bell_schedule_json
     if breaks_json is not None:
         s.breaks_json = breaks_json
+    if daily_limits_json is not None:
+        s.daily_limits_json = daily_limits_json
     db.commit()
     db.refresh(s)
     return s

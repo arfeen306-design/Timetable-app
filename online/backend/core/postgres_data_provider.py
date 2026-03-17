@@ -66,6 +66,7 @@ class PostgresDataProvider:
             "school_end_time": getattr(settings, "school_end_time", "15:00"),
             "friday_start_time": getattr(settings, "friday_start_time", None),
             "friday_end_time": getattr(settings, "friday_end_time", None),
+            "daily_limits_json": getattr(settings, "daily_limits_json", "{}"),
         }
 
     def get_subjects(self) -> list[dict[str, Any]]:

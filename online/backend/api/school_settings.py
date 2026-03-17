@@ -33,6 +33,7 @@ class SchoolSettingsResponse(BaseModel):
     saturday_end_time: Optional[str] = None
     bell_schedule_json: str
     breaks_json: str = "[]"
+    daily_limits_json: str = "{}"
 
     class Config:
         from_attributes = True
@@ -56,6 +57,7 @@ class SchoolSettingsUpdate(BaseModel):
     saturday_end_time: Optional[str] = None
     bell_schedule_json: Optional[str] = None
     breaks_json: Optional[str] = None
+    daily_limits_json: Optional[str] = None
 
 
 @router.get("", response_model=SchoolSettingsResponse)
@@ -84,6 +86,7 @@ def get_school_settings(
         saturday_end_time=getattr(s, "saturday_end_time", None),
         bell_schedule_json=s.bell_schedule_json,
         breaks_json=getattr(s, "breaks_json", "[]"),
+        daily_limits_json=getattr(s, "daily_limits_json", "{}"),
     )
 
 
@@ -114,6 +117,7 @@ def update_school_settings(
         saturday_end_time=data.saturday_end_time,
         bell_schedule_json=data.bell_schedule_json,
         breaks_json=data.breaks_json,
+        daily_limits_json=data.daily_limits_json,
     )
     return SchoolSettingsResponse.model_validate(s)
 

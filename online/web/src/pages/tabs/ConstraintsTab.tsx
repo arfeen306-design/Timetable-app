@@ -6,6 +6,13 @@ type Constraint = Awaited<ReturnType<typeof api.listConstraints>>[0];
 type Teacher = Awaited<ReturnType<typeof api.listTeachers>>[0];
 type SchoolClass = Awaited<ReturnType<typeof api.listClasses>>[0];
 type Room = Awaited<ReturnType<typeof api.listRooms>>[0];
+type Subject = Awaited<ReturnType<typeof api.listSubjects>>[0];
+type Lesson = Awaited<ReturnType<typeof api.listLessons>>[0];
+
+type DailyLimits = {
+  global_max: number;
+  overrides: { teacher_id: number; class_id: number; subject_id: number; max_per_day: number }[];
+};
 
 interface Props {
   pid: number;
@@ -13,14 +20,17 @@ interface Props {
   teachers: Teacher[];
   classes: SchoolClass[];
   rooms: Room[];
-  settings: { days_per_week: number; periods_per_day: number; weekend_days?: string; bell_schedule_json?: string } | null;
+  subjects: Subject[];
+  lessons: Lesson[];
+  settings: { days_per_week: number; periods_per_day: number; weekend_days?: string; bell_schedule_json?: string; daily_limits_json?: string } | null;
   onChange: (c: Constraint[]) => void;
+  onSettingsRefresh: () => void;
   onNext: () => void;
 }
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export default function ConstraintsTab({ pid, constraints, teachers, classes, rooms, settings, onChange, onNext }: Props) {
+export default function ConstraintsTab({ pid, constraints, teachers, classes, rooms, subjects, lessons, settings, onChange, onSettingsRefresh, onNext }: Props) {
   const toast = useToast();
   const [entityType, setEntityType] = useState<"teacher" | "class" | "room">("teacher");
   const [entityId, setEntityId] = useState<number | null>(null);
@@ -37,12 +47,9 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
 
   // Compute working day indices: show all 7 days, exclude only weekend days
   const workingDayIndices = useMemo(() => {
-    // Parse weekend days
     const weekendSet = new Set<number>();
     const wd = settings?.weekend_days || "5,6";
     wd.split(",").filter(Boolean).forEach(d => weekendSet.add(parseInt(d.trim())));
-
-    // Build working day indices: 0..6 (Mon-Sun), excluding weekends
     const indices: number[] = [];
     for (let d = 0; d < 7; d++) {
       if (!weekendSet.has(d)) indices.push(d);
@@ -74,17 +81,14 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
   /* ── Sync local state from server constraints when entity changes ── */
   useEffect(() => {
     if (allMode) {
-      // In "all" mode, show intersection of constraints (what's shared by all entities)
       const ids = entityList.map(e => e.id);
       if (ids.length === 0) { setLocalUnavailable(new Set()); return; }
-      // Start with first entity's constraints, then intersect
       const sets = ids.map(id => {
         const s = new Set<string>();
         constraints.filter(c => c.entity_type === entityType && c.entity_id === id)
           .forEach(c => s.add(`${c.day_index}-${c.period_index}`));
         return s;
       });
-      // A slot is "unavailable for all" if ALL entities have it marked
       const intersection = new Set<string>();
       if (sets.length > 0) {
         sets[0].forEach(key => {
@@ -141,7 +145,6 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
     setSaving(true);
     try {
       if (allMode) {
-        // Apply to ALL entities of this type
         const ids = entityList.map(e => e.id);
         let totalAdded = 0, totalRemoved = 0;
         for (const eid of ids) {
@@ -198,7 +201,115 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
     if (dirty) {
       await saveConstraints();
     }
+    if (limitsDirty) {
+      await saveDailyLimits();
+    }
     onNext();
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // Daily Subject Limits Section
+  // ═══════════════════════════════════════════════════════════
+  const [limitsSearch, setLimitsSearch] = useState("");
+  const [limitsDirty, setLimitsDirty] = useState(false);
+  const [savingLimits, setSavingLimits] = useState(false);
+
+  // Parse current daily limits from settings
+  const [dailyLimits, setDailyLimits] = useState<DailyLimits>({ global_max: 1, overrides: [] });
+
+  useEffect(() => {
+    try {
+      const raw = settings?.daily_limits_json || "{}";
+      const parsed = JSON.parse(raw);
+      setDailyLimits({
+        global_max: parsed.global_max ?? 1,
+        overrides: Array.isArray(parsed.overrides) ? parsed.overrides : [],
+      });
+    } catch {
+      setDailyLimits({ global_max: 1, overrides: [] });
+    }
+  }, [settings?.daily_limits_json]);
+
+  // Build teacher/class/subject lookups
+  const teacherMap = useMemo(() => Object.fromEntries(teachers.map(t => [t.id, `${t.title || ""} ${t.first_name} ${t.last_name}`.trim()])), [teachers]);
+  const classMap = useMemo(() => Object.fromEntries(classes.map(c => [c.id, c.name])), [classes]);
+  const subjectMap = useMemo(() => Object.fromEntries(subjects.map(s => [s.id, { name: s.name, code: s.code }])), [subjects]);
+
+  // Build assignment rows from lessons
+  const assignmentRows = useMemo(() => {
+    return lessons.map(l => {
+      const override = dailyLimits.overrides.find(
+        o => o.teacher_id === l.teacher_id && o.class_id === l.class_id && o.subject_id === l.subject_id
+      );
+      return {
+        teacher_id: l.teacher_id,
+        class_id: l.class_id,
+        subject_id: l.subject_id,
+        periods_per_week: l.periods_per_week,
+        teacher_name: teacherMap[l.teacher_id] || `Teacher #${l.teacher_id}`,
+        class_name: classMap[l.class_id] || `Class #${l.class_id}`,
+        subject_name: subjectMap[l.subject_id]?.name || `Subject #${l.subject_id}`,
+        subject_code: subjectMap[l.subject_id]?.code || "",
+        max_per_day: override?.max_per_day ?? dailyLimits.global_max,
+        has_override: !!override,
+      };
+    });
+  }, [lessons, dailyLimits, teacherMap, classMap, subjectMap]);
+
+  // Filtered rows
+  const filteredRows = useMemo(() => {
+    if (!limitsSearch.trim()) return assignmentRows;
+    const q = limitsSearch.toLowerCase();
+    return assignmentRows.filter(
+      r => r.teacher_name.toLowerCase().includes(q) || r.class_name.toLowerCase().includes(q) || r.subject_name.toLowerCase().includes(q)
+    );
+  }, [assignmentRows, limitsSearch]);
+
+  // Warnings: check if lessons can fit
+  const numWorkingDays = workingDayIndices.length;
+  const warnings = useMemo(() => {
+    const w: string[] = [];
+    for (const r of assignmentRows) {
+      if (r.periods_per_week > r.max_per_day * numWorkingDays) {
+        w.push(`${r.subject_name} (${r.class_name}, ${r.teacher_name}): ${r.periods_per_week} lessons/week cannot fit into ${numWorkingDays} days with limit of ${r.max_per_day}/day.`);
+      }
+    }
+    return w;
+  }, [assignmentRows, numWorkingDays]);
+
+  function setGlobalMax(val: number) {
+    setDailyLimits(prev => ({ ...prev, global_max: val }));
+    setLimitsDirty(true);
+  }
+
+  function setOverride(teacher_id: number, class_id: number, subject_id: number, max_per_day: number) {
+    setDailyLimits(prev => {
+      const filtered = prev.overrides.filter(
+        o => !(o.teacher_id === teacher_id && o.class_id === class_id && o.subject_id === subject_id)
+      );
+      // Only add override if different from global
+      if (max_per_day !== prev.global_max) {
+        filtered.push({ teacher_id, class_id, subject_id, max_per_day });
+      }
+      return { ...prev, overrides: filtered };
+    });
+    setLimitsDirty(true);
+  }
+
+  async function saveDailyLimits() {
+    setSavingLimits(true);
+    try {
+      await api.updateSchoolSettings(pid, {
+        daily_limits_json: JSON.stringify(dailyLimits),
+      });
+      onSettingsRefresh();
+      setLimitsDirty(false);
+      toast("success", "Daily subject limits saved.");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSavingLimits(false);
+    }
   }
 
   return (
@@ -292,7 +403,7 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
         </div>
       )}
 
-      {/* ── Actions ── */}
+      {/* ── Save Availability ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem" }}>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <button type="button" className="btn btn-primary" onClick={saveConstraints} disabled={saving || !dirty}>
@@ -300,9 +411,133 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
           </button>
           {dirty && <span style={{ color: "#e67e22", fontSize: "0.85rem", fontWeight: 500 }}>● Unsaved changes</span>}
         </div>
-        <div>
-          <button type="button" className="btn" onClick={handleNext}>Next: Generate →</button>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* DAILY SUBJECT LIMITS SECTION                       */}
+      {/* ═══════════════════════════════════════════════════ */}
+      <div style={{ marginTop: "2.5rem", borderTop: "2px solid #e2e8f0", paddingTop: "1.5rem" }}>
+        <h3 style={{ margin: "0 0 0.25rem", color: "#1e293b", fontSize: "1.15rem" }}>📊 Daily Subject Limits</h3>
+        <p style={{ color: "#64748b", fontSize: "0.85rem", marginBottom: "1.25rem" }}>
+          Control how many times a subject can appear per day for a given teacher-class assignment. The solver will enforce these limits.
+        </p>
+
+        {/* Global default */}
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.25rem", background: "#f1f5f9", padding: "0.75rem 1rem", borderRadius: 8 }}>
+          <label style={{ fontWeight: 600, color: "#334155", fontSize: "0.9rem", whiteSpace: "nowrap" }}>
+            Default max lessons per subject/day:
+          </label>
+          <select
+            value={dailyLimits.global_max}
+            onChange={e => setGlobalMax(Number(e.target.value))}
+            style={{ width: 70, fontWeight: 600, fontSize: "1rem" }}
+          >
+            <option value={1}>1</option>
+            <option value={2}>2</option>
+            <option value={3}>3</option>
+          </select>
+          <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>
+            (applies to all assignments unless overridden below)
+          </span>
         </div>
+
+        {/* Warnings */}
+        {warnings.length > 0 && (
+          <div style={{ background: "#fef3c7", border: "1px solid #fbbf24", borderRadius: 8, padding: "0.75rem 1rem", marginBottom: "1rem" }}>
+            <p style={{ fontWeight: 600, color: "#92400e", margin: 0, fontSize: "0.85rem" }}>⚠️ Scheduling Warnings</p>
+            {warnings.map((w, i) => (
+              <p key={i} style={{ color: "#78350f", fontSize: "0.8rem", margin: "0.3rem 0 0" }}>• {w}</p>
+            ))}
+          </div>
+        )}
+
+        {/* Search */}
+        {lessons.length > 0 && (
+          <>
+            <div style={{ marginBottom: "0.75rem" }}>
+              <input
+                type="text"
+                placeholder="🔍 Search by teacher, class, or subject..."
+                value={limitsSearch}
+                onChange={e => setLimitsSearch(e.target.value)}
+                style={{ width: "100%", maxWidth: 400, padding: "0.5rem 0.75rem", borderRadius: 6, border: "1px solid #cbd5e1", fontSize: "0.9rem" }}
+              />
+            </div>
+
+            {/* Override table */}
+            <div style={{ overflowX: "auto", maxHeight: 400, overflowY: "auto" }}>
+              <table className="data-table" style={{ minWidth: 600 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>Teacher</th>
+                    <th style={{ textAlign: "left" }}>Class</th>
+                    <th style={{ textAlign: "left" }}>Subject</th>
+                    <th style={{ textAlign: "center" }}>Lessons/Week</th>
+                    <th style={{ textAlign: "center" }}>Max/Day</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRows.length === 0 && (
+                    <tr><td colSpan={5} style={{ textAlign: "center", color: "#94a3b8", padding: "1rem" }}>No assignments found.</td></tr>
+                  )}
+                  {filteredRows.map((r, i) => {
+                    const impossible = r.periods_per_week > r.max_per_day * numWorkingDays;
+                    return (
+                      <tr key={i} style={impossible ? { background: "#fef2f2" } : r.has_override ? { background: "#eff6ff" } : undefined}>
+                        <td style={{ fontSize: "0.85rem" }}>{r.teacher_name}</td>
+                        <td style={{ fontSize: "0.85rem" }}>{r.class_name}</td>
+                        <td style={{ fontSize: "0.85rem" }}>
+                          {r.subject_code ? <span style={{ fontWeight: 600 }}>{r.subject_code}</span> : r.subject_name}
+                          {r.subject_code && <span style={{ color: "#94a3b8", marginLeft: 4 }}>({r.subject_name})</span>}
+                        </td>
+                        <td style={{ textAlign: "center", fontWeight: 600 }}>{r.periods_per_week}</td>
+                        <td style={{ textAlign: "center" }}>
+                          <select
+                            value={r.max_per_day}
+                            onChange={e => setOverride(r.teacher_id, r.class_id, r.subject_id, Number(e.target.value))}
+                            style={{
+                              width: 55, fontWeight: 600, fontSize: "0.9rem", textAlign: "center",
+                              color: r.has_override ? "#2563eb" : "#334155",
+                              border: r.has_override ? "2px solid #3b82f6" : "1px solid #cbd5e1",
+                              borderRadius: 4,
+                            }}
+                          >
+                            <option value={1}>1</option>
+                            <option value={2}>2</option>
+                            <option value={3}>3</option>
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Save limits */}
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "1rem" }}>
+              <button type="button" className="btn btn-primary" onClick={saveDailyLimits} disabled={savingLimits || !limitsDirty}>
+                {savingLimits ? "Saving…" : "Save Daily Limits"}
+              </button>
+              {limitsDirty && <span style={{ color: "#e67e22", fontSize: "0.85rem", fontWeight: 500 }}>● Unsaved changes</span>}
+              {dailyLimits.overrides.length > 0 && (
+                <span style={{ fontSize: "0.8rem", color: "#3b82f6", fontWeight: 500, marginLeft: 8 }}>
+                  {dailyLimits.overrides.length} override{dailyLimits.overrides.length > 1 ? "s" : ""} set
+                </span>
+              )}
+            </div>
+          </>
+        )}
+        {lessons.length === 0 && (
+          <div style={{ color: "#94a3b8", fontStyle: "italic", fontSize: "0.9rem" }}>
+            Add lessons first to configure daily subject limits.
+          </div>
+        )}
+      </div>
+
+      {/* ── Next ── */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+        <button type="button" className="btn" onClick={handleNext}>Next: Generate →</button>
       </div>
     </div>
   );

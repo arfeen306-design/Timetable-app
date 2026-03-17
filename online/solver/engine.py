@@ -318,29 +318,48 @@ class TimetableSolver:
                                 model.add(room_vars[i] != ridx).only_enforce_if(b_room.negated())
                                 model.add(slot_vars[i] != forbidden_slot).only_enforce_if(b_room)
 
-        # 6. Subject max per day per class
-        for subj in subjects:
-            sid = subj["id"]
-            max_per_day_val = subj["max_per_day"]
-            if max_per_day_val <= 0:
+        # 6. Subject max per day per class — enhanced with per-teacher-class overrides
+        #    Read daily_limits_json from school settings: {global_max, overrides[{teacher_id, class_id, subject_id, max_per_day}]}
+        daily_limits = {}
+        try:
+            raw_dl = school.get("daily_limits_json", "{}") or "{}"
+            daily_limits = json.loads(raw_dl) if isinstance(raw_dl, str) else (raw_dl if isinstance(raw_dl, dict) else {})
+        except (TypeError, ValueError):
+            pass
+        global_max = daily_limits.get("global_max", 0)  # 0 means "use subject default"
+        overrides_list = daily_limits.get("overrides", [])
+        # Build fast lookup: (teacher_id, class_id, subject_id) → max_per_day
+        override_map: dict[tuple[int, int, int], int] = {}
+        for ov in overrides_list:
+            key = (ov.get("teacher_id", 0), ov.get("class_id", 0), ov.get("subject_id", 0))
+            override_map[key] = ov.get("max_per_day", 1)
+
+        # Group occurrences by (teacher, class, subject)
+        tcs_occs: dict[tuple[int, int, int], list[int]] = {}
+        for i, (lesson, _) in enumerate(occurrences):
+            key = (lesson["teacher_id"], lesson["class_id"], lesson["subject_id"])
+            tcs_occs.setdefault(key, []).append(i)
+
+        for (tid, cid, sid), occ_indices in tcs_occs.items():
+            # Determine effective max: override → global_max → subject.max_per_day
+            if (tid, cid, sid) in override_map:
+                effective_max = override_map[(tid, cid, sid)]
+            elif global_max > 0:
+                effective_max = global_max
+            else:
+                subj = subject_map.get(sid)
+                effective_max = subj["max_per_day"] if subj and subj["max_per_day"] > 0 else 99
+
+            if len(occ_indices) <= effective_max:
                 continue
-
-            subj_occs_by_class: dict[int, list[int]] = {}
-            for i, (lesson, _) in enumerate(occurrences):
-                if lesson["subject_id"] == sid:
-                    subj_occs_by_class.setdefault(lesson["class_id"], []).append(i)
-
-            for cid, occ_indices in subj_occs_by_class.items():
-                if len(occ_indices) <= max_per_day_val:
-                    continue
-                for day in range(num_days):
-                    day_bools = []
-                    for idx in occ_indices:
-                        b = model.new_bool_var(f"smd_{sid}_{cid}_{day}_{idx}")
-                        model.add(day_vars[idx] == day).only_enforce_if(b)
-                        model.add(day_vars[idx] != day).only_enforce_if(b.negated())
-                        day_bools.append(b)
-                    model.add(sum(day_bools) <= max_per_day_val)
+            for day in working_day_indices:
+                day_bools = []
+                for idx in occ_indices:
+                    b = model.new_bool_var(f"sdl_{tid}_{cid}_{sid}_{day}_{idx}")
+                    model.add(day_vars[idx] == day).only_enforce_if(b)
+                    model.add(day_vars[idx] != day).only_enforce_if(b.negated())
+                    day_bools.append(b)
+                model.add(sum(day_bools) <= effective_max)
 
         # 7. Teacher max periods per day
         for teacher in teachers:

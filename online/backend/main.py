@@ -38,6 +38,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: is_approved migration skipped: {e}")
 
+    # Auto-migrate: add daily_limits_json column to school_settings if missing
+    try:
+        from backend.models.base import engine
+        from sqlalchemy import text, inspect as sa_inspect
+        insp2 = sa_inspect(engine)
+        if "school_settings" in insp2.get_table_names():
+            cols2 = [c["name"] for c in insp2.get_columns("school_settings")]
+            if "daily_limits_json" not in cols2:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE school_settings ADD COLUMN daily_limits_json TEXT NOT NULL DEFAULT '{}'"))
+                print("Migration: added daily_limits_json column to school_settings table.")
+    except Exception as e:
+        print(f"Warning: daily_limits_json migration skipped: {e}")
+
     yield
 
 

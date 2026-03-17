@@ -79,7 +79,7 @@ export default function ProjectEditor() {
         <LessonsTab pid={pid} lessons={lessons} subjects={subjects} classes={classes} teachers={teachers} onChange={setLessons} onNext={() => navigateTab("constraints")} />
       )}
       {tab === "constraints" && (
-        <ConstraintsTab pid={pid} constraints={constraints} teachers={teachers} classes={classes} rooms={rooms} settings={settings ? { days_per_week: settings.days_per_week, periods_per_day: settings.periods_per_day, weekend_days: (settings as Record<string, unknown>).weekend_days as string || "5,6", bell_schedule_json: (settings as Record<string, unknown>).bell_schedule_json as string || "{}" } : null} onChange={setConstraints} onNext={() => navigate(`/project/${projectId}/generate`)} />
+        <ConstraintsTab pid={pid} constraints={constraints} teachers={teachers} classes={classes} rooms={rooms} subjects={subjects} lessons={lessons} settings={settings ? { days_per_week: settings.days_per_week, periods_per_day: settings.periods_per_day, weekend_days: (settings as Record<string, unknown>).weekend_days as string || "5,6", bell_schedule_json: (settings as Record<string, unknown>).bell_schedule_json as string || "{}", daily_limits_json: (settings as Record<string, unknown>).daily_limits_json as string || "{}" } : null} onChange={setConstraints} onSettingsRefresh={() => { api.getSchoolSettings(pid).then(setSettings); }} onNext={() => navigate(`/project/${projectId}/generate`)} />
       )}
     </>
   );

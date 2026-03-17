@@ -29,6 +29,7 @@ class SchoolSettings(Base):
     saturday_end_time = Column(String(10), nullable=True)
     bell_schedule_json = Column(Text, nullable=False, default="[]")
     breaks_json = Column(Text, nullable=False, default="[]")  # [{name, after_period, duration_minutes, days[], friday_override}]
+    daily_limits_json = Column(Text, nullable=False, default="{}")  # {"global_max":1,"overrides":[{teacher_id,class_id,subject_id,max_per_day}]}
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

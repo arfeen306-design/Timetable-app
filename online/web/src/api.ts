@@ -118,6 +118,7 @@ export function updateSchoolSettings(projectId: number, data: Partial<{
   friday_start_time: string | null; friday_end_time: string | null;
   saturday_start_time: string | null; saturday_end_time: string | null;
   bell_schedule_json: string; breaks_json: string;
+  daily_limits_json: string;
 }>) {
   return api(`/api/projects/${projectId}/school-settings`, { method: "PUT", body: JSON.stringify(data) });
 }
