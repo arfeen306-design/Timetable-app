@@ -187,17 +187,16 @@ def microsoft_callback(request: Request, code: str = "", error: str = "", db: Se
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _handle_oauth_user(db: Session, email: str, name: str, provider: str, settings):
-    """Find existing user or create new (pending approval). Redirect to frontend."""
+    """Find existing user or create new (auto-approved for OAuth). Redirect to frontend."""
 
     user = db.query(User).filter(User.email == email).first()
 
     if user:
-        # Existing user — check approval
+        # Existing user — auto-approve if not yet approved (e.g. previously registered via email)
         if not getattr(user, "is_approved", True):
-            return RedirectResponse(
-                f"{settings.app_url}/login?error=Your+account+is+pending+admin+approval"
-            )
-        # Approved user — issue JWT
+            user.is_approved = True
+            db.commit()
+        # Issue JWT and log in
         school_id = get_first_school_id_for_user(db, user.id)
         payload = {
             "id": user.id, "email": user.email,
@@ -207,14 +206,14 @@ def _handle_oauth_user(db: Session, email: str, name: str, provider: str, settin
         token = create_access_token(subject=user.email, payload=payload)
         return RedirectResponse(f"{settings.app_url}/oauth-callback?token={token}")
 
-    # New user — create with is_approved=False
+    # New user — create with is_approved=True (OAuth users are trusted)
     user = User(
         email=email,
         password_hash="oauth-no-password",  # OAuth users don't have passwords
         name=name,
         role="school_admin",
         is_active=True,
-        is_approved=False,
+        is_approved=True,  # Auto-approved for OAuth sign-in
         email_verified_at=datetime.utcnow(),
     )
     db.add(user)
@@ -238,6 +237,13 @@ def _handle_oauth_user(db: Session, email: str, name: str, provider: str, settin
     db.commit()
 
     log.info("New OAuth user (%s) registered via %s: %s", email, provider, name)
-    return RedirectResponse(
-        f"{settings.app_url}/login?success=Registration+successful!+Your+account+is+pending+admin+approval."
-    )
+
+    # Auto-login: issue JWT immediately
+    school_id = school.id
+    payload = {
+        "id": user.id, "email": user.email,
+        "name": user.name or "", "role": user.role,
+        "school_id": school_id,
+    }
+    token = create_access_token(subject=user.email, payload=payload)
+    return RedirectResponse(f"{settings.app_url}/oauth-callback?token={token}")
