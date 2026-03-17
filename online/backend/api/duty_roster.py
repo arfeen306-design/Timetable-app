@@ -392,7 +392,7 @@ def export_duty_roster_pdf(
     except ImportError:
         raise HTTPException(501, "reportlab not installed on server.")
 
-    from utils.pdf_branding import draw_myzynca_branding as _draw_branding
+    from utils.pdf_branding import MyznycaBrandingFlowable
 
     settings = (
         db.query(SchoolSettings)
@@ -463,8 +463,10 @@ def export_duty_roster_pdf(
         Paragraph(f"Generated {datetime.datetime.utcnow().strftime('%d %b %Y, %H:%M')} UTC", sub_style),
         Spacer(1, 6 * mm),
         tbl,
+        Spacer(1, 4 * mm),
+        MyznycaBrandingFlowable(),
     ]
-    doc.build(story, onFirstPage=_draw_branding, onLaterPages=_draw_branding)
+    doc.build(story)
     buf.seek(0)
 
     fname = f"duty_roster_{project.name or project.id}.pdf"

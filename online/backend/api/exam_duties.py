@@ -677,8 +677,11 @@ def export_exam_duties_pdf(
             styles["Normal"]
         ))
 
-    from utils.pdf_branding import draw_myzynca_branding
-    doc.build(story, onFirstPage=draw_myzynca_branding, onLaterPages=draw_myzynca_branding)
+    from utils.pdf_branding import MyznycaBrandingFlowable
+    from reportlab.lib.units import cm
+    story.append(Spacer(1, 0.4 * cm))
+    story.append(MyznycaBrandingFlowable())
+    doc.build(story)
     buf.seek(0)
     fname = f"exam_duties_{date}.pdf"
     return StreamingResponse(buf, media_type="application/pdf",

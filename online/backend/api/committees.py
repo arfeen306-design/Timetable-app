@@ -104,7 +104,7 @@ def export_committees_pdf(
     except ImportError:
         raise HTTPException(501, "reportlab not installed on server.")
 
-    from utils.pdf_branding import draw_myzynca_branding as _draw_branding
+    from utils.pdf_branding import MyznycaBrandingFlowable
 
     committees = (
         db.query(Committee)
@@ -176,7 +176,10 @@ def export_committees_pdf(
             story.append(tbl)
             story.append(Spacer(1, 4*mm))
 
-    doc.build(story, onFirstPage=_draw_branding, onLaterPages=_draw_branding)
+    story.append(Spacer(1, 4*mm))
+    story.append(MyznycaBrandingFlowable())
+
+    doc.build(story)
     buf.seek(0)
     fname = f"committees_{project.name.replace(' ','_')}.pdf"
     return StreamingResponse(buf, media_type="application/pdf",

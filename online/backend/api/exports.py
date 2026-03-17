@@ -633,8 +633,11 @@ def export_pdf_current(
     _style_pdf_table(tbl, cols, has_fri, fri_day_idx, fri_cols)
     elements.append(tbl)
 
-    from utils.pdf_branding import draw_myzynca_branding
-    doc.build(elements, onFirstPage=draw_myzynca_branding, onLaterPages=draw_myzynca_branding)
+    from utils.pdf_branding import MyznycaBrandingFlowable
+    from reportlab.lib.units import cm
+    elements.append(Spacer(1, 0.4 * cm))
+    elements.append(MyznycaBrandingFlowable())
+    doc.build(elements)
     buf.seek(0)
     fname = f"timetable_view_{project.name or project.id}.pdf"
     return StreamingResponse(buf, media_type="application/pdf",
@@ -697,8 +700,11 @@ def export_pdf_all_classes(
         if idx < len(by_class) - 1:
             elements.append(PageBreak())
 
-    from utils.pdf_branding import draw_myzynca_branding
-    doc.build(elements, onFirstPage=draw_myzynca_branding, onLaterPages=draw_myzynca_branding)
+    from utils.pdf_branding import MyznycaBrandingFlowable
+    from reportlab.lib.units import cm
+    elements.append(Spacer(1, 0.4 * cm))
+    elements.append(MyznycaBrandingFlowable())
+    doc.build(elements)
     buf.seek(0)
     fname = f"all_classes_{project.name or project.id}.pdf"
     return StreamingResponse(buf, media_type="application/pdf",
@@ -773,8 +779,11 @@ def export_pdf_all_teachers(
         if idx < len(by_teacher) - 1:
             elements.append(PageBreak())
 
-    from utils.pdf_branding import draw_myzynca_branding
-    doc.build(elements, onFirstPage=draw_myzynca_branding, onLaterPages=draw_myzynca_branding)
+    from utils.pdf_branding import MyznycaBrandingFlowable
+    from reportlab.lib.units import cm
+    elements.append(Spacer(1, 0.4 * cm))
+    elements.append(MyznycaBrandingFlowable())
+    doc.build(elements)
     buf.seek(0)
     fname = f"all_teachers_{project.name or project.id}.pdf"
     return StreamingResponse(buf, media_type="application/pdf",

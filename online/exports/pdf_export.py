@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from database.connection import DatabaseConnection
 
 
-from utils.pdf_branding import draw_myzynca_branding as _draw_branding
+from utils.pdf_branding import MyznycaBrandingFlowable
 
 
 def export_pdf(db: DatabaseConnection, path: str) -> None:
@@ -168,11 +168,13 @@ def export_pdf(db: DatabaseConnection, path: str) -> None:
 
         table.setStyle(TableStyle(style_cmds))
         elements.append(table)
+        elements.append(Spacer(1, 0.5 * cm))
+        elements.append(MyznycaBrandingFlowable())
 
         if cls_idx < len(classes) - 1:
             elements.append(PageBreak())
 
-    doc.build(elements, onFirstPage=_draw_branding, onLaterPages=_draw_branding)
+    doc.build(elements)
 
 
 def export_teacher_pdf(db: DatabaseConnection, path: str) -> None:
@@ -323,11 +325,13 @@ def export_teacher_pdf(db: DatabaseConnection, path: str) -> None:
             f"<b>Total weekly periods: {total_periods}</b>",
             styles["Normal"],
         ))
+        elements.append(Spacer(1, 0.3 * cm))
+        elements.append(MyznycaBrandingFlowable())
 
         if t_idx < len(teachers) - 1:
             elements.append(PageBreak())
 
-    doc.build(elements, onFirstPage=_draw_branding, onLaterPages=_draw_branding)
+    doc.build(elements)
 
 
 def _sanitize_filename(name: str) -> str:
@@ -406,7 +410,9 @@ def export_single_teacher_pdf(db: DatabaseConnection, teacher_id: int, path: str
     elements.append(table)
     elements.append(Spacer(1, 0.3*cm))
     elements.append(Paragraph(f"<b>Total weekly periods: {total_weekly_periods}</b>", styles["Normal"]))
-    doc.build(elements, onFirstPage=_draw_branding, onLaterPages=_draw_branding)
+    elements.append(Spacer(1, 0.3*cm))
+    elements.append(MyznycaBrandingFlowable())
+    doc.build(elements)
 
 
 def _cell_text(entry, for_teacher: bool = False) -> str:
@@ -562,4 +568,6 @@ def export_single_class_pdf(db: DatabaseConnection, class_id: int, path: str) ->
     table, style_cmds = _build_table_with_slots(data, num_days, num_slots, slots_per_day, entry_map)
     table.setStyle(TableStyle(style_cmds))
     elements.append(table)
-    doc.build(elements, onFirstPage=_draw_branding, onLaterPages=_draw_branding)
+    elements.append(Spacer(1, 0.5*cm))
+    elements.append(MyznycaBrandingFlowable())
+    doc.build(elements)

@@ -595,8 +595,11 @@ def export_substitution_pdf(
     elements.append(Spacer(1, 8*mm))
     elements.append(Paragraph(f"Schedulr — School OS · Generated automatically &nbsp;&nbsp;&nbsp;&nbsp; Page 1 of 1", small_style))
 
-    from utils.pdf_branding import draw_myzynca_branding
-    doc.build(elements, onFirstPage=draw_myzynca_branding, onLaterPages=draw_myzynca_branding)
+    from utils.pdf_branding import MyznycaBrandingFlowable
+    from reportlab.lib.units import cm
+    elements.append(Spacer(1, 0.4 * cm))
+    elements.append(MyznycaBrandingFlowable())
+    doc.build(elements)
     pdf_bytes = buf.getvalue()
 
     filename = f"substitution_{target_date.strftime('%d-%m-%Y')}.pdf"

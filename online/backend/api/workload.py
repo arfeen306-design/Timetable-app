@@ -125,7 +125,7 @@ def export_workload_pdf(
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet
 
-    from utils.pdf_branding import draw_myzynca_branding as _draw_branding
+    from utils.pdf_branding import MyznycaBrandingFlowable
 
     # Fetch data
     data = get_all_workloads(db, project_id, week)
@@ -200,7 +200,10 @@ def export_workload_pdf(
         styles["Normal"],
     ))
 
-    doc.build(elements, onFirstPage=_draw_branding, onLaterPages=_draw_branding)
+    elements.append(Spacer(1, 0.3 * cm))
+    elements.append(MyznycaBrandingFlowable())
+
+    doc.build(elements)
     pdf_bytes = buf.getvalue()
 
     return Response(
