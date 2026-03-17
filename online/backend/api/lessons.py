@@ -15,6 +15,7 @@ from backend.repositories.lesson_repo import (
     update as update_lesson,
     delete as delete_lesson,
     get_allowed_room_ids,
+    batch_get_allowed_room_ids,
 )
 
 router = APIRouter()
@@ -92,7 +93,9 @@ def list_lessons(
     db: Session = Depends(get_db),
 ):
     items = list_by_project(db, project.id)
-    return [_lesson_to_response(l, get_allowed_room_ids(db, l.id)) for l in items]
+    # Single batch query instead of N+1
+    room_map = batch_get_allowed_room_ids(db, [l.id for l in items])
+    return [_lesson_to_response(l, room_map.get(l.id, [])) for l in items]
 
 
 class BulkLessonClassItem(BaseModel):
@@ -129,10 +132,12 @@ def bulk_create_lessons(
                 subject_id=data.subject_id,
                 class_id=item.class_id,
                 periods_per_week=item.periods_per_week,
+                commit=False,
             )
             created += 1
         except Exception as e:
             errors.append({"row": i + 1, "message": str(e)})
+    db.commit()
     return BulkLessonsResult(created=created, errors=errors)
 
 
@@ -169,10 +174,12 @@ def copy_lessons_from_class(
                     periods_per_week=l.periods_per_week,
                     duration=l.duration,
                     priority=l.priority,
+                    commit=False,
                 )
                 copied += 1
             except Exception:
                 pass  # skip duplicates or constraint errors
+    db.commit()
     return CopyFromClassResult(copied=copied)
 
 

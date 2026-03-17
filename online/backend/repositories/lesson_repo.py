@@ -38,6 +38,7 @@ def create(
     preferred_room_id: Optional[int] = None,
     notes: str = "",
     allowed_room_ids: Optional[List[int]] = None,
+    commit: bool = True,
 ) -> Lesson:
     l = Lesson(
         project_id=project_id,
@@ -57,8 +58,9 @@ def create(
     if allowed_room_ids:
         for rid in allowed_room_ids:
             db.add(LessonAllowedRoom(lesson_id=l.id, room_id=rid))
-    db.commit()
-    db.refresh(l)
+    if commit:
+        db.commit()
+        db.refresh(l)
     return l
 
 
@@ -95,3 +97,19 @@ def get_allowed_room_ids(db: Session, lesson_id: int) -> List[int]:
         .all()
     )
     return [r[0] for r in rows]
+
+
+def batch_get_allowed_room_ids(db: Session, lesson_ids: List[int]) -> dict[int, List[int]]:
+    """Fetch allowed room IDs for many lessons in ONE query. Returns {lesson_id: [room_ids]}."""
+    if not lesson_ids:
+        return {}
+    from collections import defaultdict
+    result: dict[int, List[int]] = defaultdict(list)
+    rows = (
+        db.query(LessonAllowedRoom.lesson_id, LessonAllowedRoom.room_id)
+        .filter(LessonAllowedRoom.lesson_id.in_(lesson_ids))
+        .all()
+    )
+    for lid, rid in rows:
+        result[lid].append(rid)
+    return result

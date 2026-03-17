@@ -151,71 +151,68 @@ def _make_code(name: str, existing_codes: set) -> str:
 
 def seed_demo_data(project_id: int, db: Session) -> dict:
     """Seed demo data into an EXISTING project. Returns summary counts."""
+    from backend.models.teacher_model import TeacherSubject
     existing_codes: set = set()
 
-    # Subjects
-    subject_map: dict[str, int] = {}
+    # ── Subjects (batch insert, single flush) ──
+    subject_objs = []
     for name in DEMO_SUBJECTS_O_LEVEL:
-        code = name[:3].upper()
-        subj = Subject(project_id=project_id, name=name, code=code)
-        db.add(subj)
-        db.flush()
-        subject_map[name] = subj.id
+        subj = Subject(project_id=project_id, name=name, code=name[:3].upper())
+        subject_objs.append(subj)
+    db.add_all(subject_objs)
+    db.flush()  # assigns IDs to all subjects at once
+    subject_map: dict[str, int] = {s.name: s.id for s in subject_objs}
 
-    # Classes
-    for cls in DEMO_CLASSES:
-        db.add(SchoolClass(
+    # ── Classes (batch insert, no flush needed yet) ──
+    db.add_all([
+        SchoolClass(
             project_id=project_id,
-            name=cls["name"],
-            grade=cls["grade"],
-            section=cls["section"],
-            stream="",
-            code=cls["grade"] + cls["section"],
-            strength=35,
-        ))
+            name=cls["name"], grade=cls["grade"], section=cls["section"],
+            stream="", code=cls["grade"] + cls["section"], strength=35,
+        )
+        for cls in DEMO_CLASSES
+    ])
 
-    # Classrooms
-    for room in DEMO_CLASSROOMS:
-        rtype = "Classroom"
-        if "Lab" in room["name"]:
-            rtype = "Lab"
-        elif "Library" in room["name"]:
-            rtype = "Library"
-        db.add(Room(
+    # ── Classrooms (batch insert) ──
+    db.add_all([
+        Room(
             project_id=project_id,
             name=room["name"],
             code=room["name"].replace(" ", "")[:4].upper(),
-            room_type=rtype,
+            room_type="Lab" if "Lab" in room["name"] else ("Library" if "Library" in room["name"] else "Classroom"),
             capacity=room["capacity"],
-        ))
+        )
+        for room in DEMO_CLASSROOMS
+    ])
 
-    # Teachers
+    # ── Teachers (batch insert, single flush for IDs) ──
+    teacher_objs = []
+    teacher_subject_pairs = []  # (teacher_obj, subject_id)
     for i, t in enumerate(DEMO_TEACHERS):
         code = _make_code(t["name"], existing_codes)
         existing_codes.add(code)
-        color = COLOR_PALETTE[i % len(COLOR_PALETTE)]
         parts = t["name"].split(" ", 1)
-        first_name = parts[0]
-        last_name = parts[1] if len(parts) > 1 else ""
-        subj_id = subject_map.get(t["subject"])
         teacher = Teacher(
             project_id=project_id,
-            first_name=first_name,
-            last_name=last_name,
-            title=t["title"],
-            code=code,
-            color=color,
-            max_periods_day=6,
-            max_periods_week=30,
+            first_name=parts[0],
+            last_name=parts[1] if len(parts) > 1 else "",
+            title=t["title"], code=code,
+            color=COLOR_PALETTE[i % len(COLOR_PALETTE)],
+            max_periods_day=6, max_periods_week=30,
         )
-        db.add(teacher)
-        db.flush()
-        # Link teacher to their subject via TeacherSubject if subject exists
+        teacher_objs.append(teacher)
+        subj_id = subject_map.get(t["subject"])
         if subj_id:
-            from backend.models.teacher_model import TeacherSubject
-            db.add(TeacherSubject(teacher_id=teacher.id, subject_id=subj_id))
+            teacher_subject_pairs.append((teacher, subj_id))
 
-    db.flush()
+    db.add_all(teacher_objs)
+    db.flush()  # assigns IDs to all teachers at once
+
+    # Link teachers to subjects (batch)
+    db.add_all([
+        TeacherSubject(teacher_id=t.id, subject_id=sid)
+        for t, sid in teacher_subject_pairs
+    ])
 
     # Write history
     db.add(TimetableHistory(
