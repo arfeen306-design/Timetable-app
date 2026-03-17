@@ -35,21 +35,35 @@ def draw_myzynca_branding(canvas, doc):
     cx = page_w / 2 - 55  # left edge of the logo block
     cy = 22               # baseline y
 
-    # ── Rounded-square icon ──────────────────────────────────────────────────
-    icon_size = 14
-    icon_x = cx - icon_size / 2
-    icon_y = cy - icon_size / 2 + 1
-    radius = 3
+    # ── Shield icon ───────────────────────────────────────────────────────────
+    icon_w = 14
+    icon_h = 17
+    sx = cx - icon_w / 2  # shield left
+    sy = cy - icon_h / 2 + 1  # shield bottom
 
-    canvas.setFillColor(_NAVY)
-    canvas.setStrokeColor(_NAVY)
-    canvas.setLineWidth(0.5)
-    canvas.roundRect(icon_x, icon_y, icon_size, icon_size, radius, fill=1, stroke=1)
+    # Draw shield path: pentagon shape
+    p = canvas.beginPath()
+    # Start at top-center
+    top_cx = sx + icon_w / 2
+    top_y = sy + icon_h
+    p.moveTo(top_cx, top_y)  # top center
+    p.lineTo(sx, top_y - 4)  # top-left shoulder
+    p.lineTo(sx, sy + icon_h * 0.35)  # bottom-left
+    # curve to bottom point
+    p.curveTo(sx, sy + 1, top_cx - 2, sy, top_cx, sy)
+    p.curveTo(top_cx + 2, sy, sx + icon_w, sy + 1, sx + icon_w, sy + icon_h * 0.35)
+    p.lineTo(sx + icon_w, top_y - 4)  # bottom-right → top-right
+    p.close()
 
-    # White 'Z' inside the rounded square
     canvas.setFillColor(_WHITE)
-    canvas.setFont("Helvetica-Bold", 9)
-    canvas.drawCentredString(cx, cy - 2.5, "Z")
+    canvas.setStrokeColor(_NAVY)
+    canvas.setLineWidth(1)
+    canvas.drawPath(p, fill=1, stroke=1)
+
+    # White 'Z' inside the shield
+    canvas.setFillColor(_NAVY)
+    canvas.setFont("Helvetica-Bold", 8)
+    canvas.drawCentredString(cx, cy - 2, "Z")
 
     # ── Brand name ───────────────────────────────────────────────────────────
     canvas.setFillColor(_NAVY)

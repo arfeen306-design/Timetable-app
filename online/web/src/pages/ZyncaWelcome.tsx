@@ -70,10 +70,10 @@ export default function ZyncaWelcome() {
       <div className="mz-hero">
         <div className="mz-shield-container">
           <div className="mz-shield-glow" />
-          <svg className="mz-shield-icon" viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="2" y="2" width="64" height="64" rx="16" ry="16"
-              fill="#FFFFFF" stroke="#1C2E4A" strokeWidth="2.5" />
-            <text x="34" y="44" textAnchor="middle" fontSize="28" fontWeight="800"
+          <svg className="mz-shield-icon" viewBox="0 0 60 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M30 2L4 16v20c0 18 12 28 26 32 14-4 26-14 26-32V16L30 2z"
+              stroke="#1C2E4A" strokeWidth="3" fill="#FFFFFF" strokeLinejoin="round" />
+            <text x="30" y="46" textAnchor="middle" fontSize="24" fontWeight="800"
               fill="#1C2E4A" fontFamily="'Sora', sans-serif">Z</text>
           </svg>
         </div>
@@ -133,7 +133,12 @@ export default function ZyncaWelcome() {
 
       {/* ── Footer branding ── */}
       <div className="mz-footer">
-        <span className="mz-footer-logo">Z</span>
+        <svg width="16" height="20" viewBox="0 0 60 72" fill="none" style={{ marginRight: 4 }}>
+          <path d="M30 2L4 16v20c0 18 12 28 26 32 14-4 26-14 26-32V16L30 2z"
+            stroke="#1C2E4A" strokeWidth="4" fill="#fff" strokeLinejoin="round" />
+          <text x="30" y="46" textAnchor="middle" fontSize="26" fontWeight="800"
+            fill="#1C2E4A" fontFamily="'Sora', sans-serif">Z</text>
+        </svg>
         <span className="mz-footer-brand">Myzynca</span>
         <span className="mz-footer-dot">·</span>
         <a href="https://myzynca.com" className="mz-footer-url" target="_blank" rel="noreferrer">myzynca.com</a>
