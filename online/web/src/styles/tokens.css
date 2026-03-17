@@ -9,9 +9,9 @@
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
 
-  --slate-50:  #E8ECF2;
-  --slate-100: #D5DBE5;
-  --slate-200: #BDC4D4;
+  --slate-50:  #F5F0EB;
+  --slate-100: #EDE7E0;
+  --slate-200: #E0D8CF;
   --slate-300: #8E9BB2;
   --slate-400: #6B7A94;
   --slate-500: #52677D;
@@ -54,9 +54,9 @@
   --color-brand-dark:   var(--primary-700);
 
   /* ── Surfaces ── */
-  --surface-page:       #BDC4D4;
+  --surface-page:       #FAF8F5;
   --surface-card:       #FFFFFF;
-  --surface-raised:     #D5DBE5;
+  --surface-raised:     #F5F0EB;
 
   /* ── Text ── */
   --text-primary:       #0F1A2B;
@@ -65,9 +65,9 @@
   --text-hint:          #8E9BB2;
 
   /* ── Borders ── */
-  --border-subtle:      #D5DBE5;
-  --border-default:     #BDC4D4;
-  --border-strong:      #8E9BB2;
+  --border-subtle:      #F0EBE4;
+  --border-default:     #E0D8CF;
+  --border-strong:      #C5BAB0;
 
   /* ── Semantic colors ── */
   --success-50:  #f0fdf4;
@@ -150,17 +150,17 @@
   /* ── Sidebar ── */
   --sidebar-w:     240px;
   --sidebar-bg:    #1C2E4A;
-  --sidebar-text:  #BDC4D4;
-  --sidebar-hover: rgba(189,196,212,0.10);
-  --sidebar-active-bg:   rgba(189,196,212,0.15);
+  --sidebar-text:  #FFFFFF;
+  --sidebar-hover: rgba(255,255,255,0.10);
+  --sidebar-active-bg:   rgba(255,255,255,0.15);
   --sidebar-active-text: #FFFFFF;
-  --sidebar-active-pill: #BDC4D4;
+  --sidebar-active-pill: #FFFFFF;
 
   /* ── Layout ── */
   --topbar-h:     48px;
-  --content-bg:   #BDC4D4;
+  --content-bg:   #FAF8F5;
   --card-bg:      #fff;
-  --card-border:  rgba(28,46,74,0.08);
+  --card-border:  rgba(28,46,74,0.06);
 
   /* ── Transitions ── */
   --ease-out: cubic-bezier(0.4, 0, 0.2, 1);

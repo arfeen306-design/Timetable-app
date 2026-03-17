@@ -207,7 +207,7 @@ export default function Dashboard() {
                 fontSize: "0.95rem", padding: "0.75rem 1.8rem", fontWeight: 700,
                 borderRadius: 12, border: "none", cursor: "pointer",
                 background: "linear-gradient(135deg, #1C2E4A 0%, #0F1A2B 100%)",
-                color: "#BDC4D4", fontFamily: "var(--font-sans)",
+                color: "#fff", fontFamily: "var(--font-sans)",
                 boxShadow: "0 6px 24px rgba(28,46,74,0.4)",
                 transition: "all 0.2s",
               }}>

@@ -4,7 +4,7 @@
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
-  background: var(--surface-page, #BDC4D4);
+  background: var(--surface-page, #FAF8F5);
 }
 
 /* ── Top tab bar ──────────────────────────────────────────────── */
@@ -490,7 +490,7 @@
   height: 44px;
   padding: 0 18px;
   background: var(--surface-card, #fff);
-  border-bottom: 1px solid var(--border-default, #BDC4D4);
+  border-bottom: 1px solid var(--border-default, #E0D8CF);
   flex-shrink: 0;
   overflow-x: auto;
   scrollbar-width: none;

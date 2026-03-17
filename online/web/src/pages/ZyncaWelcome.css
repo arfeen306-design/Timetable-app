@@ -14,13 +14,13 @@
 
 :root {
   --mz-navy:       #0F1A2B;
-  --mz-bg:         #BDC4D4;
+  --mz-bg:         #FAF8F5;
   --mz-card:       #FFFFFF;
-  --mz-ring-track: #D5DBE5;
+  --mz-ring-track: #F0EBE4;
   --mz-text:       #0F1A2B;
   --mz-text-2:     #3D4F66;
   --mz-text-3:     #6B7A94;
-  --mz-border:     #BDC4D4;
+  --mz-border:     #E0D8CF;
   --mz-radius:     12px;
   --mz-blue:       #2563EB;
   --mz-teal:       #0891B2;
@@ -251,7 +251,7 @@
   align-items: center;
   gap: 10px;
   background: linear-gradient(135deg, #0F1A2B, #1C2E4A);
-  color: #BDC4D4;
+  color: #FFFFFF;
   border: none;
   border-radius: var(--mz-radius);
   padding: 15px 36px;

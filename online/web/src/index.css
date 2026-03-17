@@ -231,7 +231,7 @@ table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .data-table tbody tr:hover { background: var(--slate-50); }
 .data-table tbody tr.selected { background: var(--blue-50); }
 th, td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--slate-100); }
-th { background: #1C2E4A; font-weight: 600; color: #BDC4D4; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+th { background: #1C2E4A; font-weight: 600; color: #FFFFFF; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* ═══════ Alerts ═══════ */
 .error { color: var(--danger-600); font-size: 0.82rem; margin-top: 0.25rem; }

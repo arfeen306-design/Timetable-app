@@ -326,7 +326,7 @@
    LIGHT THEME — login page overrides
    ═══════════════════════════════════════════════════════════════ */
 [data-theme="light"] .login-page {
-  background: linear-gradient(135deg, #BDC4D4 0%, #D5DBE5 50%, #E8ECF2 100%);
+  background: linear-gradient(135deg, #FAF8F5 0%, #F5F0EB 50%, #EDE7E0 100%);
 }
 
 [data-theme="light"] .login-overlay {
