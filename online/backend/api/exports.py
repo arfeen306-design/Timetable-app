@@ -18,15 +18,41 @@ DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
 def _get_working_day_indices(settings) -> list[int]:
-    """Return sorted 0-based day indices that are working days."""
-    wd_str = getattr(settings, 'weekend_days', '5,6') or '5,6'
+    """Return sorted 0-based day indices that are working days.
+    Uses weekend_days (0-indexed off-day list) as primary, with working_days
+    (1-indexed working-day list) as cross-check/fallback.
+    """
+    import logging
+    log = logging.getLogger(__name__)
+
+    # Primary: weekend_days — comma-separated 0-based off-day indices (e.g., "4,6")
+    wd_str = getattr(settings, 'weekend_days', None) or ''
+    # Fallback: working_days — comma-separated 1-based working-day indices (e.g., "1,2,3,4,6")
+    wk_str = getattr(settings, 'working_days', None) or ''
+
+    # If working_days is set and not the default "1,2,3,4,5", prefer it
+    # because it's more explicit about which days are working
+    if wk_str and wk_str != '1,2,3,4,5':
+        try:
+            result = sorted(int(x.strip()) - 1 for x in wk_str.split(',') if x.strip())
+            log.info("Export working days from working_days=%s => %s", wk_str, result)
+            return result
+        except ValueError:
+            pass
+
+    # Otherwise use weekend_days
+    if not wd_str:
+        wd_str = '5,6'  # default: Sat+Sun off
+
     off = set()
     for x in str(wd_str).split(','):
         x = x.strip()
         if x:
             try: off.add(int(x))
             except ValueError: pass
-    return sorted(d for d in range(7) if d not in off)
+    result = sorted(d for d in range(7) if d not in off)
+    log.info("Export working days from weekend_days=%s => %s", wd_str, result)
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
