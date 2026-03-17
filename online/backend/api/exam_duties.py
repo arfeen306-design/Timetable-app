@@ -677,7 +677,8 @@ def export_exam_duties_pdf(
             styles["Normal"]
         ))
 
-    doc.build(story)
+    from utils.pdf_branding import draw_myzynca_branding
+    doc.build(story, onFirstPage=draw_myzynca_branding, onLaterPages=draw_myzynca_branding)
     buf.seek(0)
     fname = f"exam_duties_{date}.pdf"
     return StreamingResponse(buf, media_type="application/pdf",

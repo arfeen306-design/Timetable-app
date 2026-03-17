@@ -151,10 +151,10 @@ export default function Login() {
         <div className="login-left">
           <div className="login-brand">
             <div className="login-logo-mark">
-              <svg viewBox="0 0 60 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M30 2L4 16v20c0 18 12 28 26 32 14-4 26-14 26-32V16L30 2z"
-                  stroke="white" strokeWidth="2.5" fill="rgba(255,255,255,0.1)" />
-                <text x="30" y="46" textAnchor="middle" fontSize="24" fontWeight="800"
+              <svg viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="2" width="64" height="64" rx="16" ry="16"
+                  fill="rgba(255,255,255,0.1)" stroke="white" strokeWidth="2.5" />
+                <text x="34" y="44" textAnchor="middle" fontSize="28" fontWeight="800"
                   fill="white" fontFamily="'Sora', sans-serif">Z</text>
               </svg>
             </div>

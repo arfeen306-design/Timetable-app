@@ -23,30 +23,7 @@ if TYPE_CHECKING:
     from database.connection import DatabaseConnection
 
 
-def _draw_branding(canvas, doc):
-    """Draw Myzynca branding footer on every PDF page."""
-    canvas.saveState()
-    page_w, page_h = doc.pagesize
-    # Shield icon (navy circle with Z)
-    cx, cy = page_w / 2 - 50, 22
-    canvas.setFillColor(colors.HexColor("#131E2E"))
-    canvas.circle(cx, cy, 8, fill=1, stroke=0)
-    canvas.setFillColor(colors.white)
-    canvas.setFont("Helvetica-Bold", 9)
-    canvas.drawCentredString(cx, cy - 3, "Z")
-    # Brand name
-    canvas.setFillColor(colors.HexColor("#131E2E"))
-    canvas.setFont("Helvetica-Bold", 10)
-    canvas.drawString(cx + 12, cy - 4, "Myzynca")
-    # URL
-    canvas.setFillColor(colors.HexColor("#3B82F6"))
-    canvas.setFont("Helvetica", 8)
-    canvas.drawString(cx + 62, cy - 4, "myzynca.com")
-    # Thin line above footer
-    canvas.setStrokeColor(colors.HexColor("#E2E8F0"))
-    canvas.setLineWidth(0.5)
-    canvas.line(doc.leftMargin, 38, page_w - doc.rightMargin, 38)
-    canvas.restoreState()
+from utils.pdf_branding import draw_myzynca_branding as _draw_branding
 
 
 def export_pdf(db: DatabaseConnection, path: str) -> None:

@@ -104,25 +104,7 @@ def export_committees_pdf(
     except ImportError:
         raise HTTPException(501, "reportlab not installed on server.")
 
-    def _draw_branding(canvas, doc):
-        canvas.saveState()
-        page_w = doc.pagesize[0]
-        cx, cy = page_w / 2 - 50, 22
-        canvas.setFillColor(colors.HexColor("#131E2E"))
-        canvas.circle(cx, cy, 8, fill=1, stroke=0)
-        canvas.setFillColor(colors.white)
-        canvas.setFont("Helvetica-Bold", 9)
-        canvas.drawCentredString(cx, cy - 3, "Z")
-        canvas.setFillColor(colors.HexColor("#131E2E"))
-        canvas.setFont("Helvetica-Bold", 10)
-        canvas.drawString(cx + 12, cy - 4, "Myzynca")
-        canvas.setFillColor(colors.HexColor("#3B82F6"))
-        canvas.setFont("Helvetica", 8)
-        canvas.drawString(cx + 62, cy - 4, "myzynca.com")
-        canvas.setStrokeColor(colors.HexColor("#E2E8F0"))
-        canvas.setLineWidth(0.5)
-        canvas.line(doc.leftMargin, 38, page_w - doc.rightMargin, 38)
-        canvas.restoreState()
+    from utils.pdf_branding import draw_myzynca_branding as _draw_branding
 
     committees = (
         db.query(Committee)
