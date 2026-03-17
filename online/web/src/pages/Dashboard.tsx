@@ -145,17 +145,17 @@ export default function Dashboard() {
             background:"rgba(236,72,153,0.12)",
             animation:"heroFloat1 7s ease-in-out infinite 1s" }} />
 
-          {/* Shield logo with pulse */}
+          {/* Shield logo with teal circle */}
           <div style={{
-            width: 80, height: 80, borderRadius: 20, marginBottom: 24,
-            background: "linear-gradient(135deg, #1C2E4A 0%, #52677D 50%, #1C2E4A 100%)",
+            width: 80, height: 80, borderRadius: "50%", marginBottom: 24,
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 8px 32px rgba(28,46,74,0.4)",
             animation: "heroSlide 0.6s ease, heroPulse 3s ease-in-out infinite 1s",
           }}>
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" fill="rgba(255,255,255,0.15)" stroke="#fff" strokeWidth="1.5"/>
-              <text x="12" y="16" textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff" fontFamily="Sora, sans-serif">Z</text>
+            <svg width="80" height="80" viewBox="0 0 100 100" fill="none">
+              <circle cx="50" cy="50" r="46" stroke="#00CEC8" strokeWidth="4" fill="rgba(255,255,255,0.1)" />
+              <path d="M50 20L28 32v14c0 12.5 8.3 19.4 18 22.2 1.3.4 2.6.6 4 .8 1.4-.2 2.7-.4 4-.8 9.7-2.8 18-9.7 18-22.2V32L50 20z"
+                fill="rgba(255,255,255,0.15)" stroke="#fff" strokeWidth="1.2" />
+              <text x="50" y="52" textAnchor="middle" fontSize="20" fontWeight="800" fill="#fff" fontFamily="Sora, sans-serif">Z</text>
             </svg>
           </div>
 

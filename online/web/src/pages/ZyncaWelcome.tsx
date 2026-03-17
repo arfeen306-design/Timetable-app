@@ -70,11 +70,15 @@ export default function ZyncaWelcome() {
       <div className="mz-hero">
         <div className="mz-shield-container">
           <div className="mz-shield-glow" />
-          <svg className="mz-shield-icon" viewBox="0 0 60 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M30 2L4 16v20c0 18 12 28 26 32 14-4 26-14 26-32V16L30 2z"
-              stroke="#1C2E4A" strokeWidth="3" fill="#FFFFFF" strokeLinejoin="round" />
-            <text x="30" y="46" textAnchor="middle" fontSize="24" fontWeight="800"
-              fill="#1C2E4A" fontFamily="'Sora', sans-serif">Z</text>
+          <svg className="mz-shield-icon" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* Outer teal circle ring */}
+            <circle cx="50" cy="50" r="46" stroke="#00CEC8" strokeWidth="5" fill="#FFFFFF" />
+            {/* Midnight blue filled shield */}
+            <path d="M50 20L28 32v14c0 12.5 8.3 19.4 18 22.2 1.3.4 2.6.6 4 .8 1.4-.2 2.7-.4 4-.8 9.7-2.8 18-9.7 18-22.2V32L50 20z"
+              fill="#1C2E4A" stroke="none" />
+            {/* White Z */}
+            <text x="50" y="52" textAnchor="middle" fontSize="20" fontWeight="800"
+              fill="#FFFFFF" fontFamily="'Sora', sans-serif">Z</text>
           </svg>
         </div>
 
@@ -133,11 +137,12 @@ export default function ZyncaWelcome() {
 
       {/* ── Footer branding ── */}
       <div className="mz-footer">
-        <svg width="16" height="20" viewBox="0 0 60 72" fill="none" style={{ marginRight: 4 }}>
-          <path d="M30 2L4 16v20c0 18 12 28 26 32 14-4 26-14 26-32V16L30 2z"
-            stroke="#1C2E4A" strokeWidth="4" fill="#fff" strokeLinejoin="round" />
-          <text x="30" y="46" textAnchor="middle" fontSize="26" fontWeight="800"
-            fill="#1C2E4A" fontFamily="'Sora', sans-serif">Z</text>
+        <svg width="20" height="20" viewBox="0 0 100 100" fill="none" style={{ marginRight: 4 }}>
+          <circle cx="50" cy="50" r="46" stroke="#00CEC8" strokeWidth="6" fill="#FFFFFF" />
+          <path d="M50 20L28 32v14c0 12.5 8.3 19.4 18 22.2 1.3.4 2.6.6 4 .8 1.4-.2 2.7-.4 4-.8 9.7-2.8 18-9.7 18-22.2V32L50 20z"
+            fill="#1C2E4A" />
+          <text x="50" y="52" textAnchor="middle" fontSize="22" fontWeight="800"
+            fill="#fff" fontFamily="'Sora', sans-serif">Z</text>
         </svg>
         <span className="mz-footer-brand">Myzynca</span>
         <span className="mz-footer-dot">·</span>
