@@ -35,28 +35,16 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
 
   const numPeriods = settings?.periods_per_day ?? 7;
 
-  // Compute working day indices: start with 0..days_per_week-1, exclude weekends, include exceptional day
+  // Compute working day indices: show all 7 days, exclude only weekend days
   const workingDayIndices = useMemo(() => {
-    let maxDay = (settings?.days_per_week ?? 5) - 1;
-
     // Parse weekend days
     const weekendSet = new Set<number>();
     const wd = settings?.weekend_days || "5,6";
     wd.split(",").filter(Boolean).forEach(d => weekendSet.add(parseInt(d.trim())));
 
-    // Parse exceptional day from bell_schedule_json
-    let exceptionalDayIdx = -1;
-    try {
-      const bell = JSON.parse(settings?.bell_schedule_json || "{}");
-      if (bell.friday_different) {
-        exceptionalDayIdx = bell.friday_day_index ?? 4;
-        if (exceptionalDayIdx > maxDay) maxDay = exceptionalDayIdx;
-      }
-    } catch { /* ignore */ }
-
-    // Build working day indices: 0..maxDay, excluding weekends
+    // Build working day indices: 0..6 (Mon-Sun), excluding weekends
     const indices: number[] = [];
-    for (let d = 0; d <= maxDay; d++) {
+    for (let d = 0; d < 7; d++) {
       if (!weekendSet.has(d)) indices.push(d);
     }
     return indices;
