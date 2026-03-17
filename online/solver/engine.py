@@ -77,7 +77,11 @@ class TimetableSolver:
         if friday_different and int(friday_day_index) >= num_days:
             num_days = int(friday_day_index) + 1
 
-        self.messages.append(f"Working days: {working_day_indices} ({len(working_day_indices)} days, grid width {num_days}).") 
+        self.messages.append(
+            f"Working days: {working_day_indices} ({len(working_day_indices)} days, grid width {num_days}). "
+            f"Bell config: friday_different={friday_different}, friday_day_index={friday_day_index}, "
+            f"friday_periods={friday_num_periods}, num_periods_base={num_periods_base}."
+        )
 
         num_periods = num_periods_base + (1 if zero_period else 0)
         # Use the maximum to keep a uniform grid
@@ -172,6 +176,15 @@ class TimetableSolver:
                 friday_forbidden.add(friday_day_idx * num_periods + p)
             for occ_set in occ_forbidden_slots:
                 occ_set.update(friday_forbidden)
+            self.messages.append(
+                f"Exceptional day {friday_day_idx}: only {friday_num_periods} periods "
+                f"(forbid periods {list(range(friday_num_periods, num_periods))} on day {friday_day_idx})."
+            )
+        elif friday_different:
+            self.messages.append(
+                f"Exceptional day configured but friday_num_periods={friday_num_periods} vs "
+                f"num_periods={num_periods} — no extra forbid needed."
+            )
 
         # Forbid ALL slots on off days (already computed as off_days above)
         weekend_forbidden = set()
