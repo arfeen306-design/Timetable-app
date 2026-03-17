@@ -12,6 +12,8 @@ type Lesson = Awaited<ReturnType<typeof api.listLessons>>[0];
 type DailyLimits = {
   global_max: number;
   overrides: { teacher_id: number; class_id: number; subject_id: number; max_per_day: number }[];
+  force_spread: boolean;
+  double_period_allowed: { lesson_id: number }[];
 };
 
 interface Props {
@@ -215,7 +217,7 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
   const [savingLimits, setSavingLimits] = useState(false);
 
   // Parse current daily limits from settings
-  const [dailyLimits, setDailyLimits] = useState<DailyLimits>({ global_max: 1, overrides: [] });
+  const [dailyLimits, setDailyLimits] = useState<DailyLimits>({ global_max: 1, overrides: [], force_spread: true, double_period_allowed: [] });
 
   useEffect(() => {
     try {
@@ -224,9 +226,11 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
       setDailyLimits({
         global_max: parsed.global_max ?? 1,
         overrides: Array.isArray(parsed.overrides) ? parsed.overrides : [],
+        force_spread: parsed.force_spread ?? true,
+        double_period_allowed: Array.isArray(parsed.double_period_allowed) ? parsed.double_period_allowed : [],
       });
     } catch {
-      setDailyLimits({ global_max: 1, overrides: [] });
+      setDailyLimits({ global_max: 1, overrides: [], force_spread: true, double_period_allowed: [] });
     }
   }, [settings?.daily_limits_json]);
 
@@ -274,8 +278,20 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
         w.push(`${r.subject_name} (${r.class_name}, ${r.teacher_name}): ${r.periods_per_week} lessons/week cannot fit into ${numWorkingDays} days with limit of ${r.max_per_day}/day.`);
       }
     }
+    // Spread-specific warnings
+    if (dailyLimits.force_spread) {
+      const dpSet = new Set(dailyLimits.double_period_allowed.map(d => d.lesson_id));
+      for (const l of lessons) {
+        if (dpSet.has(l.id)) continue;
+        if (l.periods_per_week > numWorkingDays * 2) {
+          const sn = subjectMap[l.subject_id]?.name || `Subject #${l.subject_id}`;
+          const cn = classMap[l.class_id] || `Class #${l.class_id}`;
+          w.push(`⛔ ${sn} (${cn}): ${l.periods_per_week} lessons exceed max capacity of ${numWorkingDays * 2} (${numWorkingDays} days × 2). Generation will fail.`);
+        }
+      }
+    }
     return w;
-  }, [assignmentRows, numWorkingDays]);
+  }, [assignmentRows, numWorkingDays, dailyLimits.force_spread, dailyLimits.double_period_allowed, lessons, subjectMap, classMap]);
 
   function setGlobalMax(val: number) {
     setDailyLimits(prev => ({ ...prev, global_max: val }));
@@ -292,6 +308,24 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
         filtered.push({ teacher_id, class_id, subject_id, max_per_day });
       }
       return { ...prev, overrides: filtered };
+    });
+    setLimitsDirty(true);
+  }
+
+  function toggleForceSpread() {
+    setDailyLimits(prev => ({ ...prev, force_spread: !prev.force_spread }));
+    setLimitsDirty(true);
+  }
+
+  function toggleDoublePeriod(lessonId: number) {
+    setDailyLimits(prev => {
+      const exists = prev.double_period_allowed.some(d => d.lesson_id === lessonId);
+      return {
+        ...prev,
+        double_period_allowed: exists
+          ? prev.double_period_allowed.filter(d => d.lesson_id !== lessonId)
+          : [...prev.double_period_allowed, { lesson_id: lessonId }],
+      };
     });
     setLimitsDirty(true);
   }
@@ -422,6 +456,31 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
           Control how many times a subject can appear per day for a given teacher-class assignment. The solver will enforce these limits.
         </p>
 
+        {/* Force Spread Toggle */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.25rem",
+          background: dailyLimits.force_spread ? "#ecfdf5" : "#f8fafc",
+          border: dailyLimits.force_spread ? "1px solid #6ee7b7" : "1px solid #e2e8f0",
+          padding: "0.75rem 1rem", borderRadius: 8,
+        }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", userSelect: "none" }}>
+            <input
+              type="checkbox"
+              checked={dailyLimits.force_spread}
+              onChange={toggleForceSpread}
+              style={{ width: 18, height: 18, accentColor: "#10b981", cursor: "pointer" }}
+            />
+            <span style={{ fontWeight: 600, color: dailyLimits.force_spread ? "#065f46" : "#64748b", fontSize: "0.9rem" }}>
+              Force Maximum Spread
+            </span>
+          </label>
+          <span style={{ color: "#94a3b8", fontSize: "0.78rem" }}>
+            {dailyLimits.force_spread
+              ? "ON — Lessons will be spread across all working days before doubling. (Hard Constraint)"
+              : "OFF — Solver will use soft penalties to encourage spread, but may cluster."}
+          </span>
+        </div>
+
         {/* Global default */}
         <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.25rem", background: "#f1f5f9", padding: "0.75rem 1rem", borderRadius: 8 }}>
           <label style={{ fontWeight: 600, color: "#334155", fontSize: "0.9rem", whiteSpace: "nowrap" }}>
@@ -531,6 +590,58 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
         {lessons.length === 0 && (
           <div style={{ color: "#94a3b8", fontStyle: "italic", fontSize: "0.9rem" }}>
             Add lessons first to configure daily subject limits.
+          </div>
+        )}
+
+        {/* ── Double Period Override ── */}
+        {dailyLimits.force_spread && lessons.length > 0 && (
+          <div style={{ marginTop: "1.5rem", borderTop: "1px solid #e2e8f0", paddingTop: "1rem" }}>
+            <h4 style={{ margin: "0 0 0.25rem", color: "#1e293b", fontSize: "1rem" }}>🔗 Double Period Overrides</h4>
+            <p style={{ color: "#64748b", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
+              Select lessons that are allowed to have back-to-back double periods on the same day, even when spread is forced (e.g., Lab sessions).
+            </p>
+            <div style={{ overflowX: "auto", maxHeight: 300, overflowY: "auto" }}>
+              <table className="data-table" style={{ minWidth: 500 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "center", width: 50 }}>Allow</th>
+                    <th style={{ textAlign: "left" }}>Subject</th>
+                    <th style={{ textAlign: "left" }}>Class</th>
+                    <th style={{ textAlign: "left" }}>Teacher</th>
+                    <th style={{ textAlign: "center" }}>Lessons/Week</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lessons.map(l => {
+                    const isAllowed = dailyLimits.double_period_allowed.some(d => d.lesson_id === l.id);
+                    const sn = subjectMap[l.subject_id]?.name || `Subject #${l.subject_id}`;
+                    const cn = classMap[l.class_id] || `Class #${l.class_id}`;
+                    const tn = teacherMap[l.teacher_id] || `Teacher #${l.teacher_id}`;
+                    return (
+                      <tr key={l.id} style={isAllowed ? { background: "#fef3c7" } : undefined}>
+                        <td style={{ textAlign: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={isAllowed}
+                            onChange={() => toggleDoublePeriod(l.id)}
+                            style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#f59e0b" }}
+                          />
+                        </td>
+                        <td style={{ fontSize: "0.85rem", fontWeight: isAllowed ? 600 : 400 }}>{sn}</td>
+                        <td style={{ fontSize: "0.85rem" }}>{cn}</td>
+                        <td style={{ fontSize: "0.85rem" }}>{tn}</td>
+                        <td style={{ textAlign: "center", fontWeight: 600 }}>{l.periods_per_week}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {dailyLimits.double_period_allowed.length > 0 && (
+              <p style={{ fontSize: "0.78rem", color: "#b45309", marginTop: "0.5rem" }}>
+                ⚠ {dailyLimits.double_period_allowed.length} lesson{dailyLimits.double_period_allowed.length > 1 ? "s" : ""} exempt from forced spread.
+              </p>
+            )}
           </div>
         )}
       </div>

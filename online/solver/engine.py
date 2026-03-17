@@ -328,6 +328,10 @@ class TimetableSolver:
             pass
         global_max = daily_limits.get("global_max", 0)  # 0 means "use subject default"
         overrides_list = daily_limits.get("overrides", [])
+        force_spread = bool(daily_limits.get("force_spread", False))
+        double_period_allowed_ids = set(
+            item.get("lesson_id", 0) for item in daily_limits.get("double_period_allowed", [])
+        )
         # Build fast lookup: (teacher_id, class_id, subject_id) → max_per_day
         override_map: dict[tuple[int, int, int], int] = {}
         for ov in overrides_list:
@@ -377,25 +381,85 @@ class TimetableSolver:
                     day_bools.append(b)
                 model.add(sum(day_bools) <= max_day_val)
 
-        # 8. Same lesson's occurrences must be on different slots (already handled
-        #    by class AllDifferent, but also enforce different days for spread)
-        # (This is a soft constraint below, not hard - lessons CAN share a day)
+        # 8. Force Maximum Spread — hard constraint
+        #    Ensures lessons are distributed across the maximum number of working days
+        #    before any day gets a second lesson.
+        num_working_days = len(working_day_indices)
+        if force_spread:
+            self.messages.append(f"Force spread enabled ({len(double_period_allowed_ids)} lesson(s) exempt).")
+            for lid_val, occ_indices in self._group_by_lesson(occurrences):
+                L = len(occ_indices)
+                if L <= 1:
+                    continue
+                # Skip lessons marked as double-period allowed
+                if lid_val in double_period_allowed_ids:
+                    continue
+
+                # Pre-gen check: impossible if L > D * 2
+                if L > num_working_days * 2:
+                    self.messages.append(
+                        f"ERROR: Lesson {lid_val} has {L} occurrences but only "
+                        f"{num_working_days} working days (max {num_working_days * 2}). "
+                        f"Cannot satisfy spread constraint."
+                    )
+                    return False, [], self.messages
+
+                # Build per-day count booleans for this lesson's occurrences
+                for day in working_day_indices:
+                    day_bools = []
+                    for idx in occ_indices:
+                        b = model.new_bool_var(f"fsd_{lid_val}_{day}_{idx}")
+                        model.add(day_vars[idx] == day).only_enforce_if(b)
+                        model.add(day_vars[idx] != day).only_enforce_if(b.negated())
+                        day_bools.append(b)
+                    day_count = model.new_int_var(0, L, f"fsc_{lid_val}_{day}")
+                    model.add(day_count == sum(day_bools))
+
+                    if L <= num_working_days:
+                        # Lessons fit: max 1 per day
+                        model.add(day_count <= 1)
+                    else:
+                        # Overflow: max 2 per day, min 1 per day (no empty days)
+                        model.add(day_count <= 2)
+                        model.add(day_count >= 1)
+
+                # If L > D: exactly (L - D) days must have exactly 2
+                if L > num_working_days:
+                    overflow = L - num_working_days
+                    has_two_vars = []
+                    for day in working_day_indices:
+                        has_two = model.new_bool_var(f"fs2_{lid_val}_{day}")
+                        # Recompute day count for this constraint
+                        day_bools2 = []
+                        for idx in occ_indices:
+                            b2 = model.new_bool_var(f"fs2b_{lid_val}_{day}_{idx}")
+                            model.add(day_vars[idx] == day).only_enforce_if(b2)
+                            model.add(day_vars[idx] != day).only_enforce_if(b2.negated())
+                            day_bools2.append(b2)
+                        dc2 = model.new_int_var(0, L, f"fs2c_{lid_val}_{day}")
+                        model.add(dc2 == sum(day_bools2))
+                        model.add(dc2 >= 2).only_enforce_if(has_two)
+                        model.add(dc2 <= 1).only_enforce_if(has_two.negated())
+                        has_two_vars.append(has_two)
+                    model.add(sum(has_two_vars) == overflow)
 
         # ---- Soft Constraints (Objective) ----
         penalties = []
 
         # Soft: spread lesson occurrences across different days
-        for lid_val, occ_indices in self._group_by_lesson(occurrences):
-            if len(occ_indices) <= 1:
-                continue
-            for a_pos in range(len(occ_indices)):
-                for b_pos in range(a_pos + 1, len(occ_indices)):
-                    a = occ_indices[a_pos]
-                    b = occ_indices[b_pos]
-                    same_day = model.new_bool_var(f"sp_{a}_{b}")
-                    model.add(day_vars[a] == day_vars[b]).only_enforce_if(same_day)
-                    model.add(day_vars[a] != day_vars[b]).only_enforce_if(same_day.negated())
-                    penalties.append(same_day * 5)
+        # (Only apply if force_spread is OFF — otherwise handled by hard constraint above)
+        if not force_spread:
+            for lid_val, occ_indices in self._group_by_lesson(occurrences):
+                if len(occ_indices) <= 1:
+                    continue
+                for a_pos in range(len(occ_indices)):
+                    for b_pos in range(a_pos + 1, len(occ_indices)):
+                        a = occ_indices[a_pos]
+                        b = occ_indices[b_pos]
+                        same_day = model.new_bool_var(f"sp_{a}_{b}")
+                        model.add(day_vars[a] == day_vars[b]).only_enforce_if(same_day)
+                        model.add(day_vars[a] != day_vars[b]).only_enforce_if(same_day.negated())
+                        penalties.append(same_day * 5)
 
         # Soft: prefer preferred rooms
         if use_rooms:
