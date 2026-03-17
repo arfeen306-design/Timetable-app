@@ -61,6 +61,20 @@ class TimetableSolver:
             num_days = int(friday_day_index) + 1
             self.messages.append(f"Grid expanded to {num_days} day columns to include exceptional day (index {friday_day_index}).")
 
+        # Auto-expand grid to include ALL non-weekend days (e.g. Sunday index 6)
+        weekend_str_pre = school.get("weekend_days", "")
+        if weekend_str_pre:
+            try:
+                weekend_pre = {int(d.strip()) for d in str(weekend_str_pre).split(",") if d.strip()}
+            except (ValueError, TypeError):
+                weekend_pre = set()
+            # Check days 0..6: any non-weekend day beyond current num_days?
+            for d in range(7):
+                if d >= num_days and d not in weekend_pre:
+                    num_days = d + 1
+            if num_days > school["days_per_week"]:
+                self.messages.append(f"Grid expanded to {num_days} days to include all working days.")
+
         num_periods = num_periods_base + (1 if zero_period else 0)
         # Use the maximum to keep a uniform grid
         if friday_num_periods and friday_num_periods > num_periods:
