@@ -142,13 +142,30 @@ class TimetableSolver:
 
         # Forbid slots on the exceptional day that exceed its period count
         if friday_different and friday_num_periods is not None and friday_num_periods < num_periods:
-            # friday_day_index is 0-based (0=Mon, 4=Fri)
+            # friday_day_index is 0-based (0=Mon, 4=Fri, 5=Sat)
             friday_day_idx = int(friday_day_index) if friday_day_index < num_days else num_days - 1
             friday_forbidden = set()
             for p in range(friday_num_periods, num_periods):
                 friday_forbidden.add(friday_day_idx * num_periods + p)
             for occ_set in occ_forbidden_slots:
                 occ_set.update(friday_forbidden)
+
+        # Forbid ALL slots on weekend days (e.g. "4,6" for Fri+Sun)
+        weekend_str = school.get("weekend_days", "")
+        if weekend_str:
+            try:
+                weekend_indices = {int(d.strip()) for d in str(weekend_str).split(",") if d.strip()}
+            except (ValueError, TypeError):
+                weekend_indices = set()
+            weekend_forbidden = set()
+            for wd in weekend_indices:
+                if 0 <= wd < num_days:
+                    for p in range(num_periods):
+                        weekend_forbidden.add(wd * num_periods + p)
+            if weekend_forbidden:
+                for occ_set in occ_forbidden_slots:
+                    occ_set.update(weekend_forbidden)
+                self.messages.append(f"Weekend days {sorted(weekend_indices)}: all slots forbidden.")
 
         # Decision variables: slot_var = day * num_periods + period
         slot_vars = []
