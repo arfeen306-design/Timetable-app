@@ -150,7 +150,7 @@ export default function SubstitutionPage() {
         const newOnes = res.slots.filter(s => !existing.has(`${s.teacher_id}-${s.period_index}`));
         return [...prev, ...newOnes];
       });
-      flash(`✅ ${res.absences_created.length} teacher(s) marked absent. ${res.slots.length} page(s) need coverage.`);
+      flash(`✅ ${res.absences_created.length} teacher(s) marked absent. ${res.slots.length} lesson(s) need coverage.`);
       setSelectedAbsent([]); setReason("");
       refreshData();
     } catch (e) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
@@ -165,7 +165,7 @@ export default function SubstitutionPage() {
     const prevSlots = absentSlots;
     setAbsentSlots(prev => prev.filter(s => !(s.teacher_id === slot.teacher_id && s.period_index === slot.period_index)));
     setExpandedSlot(null); setConfirm(null);
-    flash(`⚡ Assigning ${teacher.teacher_name} to Page ${slot.period_index + 1}...`);
+    flash(`⚡ Assigning ${teacher.teacher_name} to Lesson ${slot.period_index + 1}...`);
 
     try {
       const res = await assignSubstitute(pid, {
@@ -459,7 +459,7 @@ export default function SubstitutionPage() {
                           color: assigned ? "var(--success-600)" : "var(--primary-600)",
                           display: "flex", alignItems: "center", justifyContent: "center",
                           fontSize: "0.75rem", fontWeight: 700, fontFamily: "var(--font-mono)", flexShrink: 0,
-                        }}>Page {slot.period_index + 1}</div>
+                        }}>Lesson {slot.period_index + 1}</div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--slate-900)" }}>
                             {slot.subject_name || "Lesson"} · {slot.class_name || "Class"}
@@ -489,7 +489,7 @@ export default function SubstitutionPage() {
                               <Initials name={ft.teacher_name} color={avatarColor(ft.teacher_id)} size={28} />
                               <div style={{ flex: 1 }}>
                                 <span style={{ fontWeight: 600, fontSize: "0.82rem" }}>{ft.teacher_name}</span>
-                                <span style={{ fontSize: "0.65rem", color: "var(--slate-400)", marginLeft: 6 }}>{ft.periods_today} pages today</span>
+                                <span style={{ fontSize: "0.65rem", color: "var(--slate-400)", marginLeft: 6 }}>{ft.periods_today} lessons today</span>
                               </div>
                               {ft.subs_this_week !== undefined && <SubBadge count={ft.subs_this_week} max={2} />}
                             </div>
@@ -514,7 +514,7 @@ export default function SubstitutionPage() {
                           <Initials name={assigned.sub_teacher_name} color={avatarColor(assigned.sub_teacher_id)} size={30} />
                           <div style={{ flex: 1 }}>
                             <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--success-700)" }}>
-                              {assigned.sub_teacher_name} covering Page {assigned.period_index + 1}
+                              {assigned.sub_teacher_name} covering Lesson {assigned.period_index + 1}
                             </span>
                           </div>
                           <span style={{ color: "var(--success-600)", fontSize: "1.1rem" }}>✓</span>
@@ -562,7 +562,7 @@ export default function SubstitutionPage() {
                     color: assigned ? "var(--success-600)" : isConfirming ? "var(--warning-600)" : "var(--primary-600)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: "0.75rem", fontWeight: 700, fontFamily: "var(--font-mono)", flexShrink: 0,
-                  }}>Page {slot.period_index + 1}</div>
+                  }}>Lesson {slot.period_index + 1}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--slate-900)" }}>
                       {slot.subject_name || "Lesson"} · {slot.class_name || "Class"}
@@ -616,7 +616,7 @@ export default function SubstitutionPage() {
                       <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Assigned teacher</span><strong>{confirm.subTeacher.teacher_name}</strong></div>
                       <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Covering for</span><strong>{confirm.absentTeacherName}</strong></div>
                       <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Class</span><strong>{confirm.className}</strong></div>
-                      <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Page & time</span><strong>Page {confirm.period + 1}</strong></div>
+                      <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Lesson & time</span><strong>Lesson {confirm.period + 1}</strong></div>
                       <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Room</span><strong>{confirm.roomName || "—"}</strong></div>
                       <div><span style={{ color: "var(--slate-400)", display: "block", fontSize: "0.65rem" }}>Subject</span><strong>{confirm.subjectName || confirm.subTeacher.subject || "—"}</strong></div>
                     </div>
@@ -651,11 +651,11 @@ export default function SubstitutionPage() {
                   <div style={{ padding: "0.65rem 1rem", borderTop: "1px solid var(--slate-200)" }}>
                     <div style={{ fontSize: "0.65rem", color: "var(--slate-400)", marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--primary-500)", display: "inline-block" }} />
-                      Only showing teachers with no class in Page {slot.period_index + 1} on {new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" })}s · <strong>{numFree} teachers free</strong>
+                      Only showing teachers with no class in Lesson {slot.period_index + 1} on {new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" })}s · <strong>{numFree} teachers free</strong>
                     </div>
 
                     {freeTeachers.length === 0 ? (
-                      <div style={{ color: "var(--slate-400)", fontSize: "0.82rem", padding: "0.5rem 0" }}>No free teachers available for this page.</div>
+                      <div style={{ color: "var(--slate-400)", fontSize: "0.82rem", padding: "0.5rem 0" }}>No free teachers available for this lesson.</div>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {freeTeachers.map(ft => (
@@ -683,7 +683,7 @@ export default function SubstitutionPage() {
                                 }}>
                                   🟢 {ft.free_period_label}
                                 </span>
-                                <span style={{ color: "var(--slate-400)" }}>{ft.periods_today} pages today</span>
+                                <span style={{ color: "var(--slate-400)" }}>{ft.periods_today} lessons today</span>
                               </div>
                             </div>
 
@@ -726,7 +726,7 @@ export default function SubstitutionPage() {
                     <Initials name={assigned.sub_teacher_name} color={avatarColor(assigned.sub_teacher_id)} size={30} />
                     <div style={{ flex: 1 }}>
                       <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "var(--success-700)" }}>
-                        {assigned.sub_teacher_name} covering Page {assigned.period_index + 1}
+                        {assigned.sub_teacher_name} covering Lesson {assigned.period_index + 1}
                       </span>
                       <div style={{ fontSize: "0.68rem", color: "var(--slate-500)" }}>
                         {slot.class_name} · {slot.room_name || ""} · In place of {teacherName(Number(tId))}
@@ -746,7 +746,7 @@ export default function SubstitutionPage() {
                       }}
                       title="Remove current substitute and pick a new one">🔄 Reassign</button>
                     <button onClick={async () => {
-                      if (!confirm || window.confirm(`Unassign ${assigned.sub_teacher_name} from Page ${assigned.period_index + 1}?`)) {
+                      if (!confirm || window.confirm(`Unassign ${assigned.sub_teacher_name} from Lesson ${assigned.period_index + 1}?`)) {
                         await deleteSubstitution(pid, assigned.id);
                         loadDayData();
                       }

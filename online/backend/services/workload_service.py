@@ -244,7 +244,7 @@ def get_free_teachers(
     subs_map = {r.sub_teacher_id: r.cnt for r in subs_q}
 
     # ── Build result with annotations ──
-    period_label = f"Page {period_index + 1}"
+    period_label = f"Lesson {period_index + 1}"
     free_label = f"Free {period_label} {day_name}"
 
     result = []
