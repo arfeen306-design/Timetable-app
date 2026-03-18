@@ -311,6 +311,10 @@ def get_dashboard(
             )
             .all()
         )
+    # Pre-load all classes for this project (avoid N+1 in live_teachers loop)
+        all_classes = db.query(SchoolClass).filter(SchoolClass.project_id == project_id).all()
+        classes_by_id = {c.id: c for c in all_classes}
+
         busy_teacher_ids = set()
         for entry, lesson in busy_entries:
             tid = lesson.teacher_id
@@ -318,7 +322,7 @@ def get_dashboard(
                 continue  # absent, skip
             busy_teacher_ids.add(tid)
             t = teachers_by_id.get(tid)
-            cls = db.query(SchoolClass).get(lesson.class_id) if lesson.class_id else None
+            cls = classes_by_id.get(lesson.class_id)
             subj_name = ""
             if lesson.subject_id:
                 subj = subjects_map.get(lesson.subject_id)

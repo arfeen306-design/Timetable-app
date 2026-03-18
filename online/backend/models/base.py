@@ -19,6 +19,7 @@ else:
         "pool_size": 10,
         "max_overflow": 20,
         "pool_recycle": 300,
+        "pool_timeout": 20,
     }
 engine = create_engine(
     _url,

@@ -95,12 +95,14 @@ export default function SubstitutionPage() {
 
   useEffect(() => {
     if (!pid) return;
-    listTeachers(pid).then(t => setTeachers(t as unknown as Teacher[])).catch(console.error);
-    listAcademicWeeks(pid).then(w => {
-      setWeeks(w);
-      const current = w.find(wk => wk.is_current);
-      if (current) setSelectedWeek(current);
-    }).catch(console.error);
+    cachedFetch(`sub-teachers-${pid}`, () => listTeachers(pid), 60_000)
+      .then(t => setTeachers(t as unknown as Teacher[])).catch(console.error);
+    cachedFetch(`sub-weeks-${pid}`, () => listAcademicWeeks(pid), 60_000)
+      .then(w => {
+        setWeeks(w);
+        const current = w.find(wk => wk.is_current);
+        if (current) setSelectedWeek(current);
+      }).catch(console.error);
   }, [pid]);
 
   const loadDayData = useCallback(() => {
