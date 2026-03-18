@@ -1,6 +1,6 @@
 """Substitution, TeacherAbsence, and TeacherWeekSub models."""
 from __future__ import annotations
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Date, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Date, ForeignKey, Text, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -9,6 +9,9 @@ from backend.models.base import Base
 
 class TeacherAbsence(Base):
     __tablename__ = "teacher_absences"
+    __table_args__ = (
+        Index("ix_teacher_absences_project_date", "project_id", "date"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -24,6 +27,10 @@ class TeacherAbsence(Base):
 
 class Substitution(Base):
     __tablename__ = "substitutions"
+    __table_args__ = (
+        Index("ix_substitutions_project_date", "project_id", "date"),
+        Index("ix_substitutions_project_absent", "project_id", "absent_teacher_id", "date"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)

@@ -334,7 +334,14 @@ def substitution_history(
     db: Session = Depends(get_db),
 ):
     """Return enriched substitution history across a date range."""
-    q = db.query(Substitution).filter(Substitution.project_id == project_id)
+    from sqlalchemy.orm import joinedload
+
+    q = db.query(Substitution).options(
+        joinedload(Substitution.absent_teacher),
+        joinedload(Substitution.sub_teacher),
+        joinedload(Substitution.lesson),
+        joinedload(Substitution.room),
+    ).filter(Substitution.project_id == project_id)
 
     if date_from:
         q = q.filter(Substitution.date >= date.fromisoformat(date_from))
@@ -349,29 +356,36 @@ def substitution_history(
 
     subs = q.order_by(Substitution.date.desc(), Substitution.period_index).all()
 
+    # Batch pre-fetch related data (eliminates N+1 queries)
+    subject_ids = {s.lesson.subject_id for s in subs if s.lesson and s.lesson.subject_id}
+    class_ids = {s.lesson.class_id for s in subs if s.lesson and s.lesson.class_id}
+
+    subject_map = {}
+    if subject_ids:
+        for subj in db.query(Subject).filter(Subject.id.in_(subject_ids)).all():
+            subject_map[subj.id] = subj.name
+
+    class_map = {}
+    if class_ids:
+        for cls in db.query(SchoolClass).filter(SchoolClass.id.in_(class_ids)).all():
+            class_map[cls.id] = cls.name
+
+    # Batch-fetch absence reasons
+    absence_keys = {(s.absent_teacher_id, s.date) for s in subs}
+    absence_map: dict = {}
+    if absence_keys:
+        absences = db.query(TeacherAbsence).filter(
+            TeacherAbsence.project_id == project_id,
+        ).all()
+        for a in absences:
+            absence_map[(a.teacher_id, a.date)] = a.reason
+
     result = []
     for s in subs:
-        subject_name = ""
-        class_name = ""
-        if s.lesson:
-            if s.lesson.subject_id:
-                subj = db.query(Subject).filter(Subject.id == s.lesson.subject_id).first()
-                subject_name = subj.name if subj else ""
-            if s.lesson.class_id:
-                cls = db.query(SchoolClass).filter(SchoolClass.id == s.lesson.class_id).first()
-                class_name = cls.name if cls else ""
-
-        room_name = ""
-        if s.room_id:
-            room = db.query(Room).filter(Room.id == s.room_id).first()
-            room_name = room.name if room else ""
-
-        # Get absence reason
-        absence = db.query(TeacherAbsence).filter(
-            TeacherAbsence.project_id == project_id,
-            TeacherAbsence.teacher_id == s.absent_teacher_id,
-            TeacherAbsence.date == s.date,
-        ).first()
+        subject_name = subject_map.get(s.lesson.subject_id, "") if s.lesson else ""
+        class_name = class_map.get(s.lesson.class_id, "") if s.lesson else ""
+        room_name = s.room.name if s.room else ""
+        reason = absence_map.get((s.absent_teacher_id, s.date), "")
 
         result.append({
             "id": s.id,
@@ -385,7 +399,7 @@ def substitution_history(
             "class_name": class_name,
             "room_name": room_name,
             "is_override": s.is_override,
-            "reason": absence.reason if absence else "",
+            "reason": reason,
             "notes": s.notes,
             "created_at": s.created_at.isoformat() if s.created_at else "",
         })

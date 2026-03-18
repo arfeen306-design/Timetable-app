@@ -16,6 +16,7 @@ class DutyRoster(Base):
     __table_args__ = (
         Index("ix_duty_roster_project_id", "project_id"),
         Index("ix_duty_roster_teacher_id", "teacher_id"),
+        Index("ix_duty_roster_project_row", "project_id", "row_id"),
     )
 
     id           = Column(Integer, primary_key=True, autoincrement=True)

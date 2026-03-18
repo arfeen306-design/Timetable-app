@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import * as api from "../api";
 import { useToast } from "../context/ToastContext";
+import { cachedFetch, invalidateCachePrefix } from "../hooks/prefetchCache";
 
 type Teacher    = Awaited<ReturnType<typeof api.listTeachers>>[0];
 type DutyArea   = api.DutyArea;
@@ -291,10 +292,10 @@ export default function DutyRosterPage() {
   const load = useCallback(async () => {
     try {
       const [tList, aList, rList, eList] = await Promise.all([
-        api.listTeachers(pid),
-        api.listDutyAreas(pid),
-        api.listDutyRosterRows(pid),
-        api.listDutyEntriesV2(pid),
+        cachedFetch(`duty-teachers-${pid}`, () => api.listTeachers(pid), 60_000),
+        cachedFetch(`duty-areas-${pid}`, () => api.listDutyAreas(pid), 15_000),
+        cachedFetch(`duty-rows-${pid}`, () => api.listDutyRosterRows(pid), 15_000),
+        cachedFetch(`duty-entries-${pid}`, () => api.listDutyEntriesV2(pid), 15_000),
       ]);
       setTeachers(tList);
       setAreas(aList);
@@ -366,26 +367,44 @@ export default function DutyRosterPage() {
     } catch { /* silent */ }
   }
 
-  // ── Entry operations ──
+  // ── Entry operations (OPTIMISTIC) ──
   async function handleAddTeacher(rowId: number, colIdx: number, teacherId: number) {
+    const areaId = colAreaMap[colIdx];
+    const area = areas.find(a => a.id === areaId);
+    const t = teachers.find(t => t.id === teacherId);
+    // Optimistic: add a temporary entry immediately
+    const tempId = -(Date.now());
+    const optimistic: EntryV2 = {
+      id: tempId, project_id: pid, row_id: rowId, column_index: colIdx,
+      teacher_id: teacherId, teacher_name: t ? `${t.first_name} ${t.last_name}`.trim() : "",
+      teacher_code: t?.code ?? "", duty_type: area?.name ?? "Duty", notes: null,
+    };
+    setEntries(prev => [...prev, optimistic]);
     try {
-      const areaId = colAreaMap[colIdx];
-      const area = areas.find(a => a.id === areaId);
       const entry = await api.createDutyEntryV2(pid, {
         row_id: rowId, column_index: colIdx, teacher_id: teacherId,
         duty_type: area?.name ?? "Duty",
       });
-      setEntries(prev => [...prev, entry]);
+      // Replace temp entry with server entry
+      setEntries(prev => prev.map(e => e.id === tempId ? entry : e));
+      invalidateCachePrefix(`duty-entries-${pid}`);
     } catch (err) {
+      // Rollback
+      setEntries(prev => prev.filter(e => e.id !== tempId));
       toast("error", err instanceof Error ? err.message : "Assign failed");
     }
   }
 
   async function handleRemoveTeacher(entryId: number) {
+    // Optimistic: remove immediately
+    const removed = entries.find(e => e.id === entryId);
+    setEntries(prev => prev.filter(e => e.id !== entryId));
     try {
       await api.deleteDutyEntryV2(pid, entryId);
-      setEntries(prev => prev.filter(e => e.id !== entryId));
+      invalidateCachePrefix(`duty-entries-${pid}`);
     } catch (err) {
+      // Rollback
+      if (removed) setEntries(prev => [...prev, removed]);
       toast("error", err instanceof Error ? err.message : "Remove failed");
     }
   }

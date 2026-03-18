@@ -6,6 +6,7 @@ import {
   exportHistoryPDF,
   type HistoryRecord,
 } from "../api";
+import { cachedFetch } from "../hooks/prefetchCache";
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 function thirtyDaysAgo() { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10); }
@@ -25,13 +26,14 @@ export default function SubstitutionRecords() {
   const [lastFetched, setLastFetched] = useState<{ from: string; to: string } | null>(null);
 
   useEffect(() => {
-    listTeachers(pid).then(setTeachers).catch(() => {});
+    cachedFetch(`sub-teachers-${pid}`, () => listTeachers(pid), 60_000).then(setTeachers).catch(() => {});
   }, [pid]);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getSubstitutionHistory(pid, dateFrom, dateTo, teacherId || undefined);
+      const cacheKey = `sub-history-${pid}-${dateFrom}-${dateTo}-${teacherId}`;
+      const data = await cachedFetch(cacheKey, () => getSubstitutionHistory(pid, dateFrom, dateTo, teacherId || undefined), 30_000);
       setRecords(data);
       setLastFetched({ from: dateFrom, to: dateTo });
     } catch { setRecords([]); }

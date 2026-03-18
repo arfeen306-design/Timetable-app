@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import * as api from "../api";
 import { useToast } from "../context/ToastContext";
+import { cachedFetch } from "../hooks/prefetchCache";
 import SearchableSelect from "../components/SearchableSelect";
 
 type Teacher   = Awaited<ReturnType<typeof api.listTeachers>>[0];
@@ -100,8 +101,8 @@ export default function CommitteesPage() {
   const load = useCallback(async () => {
     try {
       const [tList, cList] = await Promise.all([
-        api.listTeachers(pid),
-        api.listCommittees(pid),
+        cachedFetch(`comm-teachers-${pid}`, () => api.listTeachers(pid), 60_000),
+        cachedFetch(`comm-list-${pid}`, () => api.listCommittees(pid), 30_000),
       ]);
       setTeachers(tList);
       setCommittees(cList);

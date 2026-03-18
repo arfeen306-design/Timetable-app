@@ -1,6 +1,6 @@
 """TimetableRun and TimetableEntry — generation runs and scheduled entries."""
 from __future__ import annotations
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -25,6 +25,9 @@ class TimetableRun(Base):
 
 class TimetableEntry(Base):
     __tablename__ = "timetable_entries"
+    __table_args__ = (
+        Index("ix_tt_entries_project_day_period", "project_id", "day_index", "period_index"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
