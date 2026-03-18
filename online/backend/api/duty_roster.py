@@ -382,62 +382,91 @@ def export_duty_roster_pdf(
     project: Project = Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
-    """Generate a duty roster PDF using shared PDFEngine."""
+    """Generate a duty roster PDF matching the builder UI: Areas (columns) × Date Ranges (rows)."""
     from reportlab.lib.units import mm
-    from reportlab.platypus import Spacer
+    from reportlab.platypus import Spacer, Paragraph
     from utils.pdf_engine import PDFEngine
 
     engine = PDFEngine(db, project)
 
-    settings = (
-        db.query(SchoolSettings)
-        .filter(SchoolSettings.project_id == project.id)
-        .first()
-    )
-    days_per_week   = settings.days_per_week   if settings else 5
-    periods_per_day = settings.periods_per_day if settings else 8
-
-    DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-    entries = (
-        db.query(DutyRoster)
-        .filter(DutyRoster.project_id == project.id)
-        .order_by(DutyRoster.day_of_week, DutyRoster.period_index)
+    # ── 1. Fetch v2 data ─────────────────────────────────────────────────
+    areas = (
+        db.query(DutyArea)
+        .filter(DutyArea.project_id == project.id)
+        .order_by(DutyArea.position, DutyArea.id)
         .all()
     )
-
+    rows = (
+        db.query(DutyRosterRow)
+        .filter(DutyRosterRow.project_id == project.id)
+        .order_by(DutyRosterRow.row_order, DutyRosterRow.id)
+        .all()
+    )
+    # v2 entries (with row_id set)
+    entries = (
+        db.query(DutyRoster)
+        .filter(DutyRoster.project_id == project.id, DutyRoster.row_id.isnot(None))
+        .all()
+    )
     teachers = {t.id: t for t in db.query(Teacher).filter(Teacher.project_id == project.id).all()}
 
-    # Build cell map
-    cell_map: dict[tuple[int, int], str] = {}
+    # ── 2. Build cell map: (row_id, column_index) → list of teacher names ──
+    cell_map: dict[tuple[int, int], list[str]] = {}
     for e in entries:
         t = teachers.get(e.teacher_id)
-        t_label = (t.code or f"{t.first_name[0]}{(t.last_name or [''])[0]}").upper() if t else "?"
-        cell_map[(e.day_of_week, e.period_index)] = f"{t_label}\n{e.duty_type}"
+        name = f"{t.first_name} {t.last_name}".strip() if t else "?"
+        key = (e.row_id, e.column_index if e.column_index is not None else 0)
+        cell_map.setdefault(key, []).append(name)
 
-    col_labels = ["Page"] + [DAY_NAMES[d] for d in range(days_per_week)]
+    # ── 3. Build table ───────────────────────────────────────────────────
+    if not areas or not rows:
+        # Empty state
+        story = engine.header("Duty Roster")
+        story.append(Paragraph("No duty roster data found. Please add areas and date rows in the builder.", engine.body_style))
+        story += engine.signature_block(labels=["Prepared by", "Headmistress", "Principal"])
+        story += engine.footer()
+        fname = f"duty_roster_{project.name or project.id}.pdf"
+        return engine.build(story, filename=fname, landscape=True)
+
+    # Header row: "DATE RANGE" + area names
+    col_labels = ["DATE RANGE"] + [a.name.upper() for a in areas]
     table_data = [col_labels]
-    for p in range(periods_per_day):
-        row = [f"Page {p + 1}"]
-        for d in range(days_per_week):
-            row.append(cell_map.get((d, p), ""))
-        table_data.append(row)
 
-    col_width = (270 * mm - 20 * mm) / max(1, days_per_week + 1)
-    col_widths = [20 * mm] + [col_width] * days_per_week
+    # Data rows
+    for row in rows:
+        # Format date range label
+        if row.date_start and row.date_end:
+            ds = row.date_start.strftime("%d/%m/%Y")
+            de = row.date_end.strftime("%d/%m/%Y")
+            row_label = f"{ds}  →  {de}"
+        elif row.label:
+            row_label = row.label
+        else:
+            row_label = f"Row {row.row_order + 1}"
 
-    # Use engine.table for consistent styling but with CENTER alignment for grid
+        data_row = [row_label]
+        for col_idx, _area in enumerate(areas):
+            names = cell_map.get((row.id, col_idx), [])
+            data_row.append("\n".join(names) if names else "—")
+        table_data.append(data_row)
+
+    # Column widths: first col wider for dates, areas share remaining space
+    total_width = 270 * mm - 20 * mm  # landscape usable
+    date_col_w = 50 * mm
+    area_col_w = (total_width - date_col_w) / max(1, len(areas))
+    col_widths = [date_col_w] + [area_col_w] * len(areas)
+
     from reportlab.lib import colors
     extra = [
         ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
         ("ALIGN",    (0, 0), (-1, -1), "CENTER"),
         ("VALIGN",   (0, 0), (-1, -1), "MIDDLE"),
     ]
-    tbl = engine.table(table_data, col_widths, font_size=8, padding=4, extra_styles=extra)
+    tbl = engine.table(table_data, col_widths, font_size=8, padding=5, extra_styles=extra)
 
-    story = engine.header("Daily Duty Roster")
+    story = engine.header("Duty Roster")
     story.extend([Spacer(1, 4 * mm), tbl])
-    story += engine.signature_block()
+    story += engine.signature_block(labels=["Prepared by", "Headmistress", "Principal"])
     story += engine.footer()
 
     fname = f"duty_roster_{project.name or project.id}.pdf"

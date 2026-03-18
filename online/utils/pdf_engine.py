@@ -214,12 +214,14 @@ class PDFEngine:
 
     # ── Signature block ──────────────────────────────────────────────────────
 
-    def signature_block(self) -> list:
-        """3-column signature row: Prepared by / Vice Principal / Principal."""
+    def signature_block(self, labels: Optional[List[str]] = None) -> list:
+        """3-column signature row. Custom labels or default: Prepared by / Vice Principal / Principal."""
+        if labels is None:
+            labels = ["Prepared by", "Vice Principal / HOD", "Principal"]
         sig_data = [
             ["", "", ""],
             ["_" * 25, "_" * 25, "_" * 25],
-            ["Prepared by", "Vice Principal / HOD", "Principal"],
+            labels,
         ]
         tbl = Table(sig_data, colWidths=[140, 140, 140])
         tbl.setStyle(TableStyle([
