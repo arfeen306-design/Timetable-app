@@ -286,6 +286,8 @@ export default function DutyRosterPage() {
   // Drag state
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  // Row hover state for showing delete button
+  const [hoverRowId, setHoverRowId] = useState<number | null>(null);
 
   const numCols = Math.max(Object.keys(colAreaMap).length, areas.length > 0 ? Math.min(areas.length, 7) : 5);
 
@@ -343,11 +345,26 @@ export default function DutyRosterPage() {
   }
 
   async function handleDeleteRow(rowId: number) {
+    // Prevent deleting the last row
+    if (rows.length <= 1) {
+      toast("error", "Cannot delete the last row. At least one row is required.");
+      return;
+    }
+    // Confirmation dialog
+    if (!window.confirm("Are you sure you want to delete this row? All teacher assignments in this row will be removed.")) return;
+    // Optimistic: remove immediately
+    const removedRow = rows.find(r => r.id === rowId);
+    const removedEntries = entries.filter(e => e.row_id === rowId);
+    setRows(prev => prev.filter(r => r.id !== rowId));
+    setEntries(prev => prev.filter(e => e.row_id !== rowId));
     try {
       await api.deleteDutyRosterRow(pid, rowId);
-      setRows(prev => prev.filter(r => r.id !== rowId));
-      setEntries(prev => prev.filter(e => e.row_id !== rowId));
+      invalidateCachePrefix(`duty-rows-${pid}`);
+      invalidateCachePrefix(`duty-entries-${pid}`);
     } catch (err) {
+      // Rollback
+      if (removedRow) setRows(prev => [...prev, removedRow].sort((a, b) => a.row_order - b.row_order));
+      if (removedEntries.length) setEntries(prev => [...prev, ...removedEntries]);
       toast("error", err instanceof Error ? err.message : "Delete failed");
     }
   }
@@ -476,6 +493,8 @@ export default function DutyRosterPage() {
                   style={{ background: isDragOver ? "#EEF2FF" : undefined, transition: "background 0.1s" }}
                   onDragOver={e => handleDragOver(e, rowIdx)}
                   onDrop={() => handleDrop(rowIdx)}
+                  onMouseEnter={() => setHoverRowId(row.id)}
+                  onMouseLeave={() => setHoverRowId(null)}
                 >
                   {/* Row header */}
                   <td style={{ padding: "4px 8px", verticalAlign: "middle", minWidth: 230 }}>
@@ -509,17 +528,18 @@ export default function DutyRosterPage() {
                           width: 120, color: "var(--slate-700)",
                         }}
                       />
-                      {/* Delete btn */}
+                      {/* Delete btn — visible on row hover */}
                       <button
                         type="button"
                         style={{
                           background: "none", border: "none", cursor: "pointer",
-                          color: "var(--danger-400)", padding: "3px 5px", opacity: 0,
+                          color: "var(--danger-400)", padding: "3px 5px",
+                          opacity: hoverRowId === row.id ? 0.7 : 0,
                           borderRadius: "var(--radius-sm)", fontSize: "0.9rem",
-                          transition: "opacity 0.15s",
+                          transition: "opacity 0.15s, color 0.15s",
                         }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "0"; }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; (e.currentTarget as HTMLElement).style.color = "var(--danger-600)"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = hoverRowId === row.id ? "0.7" : "0"; (e.currentTarget as HTMLElement).style.color = "var(--danger-400)"; }}
                         onClick={() => handleDeleteRow(row.id)}
                         title="Delete row"
                       >🗑</button>
