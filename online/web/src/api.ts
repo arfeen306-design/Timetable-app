@@ -1030,3 +1030,34 @@ export async function uploadPdfForSharing(blob: Blob, filename: string): Promise
   }
   return res.json();
 }
+
+// ─── Archives (Publish / History) ────────────────────────────────────────────
+
+export type ArchiveListItem = {
+  id: number; title: string; published_at: string; record_count: number;
+};
+
+export type LatestArchives = {
+  exam_duties: { id: number; title: string; published_at: string } | null;
+  duty_roster: { id: number; title: string; published_at: string } | null;
+  committees: { id: number; title: string; published_at: string } | null;
+};
+
+export function publishSnapshot(projectId: number, moduleType: string, title?: string) {
+  return api<{ ok: boolean; id: number; title: string; published_at: string; record_count: number }>(
+    `/api/projects/${projectId}/archives/${moduleType}/publish`,
+    { method: "POST", body: JSON.stringify({ title: title || null }) }
+  );
+}
+
+export function listArchives(projectId: number, moduleType: string) {
+  return api<ArchiveListItem[]>(`/api/projects/${projectId}/archives/${moduleType}/list`);
+}
+
+export function getLatestArchives(projectId: number) {
+  return api<LatestArchives>(`/api/projects/${projectId}/archives/latest`);
+}
+
+export function downloadArchivePDF(projectId: number, moduleType: string, archiveId: number) {
+  window.open(`/api/projects/${projectId}/archives/${moduleType}/${archiveId}/export-pdf`, "_blank");
+}

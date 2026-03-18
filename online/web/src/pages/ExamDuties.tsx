@@ -1012,11 +1012,20 @@ export default function ExamDutiesPage() {
           <h2 style={{ marginTop: 0, marginBottom: 4 }}>Exam Duties</h2>
           <p className="subheading" style={{ margin: 0 }}>Schedule exam invigilators with conflict-free auto-assignment.</p>
         </div>
-        <button type="button" className="btn" style={{ fontSize: "0.78rem" }}
-          onClick={handleExportPdf}
-          disabled={exporting}>
-          {exporting ? "Exporting…" : "📄 Export PDF"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" className="btn" style={{ fontSize: "0.78rem" }}
+            onClick={async () => {
+              try {
+                const r = await api.publishSnapshot(pid, "exam_duties");
+                toast("success", `Published: ${r.title} (${r.record_count} records)`);
+              } catch (e) { toast("error", e instanceof Error ? e.message : "Publish failed"); }
+            }}>📦 Publish</button>
+          <button type="button" className="btn" style={{ fontSize: "0.78rem" }}
+            onClick={handleExportPdf}
+            disabled={exporting}>
+            {exporting ? "Exporting…" : "📄 Export PDF"}
+          </button>
+        </div>
       </div>
 
       {/* Tab bar */}

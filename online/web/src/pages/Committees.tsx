@@ -243,7 +243,20 @@ export default function CommitteesPage() {
           <h2 style={{ marginTop: 0, marginBottom: 4 }}>Committees</h2>
           <p className="subheading" style={{ margin: 0 }}>Manage school committees and their members.</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openAddCommittee}>+ New Committee</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" className="btn" style={{ fontSize: "0.78rem" }}
+            onClick={async () => {
+              try {
+                const r = await api.publishSnapshot(pid, "committees");
+                toast("success", `Published: ${r.title} (${r.record_count} records)`);
+              } catch (e) { toast("error", e instanceof Error ? e.message : "Publish failed"); }
+            }}>📦 Publish</button>
+          <button type="button" className="btn" style={{ fontSize: "0.78rem" }}
+            onClick={() => window.open(`/api/projects/${pid}/committees/export-pdf`, "_blank")}>
+            📄 Export PDF
+          </button>
+          <button type="button" className="btn btn-primary" onClick={openAddCommittee}>+ New Committee</button>
+        </div>
       </div>
 
       {committees.length === 0 && (

@@ -395,11 +395,20 @@ export default function DutyRosterPage() {
             Set area names in column headers · add date ranges in rows · assign multiple teachers per cell.
           </p>
         </div>
-        <button
-          type="button" className="btn"
-          style={{ fontSize: "0.78rem" }}
-          onClick={() => window.open(`/api/projects/${pid}/duty-roster/export-pdf`, "_blank")}
-        >📄 Export PDF</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" className="btn" style={{ fontSize: "0.78rem" }}
+            onClick={async () => {
+              try {
+                const r = await api.publishSnapshot(pid, "duty_roster");
+                toast("success", `Published: ${r.title} (${r.record_count} records)`);
+              } catch (e) { toast("error", e instanceof Error ? e.message : "Publish failed"); }
+            }}>📦 Publish</button>
+          <button
+            type="button" className="btn"
+            style={{ fontSize: "0.78rem" }}
+            onClick={() => window.open(`/api/projects/${pid}/duty-roster/export-pdf`, "_blank")}
+          >📄 Export PDF</button>
+        </div>
       </div>
 
       {/* ── Grid ── */}

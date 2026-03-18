@@ -18,6 +18,7 @@ from backend.models.exam_duties_model import ExamSession, ExamDutyConfig, ExamDu
 from backend.models.duty_area_model import DutyArea, DutyRosterRow
 from backend.models.task_model import Task, ShareLink
 from backend.models.timetable_history import TimetableHistory
+from backend.models.published_snapshot_model import PublishedSnapshot
 
 __all__ = [
     "Base", "get_db", "init_db",
@@ -33,4 +34,5 @@ __all__ = [
     "DutyArea", "DutyRosterRow",
     "Task", "ShareLink",
     "TimetableHistory",
+    "PublishedSnapshot",
 ]
