@@ -89,6 +89,8 @@ export default function ProjectDashboard() {
   // timezone handled via ipapi
   const [cc, setCc] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  // Interactive card filter: click a stat card to filter the Live Now grid
+  const [cardFilter, setCardFilter] = useState<"present" | "absent" | "busy" | null>(null);
 
   /* ── To-Do state ── */
   const todoKey = `myzynca_tasks_${pid}`;
@@ -302,7 +304,17 @@ export default function ProjectDashboard() {
       {/* ═══ STAT CARDS (5 across) ═══ */}
       <div className="pd-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12 }}>
         {/* Present */}
-        <div className="sc anim-card" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+        <div
+          className="sc anim-card"
+          onClick={() => setCardFilter(f => f === "present" ? null : "present")}
+          style={{
+            background: "#fff", border: cardFilter === "present" ? "2px solid #0EA875" : "1px solid var(--slate-200)",
+            borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden",
+            cursor: "pointer", transition: "border 0.2s, box-shadow 0.2s, transform 0.15s",
+            boxShadow: cardFilter === "present" ? "0 0 0 3px rgba(14,168,117,0.15)" : "none",
+            transform: cardFilter === "present" ? "scale(1.02)" : "none",
+          }}
+        >
           <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#0EA875", opacity: 0.08 }} />
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Present today</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0EA875", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>
@@ -314,7 +326,17 @@ export default function ProjectDashboard() {
         </div>
 
         {/* Absent */}
-        <div className="sc anim-card" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+        <div
+          className="sc anim-card"
+          onClick={() => setCardFilter(f => f === "absent" ? null : "absent")}
+          style={{
+            background: "#fff", border: cardFilter === "absent" ? "2px solid #E8334A" : "1px solid var(--slate-200)",
+            borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden",
+            cursor: "pointer", transition: "border 0.2s, box-shadow 0.2s, transform 0.15s",
+            boxShadow: cardFilter === "absent" ? "0 0 0 3px rgba(232,51,74,0.15)" : "none",
+            transform: cardFilter === "absent" ? "scale(1.02)" : "none",
+          }}
+        >
           <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#E8334A", opacity: 0.08 }} />
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Absent today</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#E8334A", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>
@@ -325,7 +347,17 @@ export default function ProjectDashboard() {
         </div>
 
         {/* Busy */}
-        <div className="sc anim-card" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+        <div
+          className="sc anim-card"
+          onClick={() => setCardFilter(f => f === "busy" ? null : "busy")}
+          style={{
+            background: "#fff", border: cardFilter === "busy" ? "2px solid #5B4EE8" : "1px solid var(--slate-200)",
+            borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden",
+            cursor: "pointer", transition: "border 0.2s, box-shadow 0.2s, transform 0.15s",
+            boxShadow: cardFilter === "busy" ? "0 0 0 3px rgba(91,78,232,0.15)" : "none",
+            transform: cardFilter === "busy" ? "scale(1.02)" : "none",
+          }}
+        >
           <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#5B4EE8", opacity: 0.08 }} />
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Busy right now</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#5B4EE8", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>
@@ -391,6 +423,26 @@ export default function ProjectDashboard() {
                   borderRadius: 20, fontFamily: "var(--font-mono)",
                 }}>{fmt12(curLesson.start_time)} – {fmt12(curLesson.end_time)}</span>
               )}
+              {/* Active filter indicator */}
+              {cardFilter && (
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  background: cardFilter === "present" ? "#E8FAF4" : cardFilter === "absent" ? "#FDEAED" : "#ECEAFD",
+                  color: cardFilter === "present" ? "#076644" : cardFilter === "absent" ? "#8A1526" : "#3D32B0",
+                  fontSize: "0.62rem", fontWeight: 700, padding: "3px 10px",
+                  borderRadius: 20, animation: "fadeUp 0.2s ease",
+                }}>
+                  Showing: {cardFilter === "present" ? "Present" : cardFilter === "absent" ? "Absent" : "Busy"}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setCardFilter(null); }}
+                    style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      fontSize: "0.7rem", color: "inherit", padding: 0, lineHeight: 1,
+                    }}
+                    title="Clear filter"
+                  >✕</button>
+                </span>
+              )}
             </div>
             <div style={{ fontSize: "0.68rem", fontFamily: "var(--font-mono)", display: "flex", gap: 8 }}>
               <span style={{ color: "#D97706", fontWeight: 600 }}>{s.busy_now} busy</span>
@@ -402,13 +454,59 @@ export default function ProjectDashboard() {
           </div>
 
           {/* Live teacher cards */}
-          {liveT.length > 0 ? (
+          {(() => {
+            // Apply filter to teacher list
+            let filtered: typeof liveT = liveT;
+            if (cardFilter === "present") {
+              filtered = liveT; // all live teachers are present
+            } else if (cardFilter === "busy") {
+              filtered = liveT.filter(t => t.status === "busy");
+            } else if (cardFilter === "absent") {
+              // Absent teachers are NOT in liveT — build virtual cards from absent_teachers
+              const absentCards: LiveTeacher[] = absent.map((a, i) => ({
+                teacher_id: a.teacher_id,
+                name: a.teacher_name,
+                initials: a.teacher_name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2),
+                status: "free" as const, // placeholder status
+                class_name: "",
+                subject_name: a.reason || "Absent",
+                color: av(i),
+              }));
+              return absentCards.length > 0 ? (
+                <div className="pd-live-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "0 14px 14px", position: "relative" }}>
+                  {absentCards.map((t, i) => (
+                    <div key={t.teacher_id || i} style={{
+                      borderRadius: 10, padding: "10px 12px",
+                      background: "#fff", border: "1px solid #FECDD3",
+                      animation: `fadeUp 0.2s ease ${i * 0.03}s both`,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                        <div style={{
+                          width: 26, height: 26, borderRadius: "50%", background: "#E8334A",
+                          fontSize: "0.55rem", fontWeight: 700, color: "#fff",
+                          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                        }}>{t.initials}</div>
+                        <div>
+                          <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "#0F172A" }}>{t.name}</div>
+                          <div style={{ fontSize: "0.62rem", color: "#E8334A", fontWeight: 600 }}>Absent today</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: "0.6rem", color: "#94A3B8", fontStyle: "italic" }}>{t.subject_name}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--slate-400)", fontSize: "0.82rem" }}>No absent teachers today 🎉</div>
+              );
+            }
+            return filtered.length > 0 ? (
             <div className="pd-live-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "0 14px 14px", position: "relative" }}>
-              {liveT.map((t, i) => (
+              {filtered.map((t, i) => (
                 <div key={t.teacher_id || i} style={{
                   borderRadius: 10, padding: "10px 12px",
                   background: "#fff",
                   border: "1px solid #E2E8F0",
+                  animation: cardFilter ? `fadeUp 0.2s ease ${i * 0.03}s both` : undefined,
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
                     <div style={{
@@ -475,7 +573,8 @@ export default function ProjectDashboard() {
                 })}
               </div>
             </div>
-          )}
+          );
+          })()}
         </div>
       )}
 
