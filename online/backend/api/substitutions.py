@@ -438,7 +438,7 @@ def export_history_pdf(
         from reportlab.platypus import Paragraph
         story.append(Paragraph("No substitution records found.", engine.body_style))
     else:
-        header = ["Date", "Period", "Absent Teacher", "Substitute", "Subject", "Class", "Status"]
+        header = ["Date", "Page", "Absent Teacher", "Substitute", "Subject", "Class", "Status"]
         rows = [header]
         for s in subs:
             absent_name = f"{s.absent_teacher.first_name} {s.absent_teacher.last_name}".strip() if s.absent_teacher else ""
@@ -455,7 +455,7 @@ def export_history_pdf(
             status = "Override" if s.is_override else "Assigned"
             rows.append([
                 str(s.date),
-                f"P{s.period_index + 1}",
+                f"Page {s.period_index + 1}",
                 absent_name,
                 sub_name,
                 subject_name,
@@ -921,7 +921,7 @@ def export_substitution_pdf(
                 sub_name = f"{sub_name}\nOVERRIDE"
 
             rows.append([
-                f"P{s.period_index + 1}",
+                f"Page {s.period_index + 1}",
                 class_name,
                 room_name,
                 sub_name,

@@ -172,7 +172,7 @@ export default function ProjectDashboard() {
       setData({ ...data, unassigned: data.unassigned.filter(x => !(x.teacher_id === u.teacher_id && x.period_index === u.period_index)) });
     }
     setQaExpanded(null);
-    setQaMsg(`⚡ Assigning ${ft.teacher_name} to L${u.period_index + 1}...`);
+    setQaMsg(`⚡ Assigning ${ft.teacher_name} to Page ${u.period_index + 1}...`);
     try {
       await assignSubstitute(pid, {
         date: data?.date || "",
@@ -183,7 +183,7 @@ export default function ProjectDashboard() {
         room_id: u.room_id,
         force_override: force,
       });
-      setQaMsg(`✅ ${ft.teacher_name} assigned to L${u.period_index + 1}`);
+      setQaMsg(`✅ ${ft.teacher_name} assigned to Page ${u.period_index + 1}`);
       // Refresh dashboard data in background
       invalidateCachePrefix(`dash-${pid}`);
       const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -287,8 +287,8 @@ export default function ProjectDashboard() {
             fontSize: "0.6rem", color: "#fff", fontWeight: 700, flexShrink: 0,
           }}>!</div>
           <div style={{ flex: 1, fontSize: "0.78rem", fontWeight: 600, color: "#8A1526" }}>
-            {uncovered} unassigned period{uncovered !== 1 ? "s" : ""} <span style={{ fontWeight: 400, color: "#C0293E" }}>
-              — {unassigned.slice(0, 3).map(u => `${u.teacher_name} (L${u.period_index + 1})`).join(", ")}
+            {uncovered} unassigned page{uncovered !== 1 ? "s" : ""} <span style={{ fontWeight: 400, color: "#C0293E" }}>
+              — {unassigned.slice(0, 3).map(u => `${u.teacher_name} (Page ${u.period_index + 1})`).join(", ")}
               {uncovered > 3 ? ` + ${uncovered - 3} more` : ""}
             </span>
           </div>
@@ -321,7 +321,7 @@ export default function ProjectDashboard() {
             {d.is_off_day ? "—" : s.absent_today}
           </div>
           <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>{d.is_off_day ? "No school" : "marked this morning"}</div>
-          {!d.is_off_day && uncovered > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#FDEAED", color: "#8A1526" }}>{uncovered} periods uncovered</div>}
+          {!d.is_off_day && uncovered > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#FDEAED", color: "#8A1526" }}>{uncovered} pages uncovered</div>}
         </div>
 
         {/* Busy */}
@@ -422,7 +422,7 @@ export default function ProjectDashboard() {
                         fontSize: "0.62rem", marginTop: 1,
                         color: t.status === "free" ? "#16A34A" : t.status === "sub" ? "#7C3AED" : "#64748B",
                       }}>
-                        {t.status === "busy" ? "Teaching" : t.status === "sub" ? "On substitution" : "Free this period"}
+                        {t.status === "busy" ? "Teaching" : t.status === "sub" ? "On substitution" : "Free this page"}
                       </div>
                     </div>
                   </div>
@@ -491,7 +491,7 @@ export default function ProjectDashboard() {
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: "0.55rem", color: "#fff", fontWeight: 700, flexShrink: 0,
             }}>!</div>
-            <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#8A1526" }}>Unassigned periods — Quick Assign available</div>
+            <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#8A1526" }}>Unassigned pages — Quick Assign available</div>
             <div style={{
               marginLeft: "auto", background: "#E8334A", color: "#fff",
               fontSize: "0.6rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
@@ -517,7 +517,7 @@ export default function ProjectDashboard() {
                       fontFamily: "var(--font-mono)", fontSize: "0.68rem", fontWeight: 700,
                       background: "#FDEAED", color: "#E8334A", padding: "2px 7px", borderRadius: 4,
                       whiteSpace: "nowrap",
-                    }}>L{u.period_index + 1}</span>
+                    }}>Page {u.period_index + 1}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--slate-900)" }}>{u.teacher_name}</div>
                       <div style={{ fontSize: "0.68rem", color: "var(--slate-400)" }}>
@@ -538,7 +538,7 @@ export default function ProjectDashboard() {
                       {qaLoading ? (
                         <div style={{ fontSize: "0.75rem", color: "var(--slate-400)", padding: "8px 0" }}>⏳ Finding free teachers...</div>
                       ) : qaFree.length === 0 ? (
-                        <div style={{ fontSize: "0.75rem", color: "var(--slate-400)", padding: "8px 0" }}>No free teachers available for this period.</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--slate-400)", padding: "8px 0" }}>No free teachers available for this page.</div>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", marginBottom: 2 }}>
@@ -564,7 +564,7 @@ export default function ProjectDashboard() {
                                   {ft.sub_limit_reached && <span style={{ fontSize: "0.55rem", fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: "#FEE2E2", color: "#DC2626" }}>At limit</span>}
                                 </div>
                                 <div style={{ fontSize: "0.62rem", color: "var(--slate-400)" }}>
-                                  {ft.subject || ""} · {ft.periods_today} periods today · {ft.subs_this_week}/2 subs
+                                  {ft.subject || ""} · {ft.periods_today} pages today · {ft.subs_this_week}/2 subs
                                 </div>
                               </div>
                             </div>
@@ -592,7 +592,7 @@ export default function ProjectDashboard() {
         <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
-              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Today's workload — periods per teacher</div>
+              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Today's workload — pages per teacher</div>
               <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Sorted highest to lowest · orange = substitution · red = over limit</div>
             </div>
             <div style={{ display: "flex", gap: 12 }}>
@@ -699,14 +699,14 @@ export default function ProjectDashboard() {
                   <span style={{
                     fontFamily: "var(--font-mono)", fontSize: "0.6rem", fontWeight: 700,
                     background: "#ECEAFD", color: "#3D32B0", padding: "2px 7px", borderRadius: 4,
-                  }}>L{sub.period_index + 1}</span>
+                  }}>Page {sub.period_index + 1}</span>
                 </div>
               ))}
               {uncovered > 0 && (
                 <div style={{ padding: "10px 18px", background: "#FDEAED", display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#E8334A" }} />
                   <span style={{ fontSize: "0.68rem", color: "#8A1526", fontWeight: 600 }}>
-                    {uncovered} period{uncovered !== 1 ? "s" : ""} still unassigned
+                    {uncovered} page{uncovered !== 1 ? "s" : ""} still unassigned
                   </span>
                 </div>
               )}
@@ -732,7 +732,7 @@ export default function ProjectDashboard() {
                 </div>
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--slate-600)", lineHeight: 1.5 }}>
-                    <strong style={{ color: "var(--slate-900)" }}>{sub.sub_teacher_name}</strong> assigned L{sub.period_index + 1} for {sub.absent_teacher_name}
+                    <strong style={{ color: "var(--slate-900)" }}>{sub.sub_teacher_name}</strong> assigned Page {sub.period_index + 1} for {sub.absent_teacher_name}
                   </div>
                   <div style={{ fontSize: "0.62rem", color: "var(--slate-400)", marginTop: 2, fontFamily: "var(--font-mono)" }}>Today</div>
                 </div>

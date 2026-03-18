@@ -184,7 +184,7 @@ export default function TimetableGrid({ projectId, entries, days, periods, onEnt
     <div className="tt-container">
       <div className="tt-grid" style={gridStyle}>
         {/* Corner cell */}
-        <div className="tt-header tt-header--corner">Period</div>
+        <div className="tt-header tt-header--corner">Page</div>
 
         {/* Day headers */}
         {Array.from({ length: days }, (_, d) => (
@@ -198,7 +198,7 @@ export default function TimetableGrid({ projectId, entries, days, periods, onEnt
           <>
             {/* Period label */}
             <div key={`pl-${p}`} className="tt-period-label">
-              <span>P{p + 1}</span>
+              <span>Page {p + 1}</span>
             </div>
 
             {/* Day cells for this period */}

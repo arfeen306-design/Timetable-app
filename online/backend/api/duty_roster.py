@@ -415,10 +415,10 @@ def export_duty_roster_pdf(
         t_label = (t.code or f"{t.first_name[0]}{(t.last_name or [''])[0]}").upper() if t else "?"
         cell_map[(e.day_of_week, e.period_index)] = f"{t_label}\n{e.duty_type}"
 
-    col_labels = ["Period"] + [DAY_NAMES[d] for d in range(days_per_week)]
+    col_labels = ["Page"] + [DAY_NAMES[d] for d in range(days_per_week)]
     table_data = [col_labels]
     for p in range(periods_per_day):
-        row = [f"P{p + 1}"]
+        row = [f"Page {p + 1}"]
         for d in range(days_per_week):
             row.append(cell_map.get((d, p), ""))
         table_data.append(row)

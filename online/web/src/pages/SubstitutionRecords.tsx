@@ -192,7 +192,7 @@ export default function SubstitutionRecords() {
             <thead>
               <tr style={{ background: "#4f46e5", color: "#fff" }}>
                 <th style={thStyle}>Date</th>
-                <th style={thStyle}>Period</th>
+                <th style={thStyle}>Page</th>
                 <th style={thStyle}>Absent Teacher</th>
                 <th style={thStyle}>Reason</th>
                 <th style={thStyle}>Substitute</th>
@@ -205,7 +205,7 @@ export default function SubstitutionRecords() {
               {records.map((r, i) => (
                 <tr key={r.id} style={{ background: i % 2 === 0 ? "#fff" : "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
                   <td style={tdStyle}>{formatDate(r.date)}</td>
-                  <td style={{ ...tdStyle, fontWeight: 700, color: "#4f46e5" }}>P{r.period_index + 1}</td>
+                  <td style={{ ...tdStyle, fontWeight: 700, color: "#4f46e5" }}>Page {r.period_index + 1}</td>
                   <td style={tdStyle}>{r.absent_teacher_name}</td>
                   <td style={{ ...tdStyle, color: "#94a3b8", fontStyle: "italic", fontSize: "0.72rem" }}>{r.reason || "—"}</td>
                   <td style={{ ...tdStyle, fontWeight: 600 }}>{r.sub_teacher_name}</td>

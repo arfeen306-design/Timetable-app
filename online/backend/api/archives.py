@@ -273,12 +273,12 @@ def export_archive_pdf(
 
     elif module_type == "duty_roster":
         DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        header = ["Day", "Period", "Teacher", "Duty"]
+        header = ["Day", "Page", "Teacher", "Duty"]
         rows = [header]
         for e in data:
             rows.append([
                 DAY_NAMES[e["day_of_week"]] if e["day_of_week"] < 7 else "?",
-                f"P{e['period_index'] + 1}",
+                f"Page {e['period_index'] + 1}",
                 e["teacher_name"],
                 e["duty_type"],
             ])
