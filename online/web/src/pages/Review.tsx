@@ -103,6 +103,14 @@ export default function Review() {
   const [dragEntry, setDragEntry] = useState<Entry | null>(null);
   const [dragOver, setDragOver] = useState<{ day: number; period: number } | null>(null);
   const [moving, setMoving] = useState(false);
+  const [conflictModal, setConflictModal] = useState<{ msgs: string; resolve: (force: boolean) => void } | null>(null);
+
+  /** Show a custom conflict modal and return a promise that resolves to true (force) or false (cancel). */
+  function askForceMove(msgs: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      setConflictModal({ msgs, resolve });
+    });
+  }
 
   /* ── Load data ── */
   useEffect(() => {
@@ -197,8 +205,8 @@ export default function Review() {
       } else if (result.conflicts && result.conflicts.length > 0) {
         // Conflict detected — entry is still at original position (never moved)
         const msgs = result.conflicts.map(c => c.message).join("\n");
-        // Ask user if they want to force-override
-        const shouldForce = confirm(`⚠️ Conflicts:\n${msgs}\n\nMove anyway (force)?`);
+        // Show custom modal with "Force to Move" button
+        const shouldForce = await askForceMove(msgs);
         if (shouldForce) {
           const forced = await api.moveEntry(pid, entryId, newDay, newPeriod, true);
           if (forced.success) {
@@ -237,6 +245,7 @@ export default function Review() {
   const colSlots = regularSlots.length > 0 ? regularSlots : Array.from({ length: gridPeriods }, (_, i) => ({ type: "period" as const, periodIndex: i, start: "", end: "" }));
 
   return (
+    <>
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
       <p style={{ marginBottom: "0.5rem" }}>
         <Link to={`/project/${pid}`} style={{ color: "#3b82f6", textDecoration: "none", fontSize: "0.9rem" }}>← Editor</Link>
@@ -519,6 +528,52 @@ export default function Review() {
         </div>
       </div>
     </div>
+
+    {/* ═══ Conflict Force-Move Modal ═══ */}
+    {conflictModal && (
+      <div style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }} onClick={() => { conflictModal.resolve(false); setConflictModal(null); }}>
+        <div onClick={e => e.stopPropagation()} style={{
+          background: "#fff", borderRadius: 14, padding: "1.5rem 1.75rem", maxWidth: 420, width: "90%",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.25)", animation: "fadeIn 0.15s ease-out",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: "1.5rem" }}>⚠️</span>
+            <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Scheduling Conflict</h3>
+          </div>
+          <div style={{
+            background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8,
+            padding: "0.75rem 1rem", marginBottom: 16, fontSize: "0.85rem", color: "#991b1b",
+            whiteSpace: "pre-wrap", lineHeight: 1.5,
+          }}>
+            {conflictModal.msgs}
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button
+              onClick={() => { conflictModal.resolve(false); setConflictModal(null); }}
+              style={{
+                padding: "0.5rem 1.25rem", borderRadius: 8, border: "1px solid #e2e8f0",
+                background: "#f8fafc", color: "#64748b", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { conflictModal.resolve(true); setConflictModal(null); }}
+              style={{
+                padding: "0.5rem 1.25rem", borderRadius: 8, border: "none",
+                background: "#dc2626", color: "#fff", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer",
+              }}
+            >
+              Force to Move
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
