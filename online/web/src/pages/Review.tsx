@@ -181,23 +181,41 @@ export default function Review() {
     e.preventDefault(); setDragOver(null);
     if (!dragEntry || moving) return;
     if (dragEntry.day_index === newDay && dragEntry.period_index === newPeriod) { setDragEntry(null); return; }
-    const oldDay = dragEntry.day_index, oldPeriod = dragEntry.period_index;
-    setEntries(prev => prev.map(en => en.id === dragEntry.id ? { ...en, day_index: newDay, period_index: newPeriod } : en));
+
+    // Capture original position for safety
+    const entryId = dragEntry.id;
     setMoving(true);
+
     try {
-      const result = await api.moveEntry(pid, dragEntry.id, newDay, newPeriod, false);
-      if (!result.success) {
-        setEntries(prev => prev.map(en => en.id === dragEntry.id ? { ...en, day_index: oldDay, period_index: oldPeriod } : en));
+      // Step 1: Ask backend to validate — DO NOT move in state yet
+      const result = await api.moveEntry(pid, entryId, newDay, newPeriod, false);
+
+      if (result.success) {
+        // Backend accepted — now update state
+        setEntries(prev => prev.map(en => en.id === entryId ? { ...en, day_index: newDay, period_index: newPeriod } : en));
+        toast("success", result.message || "Moved.");
+      } else if (result.conflicts && result.conflicts.length > 0) {
+        // Conflict detected — entry is still at original position (never moved)
         const msgs = result.conflicts.map(c => c.message).join("\n");
-        if (confirm(`⚠️ Conflicts:\n${msgs}\n\nMove anyway (force)?`)) {
-          const forced = await api.moveEntry(pid, dragEntry.id, newDay, newPeriod, true);
-          if (forced.success) setEntries(prev => prev.map(en => en.id === dragEntry.id ? { ...en, day_index: newDay, period_index: newPeriod } : en));
+        // Ask user if they want to force-override
+        const shouldForce = confirm(`⚠️ Conflicts:\n${msgs}\n\nMove anyway (force)?`);
+        if (shouldForce) {
+          const forced = await api.moveEntry(pid, entryId, newDay, newPeriod, true);
+          if (forced.success) {
+            setEntries(prev => prev.map(en => en.id === entryId ? { ...en, day_index: newDay, period_index: newPeriod } : en));
+            toast("success", forced.message || "Moved (forced).");
+          } else {
+            toast("error", "Force move was rejected by the server.");
+          }
         }
-      } else { toast("success", result.message || "Moved."); }
+        // If user clicked Cancel — nothing happens, entry stays at original slot ✓
+      }
     } catch (err) {
-      setEntries(prev => prev.map(en => en.id === dragEntry.id ? { ...en, day_index: oldDay, period_index: oldPeriod } : en));
       toast("error", err instanceof Error ? err.message : "Move failed");
-    } finally { setMoving(false); setDragEntry(null); }
+    } finally {
+      setMoving(false);
+      setDragEntry(null);
+    }
   }
 
   /* ── Export ── */
