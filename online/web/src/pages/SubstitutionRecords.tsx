@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   listTeachers,
@@ -22,23 +22,25 @@ export default function SubstitutionRecords() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lastFetched, setLastFetched] = useState<{ from: string; to: string } | null>(null);
 
   useEffect(() => {
     listTeachers(pid).then(setTeachers).catch(() => {});
   }, [pid]);
 
-  useEffect(() => {
-    loadRecords();
-  }, [pid, dateFrom, dateTo, teacherId]);
-
-  async function loadRecords() {
+  const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
       const data = await getSubstitutionHistory(pid, dateFrom, dateTo, teacherId || undefined);
       setRecords(data);
+      setLastFetched({ from: dateFrom, to: dateTo });
     } catch { setRecords([]); }
     finally { setLoading(false); }
-  }
+  }, [pid, dateFrom, dateTo, teacherId]);
+
+  useEffect(() => {
+    loadRecords();
+  }, [loadRecords]);
 
   function handleExport() {
     exportHistoryPDF(pid, dateFrom, dateTo, teacherId || undefined);
@@ -50,6 +52,10 @@ export default function SubstitutionRecords() {
     (byDate[r.date] ??= []).push(r);
   }
   const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+
+  // Calculate actual data range
+  const earliestDate = dates.length > 0 ? dates[dates.length - 1] : null;
+  const latestDate = dates.length > 0 ? dates[0] : null;
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "1.5rem 1rem" }}>
@@ -105,6 +111,28 @@ export default function SubstitutionRecords() {
         </div>
       </div>
 
+      {/* Active filter indicator */}
+      {lastFetched && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem",
+          fontSize: "0.72rem", color: "#64748b", flexWrap: "wrap",
+        }}>
+          <span style={{ background: "#e0e7ff", color: "#4338ca", padding: "2px 8px", borderRadius: 12, fontWeight: 600 }}>
+            Showing: {formatDate(lastFetched.from)} → {formatDate(lastFetched.to)}
+          </span>
+          {teacherId > 0 && (
+            <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 12, fontWeight: 600 }}>
+              Teacher: {teachers.find(t => t.id === teacherId)?.first_name ?? "Selected"}
+            </span>
+          )}
+          {records.length > 0 && earliestDate && latestDate && (
+            <span style={{ color: "#94a3b8" }}>
+              · Data spans {formatDate(earliestDate)} to {formatDate(latestDate)}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Summary */}
       <div style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem" }}>
         <div style={{
@@ -147,7 +175,12 @@ export default function SubstitutionRecords() {
           textAlign: "center", padding: "3rem", color: "#94a3b8", background: "#f8fafc",
           borderRadius: 10, border: "1px solid #e2e8f0",
         }}>
-          No substitution records found for this period.
+          <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>📭</div>
+          <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>No substitution records found</div>
+          <div style={{ fontSize: "0.78rem" }}>
+            No records exist between {formatDate(dateFrom)} and {formatDate(dateTo)}.
+            {teacherId > 0 && " Try selecting 'All Teachers'."}
+          </div>
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
