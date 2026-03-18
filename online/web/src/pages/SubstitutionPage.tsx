@@ -279,6 +279,10 @@ export default function SubstitutionPage() {
             </select>
           )}
           <button onClick={handleExportPDF} className="btn btn-secondary" style={{ fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap" }}>Export PDF</button>
+          <a href={`/project/${pid}/substitution-records`} className="btn btn-secondary"
+            style={{ fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap", textDecoration: "none" }}>
+            📋 Records
+          </a>
         </div>
       </div>
 

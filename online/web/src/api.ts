@@ -582,6 +582,32 @@ export function listPendingWithSuggestions(projectId: number, dt: string) {
   return api<PendingWithSuggestions>(`/api/projects/${projectId}/substitutions/pending-with-suggestions?date=${dt}`);
 }
 
+// ─── Substitution History ─────────────────────────────────────────────────
+
+export type HistoryRecord = {
+  id: number; date: string; period_index: number;
+  absent_teacher_id: number; absent_teacher_name: string;
+  sub_teacher_id: number; sub_teacher_name: string;
+  subject_name: string; class_name: string; room_name: string;
+  is_override: boolean; reason: string; notes: string; created_at: string;
+};
+
+export function getSubstitutionHistory(projectId: number, dateFrom?: string, dateTo?: string, teacherId?: number) {
+  const qs = new URLSearchParams();
+  if (dateFrom) qs.set("date_from", dateFrom);
+  if (dateTo) qs.set("date_to", dateTo);
+  if (teacherId) qs.set("teacher_id", String(teacherId));
+  return api<HistoryRecord[]>(`/api/projects/${projectId}/substitutions/history?${qs}`);
+}
+
+export function exportHistoryPDF(projectId: number, dateFrom?: string, dateTo?: string, teacherId?: number) {
+  const qs = new URLSearchParams();
+  if (dateFrom) qs.set("date_from", dateFrom);
+  if (dateTo) qs.set("date_to", dateTo);
+  if (teacherId) qs.set("teacher_id", String(teacherId));
+  window.open(`/api/projects/${projectId}/substitutions/history/export-pdf?${qs}`, "_blank");
+}
+
 export function exportWorkloadPDF(projectId: number, week?: string) {
   const qs = week ? `?week=${week}` : "";
   window.open(`/api/projects/${projectId}/workload/export-pdf${qs}`, "_blank");

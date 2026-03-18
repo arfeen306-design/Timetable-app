@@ -322,6 +322,158 @@ def list_substitutions(
     ]
 
 
+# ─── Substitution History (multi-date, filterable) ────────────────────────────
+
+@router.get("/history")
+def substitution_history(
+    project_id: int = Path(...),
+    date_from: str = Query(None, description="Start date YYYY-MM-DD"),
+    date_to: str = Query(None, description="End date YYYY-MM-DD"),
+    teacher_id: int = Query(None, description="Filter by absent or sub teacher ID"),
+    project=Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    """Return enriched substitution history across a date range."""
+    q = db.query(Substitution).filter(Substitution.project_id == project_id)
+
+    if date_from:
+        q = q.filter(Substitution.date >= date.fromisoformat(date_from))
+    if date_to:
+        q = q.filter(Substitution.date <= date.fromisoformat(date_to))
+    if teacher_id:
+        from sqlalchemy import or_
+        q = q.filter(or_(
+            Substitution.absent_teacher_id == teacher_id,
+            Substitution.sub_teacher_id == teacher_id,
+        ))
+
+    subs = q.order_by(Substitution.date.desc(), Substitution.period_index).all()
+
+    result = []
+    for s in subs:
+        subject_name = ""
+        class_name = ""
+        if s.lesson:
+            if s.lesson.subject_id:
+                subj = db.query(Subject).filter(Subject.id == s.lesson.subject_id).first()
+                subject_name = subj.name if subj else ""
+            if s.lesson.class_id:
+                cls = db.query(SchoolClass).filter(SchoolClass.id == s.lesson.class_id).first()
+                class_name = cls.name if cls else ""
+
+        room_name = ""
+        if s.room_id:
+            room = db.query(Room).filter(Room.id == s.room_id).first()
+            room_name = room.name if room else ""
+
+        # Get absence reason
+        absence = db.query(TeacherAbsence).filter(
+            TeacherAbsence.project_id == project_id,
+            TeacherAbsence.teacher_id == s.absent_teacher_id,
+            TeacherAbsence.date == s.date,
+        ).first()
+
+        result.append({
+            "id": s.id,
+            "date": str(s.date),
+            "period_index": s.period_index,
+            "absent_teacher_id": s.absent_teacher_id,
+            "absent_teacher_name": f"{s.absent_teacher.first_name} {s.absent_teacher.last_name}".strip() if s.absent_teacher else "",
+            "sub_teacher_id": s.sub_teacher_id,
+            "sub_teacher_name": f"{s.sub_teacher.first_name} {s.sub_teacher.last_name}".strip() if s.sub_teacher else "",
+            "subject_name": subject_name,
+            "class_name": class_name,
+            "room_name": room_name,
+            "is_override": s.is_override,
+            "reason": absence.reason if absence else "",
+            "notes": s.notes,
+            "created_at": s.created_at.isoformat() if s.created_at else "",
+        })
+
+    return result
+
+
+@router.get("/history/export-pdf")
+def export_history_pdf(
+    project_id: int = Path(...),
+    date_from: str = Query(None, description="Start date YYYY-MM-DD"),
+    date_to: str = Query(None, description="End date YYYY-MM-DD"),
+    teacher_id: int = Query(None, description="Filter by teacher ID"),
+    project=Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    """Generate a PDF report of substitution history."""
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Spacer
+    from utils.pdf_engine import PDFEngine
+
+    engine = PDFEngine(db, project)
+
+    # Re-use the history query
+    q = db.query(Substitution).filter(Substitution.project_id == project_id)
+    if date_from:
+        q = q.filter(Substitution.date >= date.fromisoformat(date_from))
+    if date_to:
+        q = q.filter(Substitution.date <= date.fromisoformat(date_to))
+    if teacher_id:
+        from sqlalchemy import or_
+        q = q.filter(or_(
+            Substitution.absent_teacher_id == teacher_id,
+            Substitution.sub_teacher_id == teacher_id,
+        ))
+
+    subs = q.order_by(Substitution.date.desc(), Substitution.period_index).all()
+
+    # Build subtitle
+    parts = []
+    if date_from:
+        parts.append(f"From {date_from}")
+    if date_to:
+        parts.append(f"To {date_to}")
+    subtitle = " · ".join(parts) if parts else "All Records"
+
+    story = engine.header("Substitution Report", subtitle=subtitle)
+
+    if not subs:
+        from reportlab.platypus import Paragraph
+        story.append(Paragraph("No substitution records found.", engine.body_style))
+    else:
+        header = ["Date", "Period", "Absent Teacher", "Substitute", "Subject", "Class", "Status"]
+        rows = [header]
+        for s in subs:
+            absent_name = f"{s.absent_teacher.first_name} {s.absent_teacher.last_name}".strip() if s.absent_teacher else ""
+            sub_name = f"{s.sub_teacher.first_name} {s.sub_teacher.last_name}".strip() if s.sub_teacher else ""
+            subject_name = ""
+            class_name = ""
+            if s.lesson:
+                if s.lesson.subject_id:
+                    subj = db.query(Subject).filter(Subject.id == s.lesson.subject_id).first()
+                    subject_name = subj.name if subj else ""
+                if s.lesson.class_id:
+                    cls = db.query(SchoolClass).filter(SchoolClass.id == s.lesson.class_id).first()
+                    class_name = cls.name if cls else ""
+            status = "Override" if s.is_override else "Assigned"
+            rows.append([
+                str(s.date),
+                f"P{s.period_index + 1}",
+                absent_name,
+                sub_name,
+                subject_name,
+                class_name,
+                status,
+            ])
+
+        col_w = [22 * mm, 14 * mm, 30 * mm, 30 * mm, 28 * mm, 28 * mm, 18 * mm]
+        tbl = engine.smart_fit_table(rows, col_w)
+        story.extend([Spacer(1, 4 * mm), tbl])
+
+    story += engine.signature_block()
+    story += engine.footer()
+
+    fname = f"substitution_report_{date_from or 'all'}_{date_to or 'all'}.pdf"
+    return engine.build(story, filename=fname)
+
+
 # ─── List Absences ────────────────────────────────────────────────────────────
 
 @router.get("/absences")

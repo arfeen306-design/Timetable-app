@@ -17,6 +17,7 @@ const Review           = lazy(() => import("./pages/Review"));
 const Export           = lazy(() => import("./pages/Export"));
 const WorkloadPage     = lazy(() => import("./pages/WorkloadPage"));
 const SubstitutionPage = lazy(() => import("./pages/SubstitutionPage"));
+const SubstitutionRecords = lazy(() => import("./pages/SubstitutionRecords"));
 const DutyRosterPage   = lazy(() => import("./pages/DutyRoster"));
 const CommitteesPage   = lazy(() => import("./pages/Committees"));
 const ExamDutiesPage   = lazy(() => import("./pages/ExamDuties"));
@@ -87,6 +88,9 @@ export default function App() {
         } />
         <Route path="project/:projectId/substitutions" element={
           <Suspense fallback={<PageLoader />}><SubstitutionPage /></Suspense>
+        } />
+        <Route path="project/:projectId/substitution-records" element={
+          <Suspense fallback={<PageLoader />}><SubstitutionRecords /></Suspense>
         } />
         <Route path="project/:projectId/duty-roster" element={
           <Suspense fallback={<PageLoader />}><DutyRosterPage /></Suspense>
