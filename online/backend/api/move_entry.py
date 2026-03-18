@@ -111,6 +111,11 @@ def move_entry(
     if not run or run.status != "completed":
         raise HTTPException(status_code=404, detail="No completed timetable run.")
 
+    # ── Force fresh reads: expire SQLAlchemy identity-map cache ──
+    # Without this, stale TimetableEntry objects from a previous move
+    # on the same pooled connection can cause "ghost conflicts."
+    db.expire_all()
+
     entry = (
         db.query(TimetableEntry)
         .filter(
@@ -150,16 +155,22 @@ def move_entry(
     if entry.day_index == body.new_day_index and entry.period_index == body.new_period_index:
         return {"success": True, "conflicts": [], "message": "Already at this slot."}
 
-    # Check conflicts
+    # Check conflicts (session is fresh from expire_all above)
     conflicts = _find_conflicts(db, project.id, run.id, entry, body.new_day_index, body.new_period_index)
 
     if conflicts and not body.force:
         return {"success": False, "conflicts": conflicts}
 
-    # Move the entry
-    entry.day_index = body.new_day_index
-    entry.period_index = body.new_period_index
-    db.commit()
+    # ── Atomic move: update coordinates in a single transaction ──
+    try:
+        entry.day_index = body.new_day_index
+        entry.period_index = body.new_period_index
+        db.flush()      # Write to DB within transaction (catches constraint errors)
+        db.commit()     # Finalize
+        db.refresh(entry)  # Reload from DB so the object reflects true state
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Move failed — transaction rolled back.")
 
     return {
         "success": True,
@@ -181,6 +192,9 @@ def get_valid_slots(
     run = get_latest_run(db, project.id)
     if not run or run.status != "completed":
         raise HTTPException(status_code=404, detail="No completed timetable run.")
+
+    # Expire stale cache to prevent ghost conflicts during drag
+    db.expire_all()
 
     entry = (
         db.query(TimetableEntry)
