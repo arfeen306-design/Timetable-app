@@ -150,6 +150,8 @@ function TeacherChipSelector({
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [dropPos, setDropPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const assignedIds = entries.map(e => e.teacher_id);
   const unassigned = allTeachers.filter(t => !assignedIds.includes(t.id));
@@ -194,16 +196,23 @@ function TeacherChipSelector({
             background: "none", color: "#6366F1", fontSize: 14, lineHeight: 1,
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
           }}
-          onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+          ref={btnRef}
+          onClick={() => {
+            if (btnRef.current) {
+              const rect = btnRef.current.getBoundingClientRect();
+              setDropPos({ top: rect.bottom + 4, left: rect.left });
+            }
+            setOpen(true); setTimeout(() => inputRef.current?.focus(), 0);
+          }}
         >+</button>
       </div>
 
       {open && (
         <div style={{
-          position: "absolute", top: "100%", left: 0, zIndex: 200,
+          position: "fixed", top: dropPos.top, left: dropPos.left, zIndex: 9999,
           background: "#fff", border: "1px solid var(--border-default)",
-          borderRadius: "var(--radius-md)", boxShadow: "0 12px 32px rgba(0,0,0,0.14)",
-          minWidth: 240, overflow: "hidden",
+          borderRadius: "var(--radius-md)", boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
+          minWidth: 260, overflow: "hidden",
         }}>
           <input
             ref={inputRef}
