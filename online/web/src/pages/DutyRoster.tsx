@@ -406,7 +406,10 @@ export default function DutyRosterPage() {
           <button
             type="button" className="btn"
             style={{ fontSize: "0.78rem" }}
-            onClick={() => window.open(`/api/projects/${pid}/duty-roster/export-pdf`, "_blank")}
+            onClick={async () => {
+              try { await api.exportDutyRosterPDF(pid); }
+              catch (e) { toast("error", e instanceof Error ? e.message : "PDF export failed. Please log in again."); }
+            }}
           >📄 Export PDF</button>
         </div>
       </div>

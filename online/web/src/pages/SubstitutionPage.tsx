@@ -5,7 +5,7 @@ import {
   listTeachers, listAcademicWeeks,
   markAbsent, getFreeTeachers, assignSubstitute,
   listSubstitutions, listAbsences, deleteSubstitution, removeAbsence,
-  getTeacherSlots, listPendingWithSuggestions,
+  getTeacherSlots, listPendingWithSuggestions, exportSubstitutionsPDF,
   type AbsentSlot, type FreeTeacher, type SubstitutionRecord, type AbsenceRecord, type AcademicWeekInfo,
   type SuggestionTeacher,
 } from "../api";
@@ -250,7 +250,11 @@ export default function SubstitutionPage() {
   }
 
   async function handleExportPDF() {
-    window.open(`/api/projects/${pid}/substitutions/export-pdf?date=${date}`, "_blank");
+    try {
+      await exportSubstitutionsPDF(pid, date);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "PDF export failed. Please log in again.");
+    }
   }
 
   // Group absent slots by teacher

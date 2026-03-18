@@ -40,6 +40,16 @@ export async function apiBlob(path: string): Promise<Blob> {
   return res.blob();
 }
 
+/** Authenticated PDF download — replaces window.open() which can't send JWT */
+export function downloadPDF(path: string, filename: string): Promise<void> {
+  return apiBlob(path).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
 // Auth
 export function login(email: string, password: string) {
   return api<{ access_token: string; user: { email: string; name: string; school_id: number } }>(
@@ -605,12 +615,20 @@ export function exportHistoryPDF(projectId: number, dateFrom?: string, dateTo?: 
   if (dateFrom) qs.set("date_from", dateFrom);
   if (dateTo) qs.set("date_to", dateTo);
   if (teacherId) qs.set("teacher_id", String(teacherId));
-  window.open(`/api/projects/${projectId}/substitutions/history/export-pdf?${qs}`, "_blank");
+  return downloadPDF(`/api/projects/${projectId}/substitutions/history/export-pdf?${qs}`, "substitution_history.pdf");
 }
 
 export function exportWorkloadPDF(projectId: number, week?: string) {
   const qs = week ? `?week=${week}` : "";
-  window.open(`/api/projects/${projectId}/workload/export-pdf${qs}`, "_blank");
+  return downloadPDF(`/api/projects/${projectId}/workload/export-pdf${qs}`, "workload_report.pdf");
+}
+
+export function exportSubstitutionsPDF(projectId: number, date: string) {
+  return downloadPDF(`/api/projects/${projectId}/substitutions/export-pdf?date=${date}`, `substitutions_${date}.pdf`);
+}
+
+export function exportDutyRosterPDF(projectId: number) {
+  return downloadPDF(`/api/projects/${projectId}/duty-roster/export-pdf`, "duty_roster.pdf");
 }
 
 // ─── Exam Duties ────────────────────────────────────────────────────────────
@@ -1059,5 +1077,5 @@ export function getLatestArchives(projectId: number) {
 }
 
 export function downloadArchivePDF(projectId: number, moduleType: string, archiveId: number) {
-  window.open(`/api/projects/${projectId}/archives/${moduleType}/${archiveId}/export-pdf`, "_blank");
+  return downloadPDF(`/api/projects/${projectId}/archives/${moduleType}/${archiveId}/export-pdf`, `archive_${moduleType}_${archiveId}.pdf`);
 }

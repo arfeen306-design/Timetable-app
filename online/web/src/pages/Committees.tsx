@@ -252,7 +252,10 @@ export default function CommitteesPage() {
               } catch (e) { toast("error", e instanceof Error ? e.message : "Publish failed"); }
             }}>📦 Publish</button>
           <button type="button" className="btn" style={{ fontSize: "0.78rem" }}
-            onClick={() => window.open(`/api/projects/${pid}/committees/export-pdf`, "_blank")}>
+            onClick={async () => {
+              try { await api.exportCommitteesPdf(pid); }
+              catch (e) { toast("error", e instanceof Error ? e.message : "PDF export failed. Please log in again."); }
+            }}>
             📄 Export PDF
           </button>
           <button type="button" className="btn btn-primary" onClick={openAddCommittee}>+ New Committee</button>
