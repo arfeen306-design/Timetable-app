@@ -249,7 +249,7 @@ export default function ProjectDashboard() {
       {/* ═══ TOPBAR ═══ */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        background: "#fff", padding: "14px 20px",
+        background: "var(--card-bg)", padding: "14px 20px",
         borderBottom: "1px solid var(--slate-200)",
       }}>
         <div>
@@ -308,7 +308,7 @@ export default function ProjectDashboard() {
           className="sc anim-card"
           onClick={() => setCardFilter(f => f === "present" ? null : "present")}
           style={{
-            background: "#fff", border: cardFilter === "present" ? "2px solid #0EA875" : "1px solid var(--slate-200)",
+            background: "var(--card-bg)", border: cardFilter === "present" ? "2px solid #0EA875" : "1px solid var(--border-default)",
             borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden",
             cursor: "pointer", transition: "border 0.2s, box-shadow 0.2s, transform 0.15s",
             boxShadow: cardFilter === "present" ? "0 0 0 3px rgba(14,168,117,0.15)" : "none",
@@ -330,7 +330,7 @@ export default function ProjectDashboard() {
           className="sc anim-card"
           onClick={() => setCardFilter(f => f === "absent" ? null : "absent")}
           style={{
-            background: "#fff", border: cardFilter === "absent" ? "2px solid #E8334A" : "1px solid var(--slate-200)",
+            background: "var(--card-bg)", border: cardFilter === "absent" ? "2px solid #E8334A" : "1px solid var(--border-default)",
             borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden",
             cursor: "pointer", transition: "border 0.2s, box-shadow 0.2s, transform 0.15s",
             boxShadow: cardFilter === "absent" ? "0 0 0 3px rgba(232,51,74,0.15)" : "none",
@@ -351,7 +351,7 @@ export default function ProjectDashboard() {
           className="sc anim-card"
           onClick={() => setCardFilter(f => f === "busy" ? null : "busy")}
           style={{
-            background: "#fff", border: cardFilter === "busy" ? "2px solid #5B4EE8" : "1px solid var(--slate-200)",
+            background: "var(--card-bg)", border: cardFilter === "busy" ? "2px solid #5B4EE8" : "1px solid var(--border-default)",
             borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden",
             cursor: "pointer", transition: "border 0.2s, box-shadow 0.2s, transform 0.15s",
             boxShadow: cardFilter === "busy" ? "0 0 0 3px rgba(91,78,232,0.15)" : "none",
@@ -370,7 +370,7 @@ export default function ProjectDashboard() {
         </div>
 
         {/* Workload */}
-        <div className="sc anim-card" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+        <div className="sc anim-card" style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#E8A020", opacity: 0.08 }} />
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Avg. workload</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#E8A020", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>{s.avg_workload}</div>
@@ -379,7 +379,7 @@ export default function ProjectDashboard() {
         </div>
 
         {/* Classes */}
-        <div className="sc anim-card" style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
+        <div className="sc anim-card" style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#F06830", opacity: 0.08 }} />
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Total classes</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#F06830", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>{s.total_classes}</div>
@@ -398,7 +398,7 @@ export default function ProjectDashboard() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
             <span style={{ fontSize: "1.2rem" }}>🏖️</span>
             <div>
-              <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#0F172A" }}>{d.day_name} — No school today</div>
+              <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--text-primary)" }}>{d.day_name} — No school today</div>
               <div style={{ fontSize: "0.68rem", color: "#64748B" }}>Dashboard stats will resume on the next working day.</div>
             </div>
           </div>
@@ -413,7 +413,7 @@ export default function ProjectDashboard() {
           <div className="pd-live-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span className="live-indicator" style={{ background: "#22C55E", boxShadow: "0 0 0 3px rgba(34,197,94,0.2)" }} />
-              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#0F172A" }}>
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text-primary)" }}>
                 Live right now {curLesson ? `— Lesson ${curLesson.lesson_number}` : ""}
               </span>
               {curLesson && (
@@ -477,7 +477,7 @@ export default function ProjectDashboard() {
                   {absentCards.map((t, i) => (
                     <div key={t.teacher_id || i} style={{
                       borderRadius: 10, padding: "10px 12px",
-                      background: "#fff", border: "1px solid #FECDD3",
+                      background: "var(--card-bg)", border: "1px solid var(--danger-200, #FECDD3)",
                       animation: `fadeUp 0.2s ease ${i * 0.03}s both`,
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
@@ -487,7 +487,7 @@ export default function ProjectDashboard() {
                           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                         }}>{t.initials}</div>
                         <div>
-                          <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "#0F172A" }}>{t.name}</div>
+                          <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text-primary)" }}>{t.name}</div>
                           <div style={{ fontSize: "0.62rem", color: "#E8334A", fontWeight: 600 }}>Absent today</div>
                         </div>
                       </div>
@@ -504,8 +504,8 @@ export default function ProjectDashboard() {
               {filtered.map((t, i) => (
                 <div key={t.teacher_id || i} style={{
                   borderRadius: 10, padding: "10px 12px",
-                  background: "#fff",
-                  border: "1px solid #E2E8F0",
+                  background: "var(--card-bg)",
+                  border: "1px solid var(--border-default)",
                   animation: cardFilter ? `fadeUp 0.2s ease ${i * 0.03}s both` : undefined,
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
@@ -515,7 +515,7 @@ export default function ProjectDashboard() {
                       display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                     }}>{t.initials}</div>
                     <div>
-                      <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "#0F172A" }}>{t.name}</div>
+                      <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text-primary)" }}>{t.name}</div>
                       <div style={{
                         fontSize: "0.62rem", marginTop: 1,
                         color: t.status === "free" ? "#16A34A" : t.status === "sub" ? "#7C3AED" : "#64748B",
@@ -525,7 +525,7 @@ export default function ProjectDashboard() {
                     </div>
                   </div>
                   {t.status === "busy" && (
-                    <div style={{ fontSize: "0.6rem", color: "#475569", display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ fontSize: "0.6rem", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 4 }}>
                       <span style={{
                         background: "#EEF2FF", color: "#4F46E5",
                         fontSize: "0.58rem", fontWeight: 600, padding: "1px 6px", borderRadius: 4,
@@ -580,7 +580,7 @@ export default function ProjectDashboard() {
 
       {/* ═══ UNASSIGNED ALERTS CARD ═══ */}
       {uncovered > 0 && !d.is_off_day && (
-        <div style={{ background: "#fff", border: "1px solid #FCCDD3", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--danger-200, #FCCDD3)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{
             background: "#FFF0F2", padding: "12px 18px", display: "flex", alignItems: "center", gap: 8,
             borderBottom: "1px solid #FCCDD3",
@@ -688,7 +688,7 @@ export default function ProjectDashboard() {
       <div className="pd-body-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14 }}>
 
         {/* ── Workload Chart ── */}
-        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
               <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Today's workload — lessons per teacher</div>
@@ -756,7 +756,7 @@ export default function ProjectDashboard() {
         </div>
 
         {/* ── Substitutions ── */}
-        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
               <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>{showHistory ? "Substitution History" : "Substitutions today"}</div>
@@ -814,7 +814,7 @@ export default function ProjectDashboard() {
         </div>
 
         {/* ── Activity Feed ── */}
-        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
               <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Recent activity</div>
@@ -875,7 +875,7 @@ export default function ProjectDashboard() {
           const prevMonth = () => { if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1); } else setCalMonth(calMonth - 1); };
           const nextMonth = () => { if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1); } else setCalMonth(calMonth + 1); };
           return (
-            <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
                   <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Calendar</div>
@@ -926,7 +926,7 @@ export default function ProjectDashboard() {
         })()}
 
         {/* ── To-Do Widget ── */}
-        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>To-Do</div>
             <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>{tasks.filter(t => !t.completed).length} pending tasks</div>
@@ -1041,7 +1041,7 @@ export default function ProjectDashboard() {
         </div>
 
         {/* ── Performance Pie Chart ── */}
-        <div style={{ background: "#fff", border: "1px solid var(--slate-200)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Performance</div>
             <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Teacher presence overview</div>
