@@ -27,6 +27,10 @@ export default function AdminUsers() {
   const [newPwd, setNewPwd] = useState("");
   const [resetting, setResetting] = useState(false);
 
+  // Delete confirmation modal
+  const [deleteModal, setDeleteModal] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const token = localStorage.getItem("timetable_token") || "";
 
   const fetchUsers = useCallback(async () => {
@@ -84,6 +88,24 @@ export default function AdminUsers() {
     } finally { setResetting(false); }
   }
 
+  async function handleDeleteUser() {
+    if (!deleteModal) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/users/${deleteModal.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed");
+      showToast(data.message || "User deleted");
+      setDeleteModal(null);
+      fetchUsers();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed");
+    } finally { setDeleting(false); }
+  }
+
   const filtered = users.filter(u => {
     const q = search.toLowerCase();
     return !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
@@ -104,7 +126,7 @@ export default function AdminUsers() {
     <div className="admin-users">
       <div className="admin-header">
         <div>
-          <h1 className="admin-title">👤 User Management</h1>
+          <h1 className="admin-title">User Management</h1>
           <p className="admin-subtitle">{users.length} registered accounts</p>
         </div>
         <div className="admin-search-wrap">
@@ -165,11 +187,14 @@ export default function AdminUsers() {
                   </td>
                   <td className="col-actions">
                     {!u.is_approved ? (
-                      <button className="action-btn approve" onClick={() => handleToggleStatus(u, "approve")} title="Approve">✓ Approve</button>
+                      <button className="action-btn approve" onClick={() => handleToggleStatus(u, "approve")}>✓ Approve</button>
                     ) : (
-                      <button className="action-btn deactivate" onClick={() => handleToggleStatus(u, "deactivate")} title="Deactivate">✕ Deactivate</button>
+                      <button className="action-btn deactivate" onClick={() => handleToggleStatus(u, "deactivate")}>✕ Deactivate</button>
                     )}
-                    <button className="action-btn reset" onClick={() => { setResetModal(u); setNewPwd(""); }} title="Reset Password">🔑 Reset</button>
+                    <button className="action-btn reset" onClick={() => { setResetModal(u); setNewPwd(""); }}>🔑 Reset</button>
+                    {u.role !== "platform_admin" && (
+                      <button className="action-btn delete" onClick={() => setDeleteModal(u)}>🗑 Delete</button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -182,7 +207,7 @@ export default function AdminUsers() {
       {resetModal && (
         <div className="modal-overlay" onClick={() => setResetModal(null)}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">Reset Password</h3>
+            <h3 className="modal-title">🔑 Reset Password</h3>
             <p className="modal-sub">Setting new password for <strong>{resetModal.email}</strong></p>
             <input
               className="modal-input"
@@ -196,6 +221,33 @@ export default function AdminUsers() {
               <button className="modal-btn cancel" onClick={() => setResetModal(null)}>Cancel</button>
               <button className="modal-btn confirm" onClick={handleResetPassword} disabled={resetting || newPwd.length < 6}>
                 {resetting ? "Resetting…" : "Reset Password"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {deleteModal && (
+        <div className="modal-overlay" onClick={() => setDeleteModal(null)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <h3 className="modal-title">🗑 Delete User Permanently</h3>
+            <p className="modal-sub">
+              You are about to permanently delete <strong>{deleteModal.name}</strong> ({deleteModal.email}).
+            </p>
+            <div className="modal-warning">
+              ⚠️ This action cannot be undone. The following will be permanently deleted:
+              <ul style={{ margin: "8px 0 0", paddingLeft: 20 }}>
+                <li>User account and profile</li>
+                <li>Their school and all projects</li>
+                <li>All timetables, lessons, and settings</li>
+                <li>All cached data and memory</li>
+              </ul>
+            </div>
+            <div className="modal-actions">
+              <button className="modal-btn cancel" onClick={() => setDeleteModal(null)}>Cancel</button>
+              <button className="modal-btn danger" onClick={handleDeleteUser} disabled={deleting}>
+                {deleting ? "Deleting…" : "Delete Permanently"}
               </button>
             </div>
           </div>

@@ -124,3 +124,53 @@ def toggle_user_status(
 
     log.info("Admin %s %sd user %s", current_user["email"], data.action, user.email)
     return {"ok": True, "message": msg}
+
+
+# ─── DELETE USER (permanent) ────────────────────────────────────────────────
+
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Permanently delete a user and all their data (school, projects, etc.)."""
+    _require_platform_admin(current_user)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    # Prevent self-deletion
+    if user.email == current_user.get("email"):
+        raise HTTPException(400, "Cannot delete your own admin account")
+
+    email = user.email
+
+    # Get schools owned by this user
+    memberships = db.query(SchoolMembership).filter(SchoolMembership.user_id == user_id).all()
+    school_ids_to_delete = []
+    for m in memberships:
+        # Check if sole member
+        count = db.query(SchoolMembership).filter(SchoolMembership.school_id == m.school_id).count()
+        if count <= 1:
+            school_ids_to_delete.append(m.school_id)
+
+    # Delete memberships
+    db.query(SchoolMembership).filter(SchoolMembership.user_id == user_id).delete()
+
+    # Delete schools (CASCADE will remove projects and all child data)
+    from sqlalchemy import text
+    for sid in school_ids_to_delete:
+        db.execute(text("DELETE FROM schools WHERE id = :sid"), {"sid": sid})
+
+    # Delete user
+    db.delete(user)
+    db.commit()
+
+    # Free memory
+    db.expire_all()
+    import gc; gc.collect()
+
+    log.info("Admin %s permanently deleted user %s (%s)", current_user["email"], user_id, email)
+    return {"ok": True, "message": f"User {email} permanently deleted"}
