@@ -104,7 +104,8 @@ def get_dashboard(
     _bell = {}
     try:
         _bell_raw = getattr(settings, 'bell_schedule_json', '{}') or '{}'
-        _bell = _json.loads(_bell_raw) if isinstance(_bell_raw, str) else (_bell_raw if isinstance(_bell_raw, dict) else {})
+        _parsed = _json.loads(_bell_raw) if isinstance(_bell_raw, str) else _bell_raw
+        _bell = _parsed if isinstance(_parsed, dict) else {}
     except Exception:
         pass
     _exceptional_day_idx = _bell.get('friday_day_index', 4) if _bell.get('friday_different') else -1
