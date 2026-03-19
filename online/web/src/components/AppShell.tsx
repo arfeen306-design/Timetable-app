@@ -69,6 +69,13 @@ const TABS: Tab[] = [
     pathSegments: ["/committees"],
     segment:      "committees",
   },
+  {
+    id:           "contact",
+    label:        "Contact Us",
+    icon:         "✉️",
+    pathSegments: ["/contact"],
+    segment:      "contact",
+  },
 ];
 
 const DROPDOWN_GROUPS = [
@@ -120,7 +127,7 @@ export default function AppShell() {
 
   // Compute which tabs are enabled
   const enabledTabs = useMemo(() => {
-    const set = new Set<string>(["zynca", "timetable"]); // always enabled
+    const set = new Set<string>(["zynca", "timetable", "contact"]); // always enabled
     if (progress.hasGenerated) {
       set.add("dashboard");
       set.add("substitution");
