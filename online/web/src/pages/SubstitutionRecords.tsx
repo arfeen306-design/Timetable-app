@@ -163,7 +163,7 @@ export default function SubstitutionRecords() {
         }}>
           <span style={{ fontSize: "1.5rem" }}>⚠️</span>
           <div>
-            <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#dc2626" }}>{records.filter(r => r.is_override).length}</div>
+            <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#B45309" }}>{records.filter(r => r.is_override).length}</div>
             <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>Overrides</div>
           </div>
         </div>
@@ -215,7 +215,7 @@ export default function SubstitutionRecords() {
                   <td style={tdStyle}>{r.class_name || "—"}</td>
                   <td style={tdStyle}>
                     {r.is_override ? (
-                      <span style={{ background: "#fef2f2", color: "#dc2626", padding: "2px 8px", borderRadius: 12, fontSize: "0.68rem", fontWeight: 700 }}>Override</span>
+                      <span style={{ background: "#FFFBEB", color: "#B45309", padding: "2px 8px", borderRadius: 12, fontSize: "0.68rem", fontWeight: 700 }}>Override</span>
                     ) : (
                       <span style={{ background: "#f0fdf4", color: "#16a34a", padding: "2px 8px", borderRadius: 12, fontSize: "0.68rem", fontWeight: 700 }}>Assigned</span>
                     )}

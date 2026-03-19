@@ -758,8 +758,8 @@ th { background: #1C2E4A; font-weight: 600; color: #FFFFFF; font-size: 0.75rem; 
 [data-theme="dark"] [style*="background: \"#E8FAF4\""] {
   background: rgba(14,168,117,0.15) !important;
 }
-[data-theme="dark"] [style*="background: \"#FDEAED\""] {
-  background: rgba(232,51,74,0.15) !important;
+[data-theme="dark"] [style*="background: \"#FEF3C7\""] {
+  background: rgba(217,119,6,0.15) !important;
 }
 [data-theme="dark"] [style*="background: \"#ECEAFD\""] {
   background: rgba(91,78,232,0.15) !important;
@@ -774,11 +774,11 @@ th { background: #1C2E4A; font-weight: 600; color: #FFFFFF; font-size: 0.75rem; 
 /* ── QA panel red border ── */
 [data-theme="dark"] [style*="border: \"1px solid #FCCDD3\""],
 [data-theme="dark"] [style*="border: 1px solid #FCCDD3"] {
-  border-color: rgba(232,51,74,0.2) !important;
+  border-color: rgba(217,119,6,0.2) !important;
 }
-[data-theme="dark"] [style*="background: \"#FFF0F2\""],
-[data-theme="dark"] [style*="background: #FFF0F2"] {
-  background: rgba(232,51,74,0.1) !important;
+[data-theme="dark"] [style*="background: \"#FFFBEB\""],
+[data-theme="dark"] [style*="background: #FFFBEB"] {
+  background: rgba(217,119,6,0.1) !important;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

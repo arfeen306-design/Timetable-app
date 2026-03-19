@@ -126,7 +126,7 @@ export default function Generate() {
               onClick={() => navigate(`/project/${pid}/${s.label.toLowerCase()}`)}
             >
               <div className="gen-stat-icon">{s.icon}</div>
-              <div className="gen-stat-count" style={{ color: s.ok ? s.color : "#EF4444" }}>{s.count}</div>
+              <div className="gen-stat-count" style={{ color: s.ok ? s.color : "#D97706" }}>{s.count}</div>
               <div className="gen-stat-label">{s.label}</div>
               {!s.ok && <div className="gen-stat-warning">⚠️ None added</div>}
             </div>
@@ -147,7 +147,7 @@ export default function Generate() {
                   const dash = pct * circ;
                   const el = (
                     <circle key={s.label} cx="60" cy="60" r="50" fill="none"
-                      stroke={s.ok ? s.color : "#EF4444"} strokeWidth="10"
+                      stroke={s.ok ? s.color : "#D97706"} strokeWidth="10"
                       strokeDasharray={`${dash} ${circ - dash}`}
                       strokeDashoffset={-offset} transform="rotate(-90 60 60)"
                       style={{ transition: "all 0.8s ease" }} />
@@ -172,11 +172,11 @@ export default function Generate() {
                   <div className="gen-bar-fill"
                     style={{
                       width: total > 0 ? `${(s.count / Math.max(...stats.map(x => x.count), 1)) * 100}%` : "0%",
-                      background: s.ok ? s.color : "#EF4444",
+                      background: s.ok ? s.color : "#D97706",
                       animation: "barGrow 1s ease",
                     }} />
                 </div>
-                <span className="gen-bar-count" style={{ color: s.ok ? s.color : "#EF4444" }}>{s.count}</span>
+                <span className="gen-bar-count" style={{ color: s.ok ? s.color : "#D97706" }}>{s.count}</span>
               </div>
             ))}
           </div>
@@ -194,7 +194,7 @@ export default function Generate() {
                   <div key={k} className={`gen-readiness-item ${isOk ? "" : "gen-readiness-bad"}`}>
                     <span className="gen-readiness-icon">{isOk ? "✅" : "❌"}</span>
                     <span className="gen-readiness-key">{k.replace(/_/g, " ")}</span>
-                    <span className="gen-readiness-val" style={{ color: isOk ? "#16A34A" : "#EF4444" }}>{val}</span>
+                    <span className="gen-readiness-val" style={{ color: isOk ? "#16A34A" : "#D97706" }}>{val}</span>
                   </div>
                 );
               })}
@@ -206,7 +206,7 @@ export default function Generate() {
       {/* ═══ VALIDATION ISSUES ═══ */}
       {validation && (hasErrors || hasWarnings) && (
         <div className="gen-issues" style={{ animation: "genSlide 0.5s ease 0.2s both" }}>
-          <h2 className="gen-section-title" style={{ color: hasErrors ? "#EF4444" : "#F59E0B" }}>
+          <h2 className="gen-section-title" style={{ color: hasErrors ? "#D97706" : "#F59E0B" }}>
             {hasErrors ? "🚫 Issues Found" : "⚠️ Warnings"}
           </h2>
           {validation.errors.length > 0 && (

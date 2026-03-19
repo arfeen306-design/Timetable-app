@@ -6,7 +6,7 @@ import { TITLE_OPTIONS } from "../../constants";
 type Teacher = Awaited<ReturnType<typeof api.listTeachers>>[0];
 type Subject = Awaited<ReturnType<typeof api.listSubjects>>[0];
 
-const COLOR_PALETTE = ['#4F46E5','#0891B2','#16A34A','#D97706','#DC2626','#7C3AED','#0F766E','#B45309','#9333EA','#0369A1','#15803D','#C2410C'];
+const COLOR_PALETTE = ['#4F46E5','#0891B2','#16A34A','#D97706','#B45309','#7C3AED','#0F766E','#B45309','#9333EA','#0369A1','#15803D','#C2410C'];
 
 function nextAvailableColor(usedColors: string[]): string {
   const available = COLOR_PALETTE.find(c => !usedColors.includes(c));

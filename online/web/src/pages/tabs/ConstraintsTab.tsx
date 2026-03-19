@@ -542,7 +542,7 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
                   {filteredRows.map((r, i) => {
                     const impossible = r.periods_per_week > r.max_per_day * numWorkingDays;
                     return (
-                      <tr key={i} style={impossible ? { background: "#fef2f2" } : r.has_override ? { background: "#eff6ff" } : undefined}>
+                      <tr key={i} style={impossible ? { background: "#FFFBEB" } : r.has_override ? { background: "#eff6ff" } : undefined}>
                         <td style={{ fontSize: "0.85rem" }}>{r.teacher_name}</td>
                         <td style={{ fontSize: "0.85rem" }}>{r.class_name}</td>
                         <td style={{ fontSize: "0.85rem" }}>

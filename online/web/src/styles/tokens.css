@@ -85,13 +85,13 @@
   --warning-600: #d97706;
   --warning-700: #b45309;
 
-  --danger-50:  #fef2f2;
-  --danger-100: #fee2e2;
-  --danger-200: #fecaca;
-  --danger-400: #f87171;
-  --danger-500: #ef4444;
-  --danger-600: #dc2626;
-  --danger-700: #b91c1c;
+  --danger-50:  #FFFBEB;
+  --danger-100: #FEF3C7;
+  --danger-200: #FDE68A;
+  --danger-400: #FBBF24;
+  --danger-500: #D97706;
+  --danger-600: #B45309;
+  --danger-700: #92400E;
 
   --color-sub:          #F97316;   /* substitution accent — orange */
   --color-sub-bg:       #FFF7ED;
@@ -194,9 +194,9 @@
   /* ── Semantic – toned down for dark ── */
   --success-50:  #052E16;
   --success-100: #0A3D20;
-  --danger-50:   #2D0A0A;
-  --danger-100:  #3B1414;
-  --danger-200:  #5C2424;
+  --danger-50:   #2D1F00;
+  --danger-100:  #3B2A06;
+  --danger-200:  #5C3D10;
   --warning-50:  #2D1F00;
   --warning-100: #3B2A06;
 

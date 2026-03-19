@@ -307,12 +307,12 @@
                    cursor: pointer; font-size: 14px; opacity: 0.45;
                    transition: opacity 0.2s; padding: 4px; color: #52677D; }
 .lf-toggle-pass:hover { opacity: 1; }
-.lf-input-err { font-size: 11px; color: #f87171; margin-top: 2px; }
+.lf-input-err { font-size: 11px; color: #F59E0B; margin-top: 2px; }
 
 .lf-error {
   display: flex; align-items: center; gap: 8px;
   background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.15);
-  border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #FCA5A5;
+  border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #FBBF24;
   animation: shake 0.4s ease;
 }
 .lf-success {
@@ -555,7 +555,7 @@
 [data-theme="light"] .lf-error {
   background: rgba(239,68,68,0.06);
   border-color: rgba(239,68,68,0.15);
-  color: #DC2626;
+  color: #B45309;
 }
 [data-theme="light"] .lf-success {
   background: rgba(56,178,172,0.06);

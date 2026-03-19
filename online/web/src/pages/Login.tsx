@@ -50,7 +50,7 @@ const SLIDES = [
     title: "Smart Substitutions",
     subtitle: "Instant coverage when teachers are absent",
     desc: "Mark a teacher absent and instantly see available substitutes ranked by workload, subject expertise, and schedule fit. One-click assignment with full audit trail.",
-    color: "#E8334A",
+    color: "#D97706",
     features: ["Best-fit ranking", "Workload-aware", "One-click assign", "History & audit log"],
   },
   {

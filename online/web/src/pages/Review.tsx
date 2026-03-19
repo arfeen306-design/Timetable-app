@@ -544,7 +544,7 @@ export default function Review() {
             <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>Scheduling Conflict</h3>
           </div>
           <div style={{
-            background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8,
+            background: "#FFFBEB", border: "1px solid #fecaca", borderRadius: 8,
             padding: "0.75rem 1rem", marginBottom: 16, fontSize: "0.85rem", color: "#991b1b",
             whiteSpace: "pre-wrap", lineHeight: 1.5,
           }}>
@@ -564,7 +564,7 @@ export default function Review() {
               onClick={() => { conflictModal.resolve(true); setConflictModal(null); }}
               style={{
                 padding: "0.5rem 1.25rem", borderRadius: 8, border: "none",
-                background: "#dc2626", color: "#fff", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer",
+                background: "#B45309", color: "#fff", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer",
               }}
             >
               Force to Move

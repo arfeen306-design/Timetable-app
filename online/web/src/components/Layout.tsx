@@ -170,7 +170,7 @@ export default function Layout() {
                   background: "none", border: "none", color: "#64748b", cursor: "pointer",
                   fontSize: "1rem", padding: 4, borderRadius: 4, transition: "color 0.15s",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.color = "#ef4444"; }}
+                onMouseEnter={e => { e.currentTarget.style.color = "#D97706"; }}
                 onMouseLeave={e => { e.currentTarget.style.color = "#64748b"; }}
               >⏻</button>
             </>

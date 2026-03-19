@@ -23,7 +23,7 @@ function weekLabel(w: string): string {
   return `Week ${week} · ${fmt(d)}–${fmt(end)} ${year}`;
 }
 
-const AVATAR_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#22c55e"];
+const AVATAR_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#D97706", "#8b5cf6", "#06b6d4", "#ec4899", "#22c55e"];
 
 
 

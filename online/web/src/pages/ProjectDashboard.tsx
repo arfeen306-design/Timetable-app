@@ -65,7 +65,7 @@ function countryFlag(cc: string) {
   return String.fromCodePoint(b + cc.charCodeAt(0) - 65, b + cc.charCodeAt(1) - 65);
 }
 
-const COLORS = ["#5B4EE8","#0369A1","#7C3AED","#DC2626","#B45309","#0EA875","#F06830","#0891B2"];
+const COLORS = ["#5B4EE8","#0369A1","#7C3AED","#B45309","#B45309","#0EA875","#F06830","#0891B2"];
 const av = (i: number) => COLORS[i % COLORS.length];
 
 /* ── Null-safe defaults ── */
@@ -283,22 +283,22 @@ export default function ProjectDashboard() {
       {uncovered > 0 && (
         <div style={{
           display: "flex", alignItems: "center", gap: 10,
-          background: isDark ? "rgba(232,51,74,0.12)" : "#FFF0F2", border: isDark ? "2px solid rgba(232,51,74,0.25)" : "2px solid #F8C0C8", borderRadius: 10,
+          background: isDark ? "rgba(217,119,6,0.12)" : "#FFFBEB", border: isDark ? "2px solid rgba(217,119,6,0.25)" : "2px solid #FDE68A", borderRadius: 10,
           padding: "10px 20px", animation: "fadeUp 0.3s ease",
         }}>
           <div style={{
-            width: 20, height: 20, borderRadius: "50%", background: "#E8334A",
+            width: 20, height: 20, borderRadius: "50%", background: "#D97706",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: "0.6rem", color: "#fff", fontWeight: 700, flexShrink: 0,
           }}>!</div>
-          <div style={{ flex: 1, fontSize: "0.78rem", fontWeight: 600, color: isDark ? "#FCA5A5" : "#8A1526" }}>
-            {uncovered} unassigned lesson{uncovered !== 1 ? "s" : ""} <span style={{ fontWeight: 400, color: isDark ? "#F87171" : "#C0293E" }}>
+          <div style={{ flex: 1, fontSize: "0.78rem", fontWeight: 600, color: isDark ? "#FBBF24" : "#78350F" }}>
+            {uncovered} unassigned lesson{uncovered !== 1 ? "s" : ""} <span style={{ fontWeight: 400, color: isDark ? "#F59E0B" : "#92400E" }}>
               — {unassigned.slice(0, 3).map(u => `${u.teacher_name} (Lesson ${u.period_index + 1})`).join(", ")}
               {uncovered > 3 ? ` + ${uncovered - 3} more` : ""}
             </span>
           </div>
           <Link to={`/project/${pid}/substitutions`} style={{
-            padding: "5px 12px", borderRadius: 6, background: "#E8334A", color: "#fff",
+            padding: "5px 12px", borderRadius: 6, background: "#D97706", color: "#fff",
             fontSize: "0.68rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap",
           }}>Assign Now</Link>
         </div>
@@ -333,20 +333,20 @@ export default function ProjectDashboard() {
           className="sc anim-card"
           onClick={() => setCardFilter(f => f === "absent" ? null : "absent")}
           style={{
-            background: "var(--card-bg)", border: cardFilter === "absent" ? "2px solid #E8334A" : "1px solid var(--border-default)",
+            background: "var(--card-bg)", border: cardFilter === "absent" ? "2px solid #D97706" : "1px solid var(--border-default)",
             borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden",
             cursor: "pointer", transition: "border 0.2s, box-shadow 0.2s, transform 0.15s",
-            boxShadow: cardFilter === "absent" ? "0 0 0 3px rgba(232,51,74,0.15)" : "none",
+            boxShadow: cardFilter === "absent" ? "0 0 0 3px rgba(217,119,6,0.15)" : "none",
             transform: cardFilter === "absent" ? "scale(1.02)" : "none",
           }}
         >
-          <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#E8334A", opacity: 0.08 }} />
+          <div style={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, borderRadius: "50%", transform: "translate(20px,-20px)", background: "#D97706", opacity: 0.08 }} />
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Absent today</div>
-          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#E8334A", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>
+          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#D97706", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>
             {d.is_off_day ? "—" : s.absent_today}
           </div>
           <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>{d.is_off_day ? "No school" : "marked this morning"}</div>
-          {!d.is_off_day && uncovered > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: isDark ? "rgba(232,51,74,0.15)" : "#FDEAED", color: isDark ? "#FCA5A5" : "#8A1526" }}>{uncovered} lessons uncovered</div>}
+          {!d.is_off_day && uncovered > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: isDark ? "rgba(217,119,6,0.15)" : "#FEF3C7", color: isDark ? "#FBBF24" : "#78350F" }}>{uncovered} lessons uncovered</div>}
         </div>
 
         {/* Busy */}
@@ -378,7 +378,7 @@ export default function ProjectDashboard() {
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Avg. workload</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#E8A020", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>{s.avg_workload}</div>
           <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>lessons this week</div>
-          {s.over_max > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: isDark ? "rgba(232,51,74,0.15)" : "#FDEAED", color: isDark ? "#FCA5A5" : "#8A1526" }}>{s.over_max} over max limit</div>}
+          {s.over_max > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: isDark ? "rgba(217,119,6,0.15)" : "#FEF3C7", color: isDark ? "#FBBF24" : "#78350F" }}>{s.over_max} over max limit</div>}
         </div>
 
         {/* Classes */}
@@ -430,8 +430,8 @@ export default function ProjectDashboard() {
               {cardFilter && (
                 <span style={{
                   display: "inline-flex", alignItems: "center", gap: 5,
-                  background: cardFilter === "present" ? (isDark ? "rgba(14,168,117,0.15)" : "#E8FAF4") : cardFilter === "absent" ? (isDark ? "rgba(232,51,74,0.15)" : "#FDEAED") : (isDark ? "rgba(91,78,232,0.15)" : "#ECEAFD"),
-                  color: cardFilter === "present" ? (isDark ? "#34D399" : "#076644") : cardFilter === "absent" ? (isDark ? "#FCA5A5" : "#8A1526") : (isDark ? "#A5B4FC" : "#3D32B0"),
+                  background: cardFilter === "present" ? (isDark ? "rgba(14,168,117,0.15)" : "#E8FAF4") : cardFilter === "absent" ? (isDark ? "rgba(217,119,6,0.15)" : "#FEF3C7") : (isDark ? "rgba(91,78,232,0.15)" : "#ECEAFD"),
+                  color: cardFilter === "present" ? (isDark ? "#34D399" : "#076644") : cardFilter === "absent" ? (isDark ? "#FBBF24" : "#78350F") : (isDark ? "#A5B4FC" : "#3D32B0"),
                   fontSize: "0.62rem", fontWeight: 700, padding: "3px 10px",
                   borderRadius: 20, animation: "fadeUp 0.2s ease",
                 }}>
@@ -480,18 +480,18 @@ export default function ProjectDashboard() {
                   {absentCards.map((t, i) => (
                     <div key={t.teacher_id || i} style={{
                       borderRadius: 10, padding: "10px 12px",
-                      background: "var(--card-bg)", border: "1px solid var(--danger-200, #FECDD3)",
+                      background: "var(--card-bg)", border: "1px solid var(--danger-200, #FDE68A)",
                       animation: `fadeUp 0.2s ease ${i * 0.03}s both`,
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
                         <div style={{
-                          width: 26, height: 26, borderRadius: "50%", background: "#E8334A",
+                          width: 26, height: 26, borderRadius: "50%", background: "#D97706",
                           fontSize: "0.55rem", fontWeight: 700, color: "#fff",
                           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                         }}>{t.initials}</div>
                         <div>
                           <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text-primary)" }}>{t.name}</div>
-                          <div style={{ fontSize: "0.62rem", color: "#E8334A", fontWeight: 600 }}>Absent today</div>
+                          <div style={{ fontSize: "0.62rem", color: "#D97706", fontWeight: 600 }}>Absent today</div>
                         </div>
                       </div>
                       <div style={{ fontSize: "0.6rem", color: "#94A3B8", fontStyle: "italic" }}>{t.subject_name}</div>
@@ -585,17 +585,17 @@ export default function ProjectDashboard() {
       {uncovered > 0 && !d.is_off_day && (
         <div style={{ background: "var(--card-bg)", border: "1px solid var(--danger-200, #FCCDD3)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{
-            background: isDark ? "rgba(232,51,74,0.12)" : "#FFF0F2", padding: "12px 18px", display: "flex", alignItems: "center", gap: 8,
+            background: isDark ? "rgba(217,119,6,0.12)" : "#FFFBEB", padding: "12px 18px", display: "flex", alignItems: "center", gap: 8,
             borderBottom: "1px solid #FCCDD3",
           }}>
             <div style={{
-              width: 18, height: 18, borderRadius: "50%", background: "#E8334A",
+              width: 18, height: 18, borderRadius: "50%", background: "#D97706",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: "0.55rem", color: "#fff", fontWeight: 700, flexShrink: 0,
             }}>!</div>
-            <div style={{ fontSize: "0.78rem", fontWeight: 700, color: isDark ? "#FCA5A5" : "#8A1526" }}>Unassigned lessons — Quick Assign available</div>
+            <div style={{ fontSize: "0.78rem", fontWeight: 700, color: isDark ? "#FBBF24" : "#78350F" }}>Unassigned lessons — Quick Assign available</div>
             <div style={{
-              marginLeft: "auto", background: "#E8334A", color: "#fff",
+              marginLeft: "auto", background: "#D97706", color: "#fff",
               fontSize: "0.6rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
             }}>{uncovered} urgent</div>
           </div>
@@ -617,7 +617,7 @@ export default function ProjectDashboard() {
                   }} onClick={() => handleQaExpand(u)}>
                     <span style={{
                       fontFamily: "var(--font-mono)", fontSize: "0.68rem", fontWeight: 700,
-                      background: "#FDEAED", color: "#E8334A", padding: "2px 7px", borderRadius: 4,
+                      background: "#FEF3C7", color: "#D97706", padding: "2px 7px", borderRadius: 4,
                       whiteSpace: "nowrap",
                     }}>Lesson {u.period_index + 1}</span>
                     <div style={{ flex: 1 }}>
@@ -663,7 +663,7 @@ export default function ProjectDashboard() {
                                 <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--slate-900)", display: "flex", alignItems: "center", gap: 5 }}>
                                   {ft.teacher_name}
                                   {ft.best_fit && <span style={{ fontSize: "0.55rem", fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: "#4F46E5", color: "#fff" }}>Best fit</span>}
-                                  {ft.sub_limit_reached && <span style={{ fontSize: "0.55rem", fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: "#FEE2E2", color: "#DC2626" }}>At limit</span>}
+                                  {ft.sub_limit_reached && <span style={{ fontSize: "0.55rem", fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: "#FEF3C7", color: "#B45309" }}>At limit</span>}
                                 </div>
                                 <div style={{ fontSize: "0.62rem", color: "var(--slate-400)" }}>
                                   {ft.subject || ""} · {ft.periods_today} lessons today · {ft.subs_this_week}/2 subs
@@ -698,7 +698,7 @@ export default function ProjectDashboard() {
               <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Sorted highest to lowest · orange = substitution · red = over limit</div>
             </div>
             <div style={{ display: "flex", gap: 12 }}>
-              {[{ c: "#5B4EE8", l: "Sched" }, { c: "#F06830", l: "Sub" }, { c: "#E8334A", l: "Over" }].map(x => (
+              {[{ c: "#5B4EE8", l: "Sched" }, { c: "#F06830", l: "Sub" }, { c: "#D97706", l: "Over" }].map(x => (
                 <span key={x.l} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.6rem", color: "var(--slate-400)" }}>
                   <span style={{ width: 8, height: 8, borderRadius: 2, background: x.c, display: "inline-block" }} />{x.l}
                 </span>
@@ -713,9 +713,9 @@ export default function ProjectDashboard() {
                   const isOver = w.utilization_pct > 100;
                   return (
                     <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flex: 1 }}>
-                      <span style={{ fontSize: "0.55rem", fontWeight: 700, fontFamily: "var(--font-mono)", color: isOver ? "#E8334A" : "var(--slate-400)" }}>{w.total}</span>
+                      <span style={{ fontSize: "0.55rem", fontWeight: 700, fontFamily: "var(--font-mono)", color: isOver ? "#D97706" : "var(--slate-400)" }}>{w.total}</span>
                       <div style={{ width: "100%", borderRadius: "4px 4px 0 0", overflow: "hidden", display: "flex", flexDirection: "column-reverse" }}>
-                        <div className="wl-bar" style={{ height: Math.max(h - (w.substitutions / chartMax * 90), 4), background: isOver ? "#E8334A" : "#5B4EE8" }} />
+                        <div className="wl-bar" style={{ height: Math.max(h - (w.substitutions / chartMax * 90), 4), background: isOver ? "#D97706" : "#5B4EE8" }} />
                         {w.substitutions > 0 && <div className="wl-bar" style={{ height: (w.substitutions / chartMax * 90), background: "#F06830" }} />}
                       </div>
                       <span style={{ fontSize: "0.5rem", color: "var(--slate-400)", fontFamily: "var(--font-mono)" }}>{w.initials}</span>
@@ -735,7 +735,7 @@ export default function ProjectDashboard() {
               <circle cx="40" cy="40" r="30" fill="none" stroke="#0EA875" strokeWidth="12"
                 strokeDasharray={`${d.is_off_day ? 0 : pDash} ${188.5 - (d.is_off_day ? 0 : pDash)}`}
                 strokeDashoffset="0" transform="rotate(-90 40 40)" />
-              <circle cx="40" cy="40" r="30" fill="none" stroke="#E8334A" strokeWidth="12"
+              <circle cx="40" cy="40" r="30" fill="none" stroke="#D97706" strokeWidth="12"
                 strokeDasharray={`${d.is_off_day ? 0 : aDash} ${188.5 - (d.is_off_day ? 0 : aDash)}`}
                 strokeDashoffset={`${-(d.is_off_day ? 0 : pDash)}`} transform="rotate(-90 40 40)" />
               <text x="40" y="37" textAnchor="middle" fontSize="13" fontWeight="800" fill="#0D1117" fontFamily="var(--font-mono)">{s.total_teachers}</text>
@@ -744,7 +744,7 @@ export default function ProjectDashboard() {
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {[
                 { c: "#0EA875", l: "Present", v: d.is_off_day ? "—" : s.present_today },
-                { c: "#E8334A", l: "Absent", v: d.is_off_day ? "—" : s.absent_today },
+                { c: "#D97706", l: "Absent", v: d.is_off_day ? "—" : s.absent_today },
                 { c: "#5B4EE8", l: curLesson ? `Busy L${curLesson.lesson_number}` : "Busy", v: d.is_off_day ? "—" : s.busy_now },
                 { c: "#0EA875", l: curLesson ? `Free L${curLesson.lesson_number}` : "Free", v: d.is_off_day ? "—" : s.free_now },
               ].map(x => (
@@ -805,9 +805,9 @@ export default function ProjectDashboard() {
                 </div>
               ))}
               {uncovered > 0 && (
-                <div style={{ padding: "10px 18px", background: "#FDEAED", display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#E8334A" }} />
-                  <span style={{ fontSize: "0.68rem", color: "#8A1526", fontWeight: 600 }}>
+                <div style={{ padding: "10px 18px", background: "#FEF3C7", display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#D97706" }} />
+                  <span style={{ fontSize: "0.68rem", color: "#78350F", fontWeight: 600 }}>
                     {uncovered} lesson{uncovered !== 1 ? "s" : ""} still unassigned
                   </span>
                 </div>
@@ -843,7 +843,7 @@ export default function ProjectDashboard() {
             {absent.map(a => (
               <div key={`a${a.id}`} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 18px", borderBottom: "1px solid var(--slate-50)" }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#E8334A", flexShrink: 0, marginTop: 3 }} />
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#D97706", flexShrink: 0, marginTop: 3 }} />
                   <div style={{ width: 1, background: "var(--slate-200)", flex: 1, minHeight: 14 }} />
                 </div>
                 <div>
@@ -1027,8 +1027,8 @@ export default function ProjectDashboard() {
                 </div>
                 <span style={{
                   fontSize: "0.55rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
-                  background: t.priority === "high" ? "#FDEAED" : t.priority === "medium" ? "#FEF3DC" : "#E8FAF4",
-                  color: t.priority === "high" ? "#E8334A" : t.priority === "medium" ? "#8A5A00" : "#076644",
+                  background: t.priority === "high" ? "#FEF3C7" : t.priority === "medium" ? "#FEF3DC" : "#E8FAF4",
+                  color: t.priority === "high" ? "#D97706" : t.priority === "medium" ? "#8A5A00" : "#076644",
                 }}>{t.priority}</span>
                 <button onClick={() => deleteTask(t.id)} style={{
                   background: "none", border: "none", cursor: "pointer", padding: 2,
@@ -1055,7 +1055,7 @@ export default function ProjectDashboard() {
               <circle cx="70" cy="70" r="52" fill="none" stroke="#0EA875" strokeWidth="18"
                 strokeDasharray={`${(s.present_today / (s.total_teachers || 1)) * 326.7} ${326.7 - (s.present_today / (s.total_teachers || 1)) * 326.7}`}
                 strokeDashoffset="0" transform="rotate(-90 70 70)" strokeLinecap="round" />
-              <circle cx="70" cy="70" r="52" fill="none" stroke="#E8334A" strokeWidth="18"
+              <circle cx="70" cy="70" r="52" fill="none" stroke="#D97706" strokeWidth="18"
                 strokeDasharray={`${(s.absent_today / (s.total_teachers || 1)) * 326.7} ${326.7 - (s.absent_today / (s.total_teachers || 1)) * 326.7}`}
                 strokeDashoffset={`${-((s.present_today / (s.total_teachers || 1)) * 326.7)}`}
                 transform="rotate(-90 70 70)" strokeLinecap="round" />
@@ -1066,7 +1066,7 @@ export default function ProjectDashboard() {
             <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
               {[
                 { c: "#0EA875", l: "Present", v: d.is_off_day ? "—" : s.present_today, pct: d.is_off_day ? "—" : `${Math.round((s.present_today / (s.total_teachers || 1)) * 100)}%` },
-                { c: "#E8334A", l: "Absent", v: d.is_off_day ? "—" : s.absent_today, pct: d.is_off_day ? "—" : `${Math.round((s.absent_today / (s.total_teachers || 1)) * 100)}%` },
+                { c: "#D97706", l: "Absent", v: d.is_off_day ? "—" : s.absent_today, pct: d.is_off_day ? "—" : `${Math.round((s.absent_today / (s.total_teachers || 1)) * 100)}%` },
               ].map(x => (
                 <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 8px" }}>
                   <div style={{ width: 10, height: 10, borderRadius: 3, background: x.c, flexShrink: 0 }} />

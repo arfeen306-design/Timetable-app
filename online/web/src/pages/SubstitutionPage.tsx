@@ -17,7 +17,7 @@ function fmtShort(d: string) { return new Date(d + "T00:00:00").toLocaleDateStri
 
 type Teacher = { id: number; first_name: string; last_name: string; code: string };
 
-const AVATAR_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#22c55e"];
+const AVATAR_COLORS = ["#6366f1", "#14b8a6", "#f59e0b", "#D97706", "#8b5cf6", "#06b6d4", "#ec4899", "#22c55e"];
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 
 function Initials({ name, color, size }: { name: string; color: string; size?: number }) {
