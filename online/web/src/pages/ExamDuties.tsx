@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import * as api from "../api";
 import { useToast } from "../context/ToastContext";
+import { cachedFetch } from "../hooks/prefetchCache";
 import SearchableSelect from "../components/SearchableSelect";
 
 type Teacher    = Awaited<ReturnType<typeof api.listTeachers>>[0];
@@ -967,10 +968,10 @@ export default function ExamDutiesPage() {
 
   useEffect(() => {
     Promise.all([
-      api.listTeachers(pid),
-      api.listSubjects(pid),
-      api.listRooms(pid),
-      api.listExamSessions(pid),
+      cachedFetch(`exam-teachers-${pid}`, () => api.listTeachers(pid), 60_000),
+      cachedFetch(`exam-subjects-${pid}`, () => api.listSubjects(pid), 60_000),
+      cachedFetch(`exam-rooms-${pid}`, () => api.listRooms(pid), 60_000),
+      cachedFetch(`exam-sessions-${pid}`, () => api.listExamSessions(pid), 15_000),
     ]).then(([t, s, r, sess]) => {
       setTeachers(t); setSubjects(s); setRooms(r); setSessions(sess);
     }).catch(err => {

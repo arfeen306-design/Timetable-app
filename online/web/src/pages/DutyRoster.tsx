@@ -413,6 +413,11 @@ export default function DutyRosterPage() {
   }
 
   async function handleRemoveTeacher(entryId: number) {
+    // Optimistic entries have negative temp IDs — skip API call
+    if (entryId < 0) {
+      setEntries(prev => prev.filter(e => e.id !== entryId));
+      return;
+    }
     // Optimistic: remove immediately
     const removed = entries.find(e => e.id === entryId);
     setEntries(prev => prev.filter(e => e.id !== entryId));
