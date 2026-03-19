@@ -650,7 +650,7 @@ export default function ProjectDashboard() {
 
       {/* ═══ UNASSIGNED ALERTS CARD ═══ */}
       {uncovered > 0 && !d.is_off_day && (
-        <div style={{ background: "var(--card-bg)", border: "1px solid var(--danger-200, #FCCDD3)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--danger-200, #FCCDD3)", borderRadius: 14, overflow: "hidden", maxHeight: 300, display: "flex", flexDirection: "column" }}>
           <div style={{
             background: isDark ? "rgba(217,119,6,0.12)" : "#FFFBEB", padding: "12px 18px", display: "flex", alignItems: "center", gap: 8,
             borderBottom: "1px solid #FCCDD3",
@@ -671,7 +671,7 @@ export default function ProjectDashboard() {
               {qaMsg}
             </div>
           )}
-          <div>
+          <div style={{ flex: 1, overflowY: "auto" }}>
             {unassigned.map((u, i) => {
               const key = `${u.teacher_id}-${u.period_index}`;
               const isExpanded = qaExpanded === key;
