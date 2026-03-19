@@ -758,7 +758,7 @@ export default function ProjectDashboard() {
       <div className="pd-body-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14 }}>
 
         {/* ── Workload Chart ── */}
-        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden", maxHeight: 420, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
               <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Today's workload — lessons per teacher</div>
@@ -825,8 +825,7 @@ export default function ProjectDashboard() {
           </div>
         </div>
 
-        {/* ── Substitutions ── */}
-        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden", maxHeight: 420, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
               <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Substitutions today</div>
@@ -836,7 +835,7 @@ export default function ProjectDashboard() {
           </div>
 
           {(
-            <div>
+            <div style={{ flex: 1, overflowY: "auto" }}>
               {subs.length === 0 ? (
                 <div style={{ padding: "2rem", textAlign: "center", color: "var(--slate-400)", fontSize: "0.78rem" }}>No substitutions assigned</div>
               ) : subs.map((sub, i) => (
@@ -871,7 +870,7 @@ export default function ProjectDashboard() {
         </div>
 
         {/* ── Activity Feed ── */}
-        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden", maxHeight: 420, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
               <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Recent activity</div>
@@ -879,7 +878,7 @@ export default function ProjectDashboard() {
             </div>
             <span className="live-indicator" />
           </div>
-          <div>
+          <div style={{ flex: 1, overflowY: "auto" }}>
             {subs.map(sub => (
               <div key={`s${sub.id}`} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 18px", borderBottom: "1px solid var(--slate-50)" }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
