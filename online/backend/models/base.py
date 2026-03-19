@@ -85,7 +85,7 @@ def init_db() -> None:
 def _auto_promote_admin() -> None:
     """Promote the owner account to platform_admin if not already."""
     from sqlalchemy import text
-    OWNER_EMAIL = "saimarauf284@gmail.com"
+    OWNER_EMAIL = "arfeen306@gmail.com"
     try:
         with engine.begin() as conn:
             conn.execute(text(
