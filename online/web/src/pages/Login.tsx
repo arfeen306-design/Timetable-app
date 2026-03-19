@@ -147,6 +147,7 @@ export default function Login() {
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
   const [success,      setSuccess]      = useState("");
+  const [showContact,  setShowContact]  = useState(false);
   const [searchParams] = useSearchParams();
 
   // Slide auto-rotation
@@ -491,27 +492,37 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ── Developer Console — Contact Section ── */}
-      <div className="dev-console">
-        <div className="dev-console-row">
-          <svg className="dev-console-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="2" y="4" width="16" height="12" rx="2" />
-            <path d="M2 6l8 5 8-5" />
-          </svg>
-          <span className="dev-console-label">Get in touch with the Architect</span>
+      {/* ── Contact Toggle Pill ── */}
+      <button
+        type="button"
+        className={`dev-console-pill ${showContact ? "open" : ""}`}
+        onClick={() => setShowContact(v => !v)}
+      >
+        ✉️ Contact
+      </button>
+      {showContact && (
+        <div className="dev-console" onClick={() => setShowContact(false)}>
+          <div className="dev-console-row">
+            <svg className="dev-console-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="2" y="4" width="16" height="12" rx="2" />
+              <path d="M2 6l8 5 8-5" />
+            </svg>
+            <span className="dev-console-label">Get in touch with the Architect</span>
+            <span style={{ marginLeft: "auto", fontSize: 14, cursor: "pointer", opacity: 0.5 }}>✕</span>
+          </div>
+          <div className="dev-console-row">
+            <span className="dev-console-prompt">$</span>
+            <span className="dev-console-key">Email:</span>
+            <a href="mailto:info@myzynca.com" className="dev-console-link" onClick={e => e.stopPropagation()}>info@myzynca.com</a>
+          </div>
+          <div className="dev-console-row">
+            <span className="dev-console-prompt">$</span>
+            <span className="dev-console-key">Dev:</span>
+            <a href="mailto:arfeen306@live.com" className="dev-console-link" onClick={e => e.stopPropagation()}>arfeen306@live.com</a>
+          </div>
+          <div className="dev-console-note">Available for technical consultations and enterprise inquiries.</div>
         </div>
-        <div className="dev-console-row">
-          <span className="dev-console-prompt">$</span>
-          <span className="dev-console-key">Email:</span>
-          <a href="mailto:info@myzynca.com" className="dev-console-link">info@myzynca.com</a>
-        </div>
-        <div className="dev-console-row">
-          <span className="dev-console-prompt">$</span>
-          <span className="dev-console-key">Dev:</span>
-          <a href="mailto:arfeen306@live.com" className="dev-console-link">arfeen306@live.com</a>
-        </div>
-        <div className="dev-console-note">Available for technical consultations and enterprise inquiries.</div>
-      </div>
+      )}
     </div>
   );
 }
