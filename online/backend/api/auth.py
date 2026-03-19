@@ -277,6 +277,22 @@ def logout():
     return {"message": "Logged out"}
 
 
+@router.post("/promote-admin")
+def promote_admin(email: str, admin_key: str, db: Session = Depends(get_db)):
+    """Promote a user to platform_admin. Requires ADMIN_KEY for security."""
+    settings = get_settings()
+    if admin_key != settings.admin_key:
+        raise HTTPException(403, "Invalid admin key")
+    user = db.query(User).filter(User.email == email.strip().lower()).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    user.role = "platform_admin"
+    user.is_approved = True
+    user.is_active = True
+    db.commit()
+    return {"ok": True, "message": f"{user.email} promoted to platform_admin"}
+
+
 # ─── FORGOT PASSWORD ─────────────────────────────────────────────────────────
 
 def _send_reset_email(to_email: str, token: str):
