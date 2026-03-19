@@ -73,6 +73,15 @@ def _run_migrations() -> None:
                 if column not in existing:
                     conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {col_type}'))
 
+    # Fix NULL values for existing users
+    with engine.begin() as conn:
+        try:
+            conn.execute(text("UPDATE users SET is_active = true WHERE is_active IS NULL"))
+            conn.execute(text("UPDATE users SET is_approved = true WHERE is_approved IS NULL"))
+            conn.execute(text("UPDATE users SET role = 'school_admin' WHERE role IS NULL"))
+        except Exception:
+            pass
+
 
 def init_db() -> None:
     """Create all tables and run lightweight migrations."""
