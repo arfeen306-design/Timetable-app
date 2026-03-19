@@ -87,6 +87,9 @@ export function prefetchRoute(route: string, projectId: number): void {
           .then(d => cache.set(key, { data: d, timestamp: Date.now() }))
           .catch(() => {});
       }
+    } else if (route === "substitution") {
+      cachedFetch(`sub-teachers-${pid}`, () => api.listTeachers(pid), 60_000).catch(() => {});
+      cachedFetch(`sub-weeks-${pid}`, () => api.listAcademicWeeks(pid), 60_000).catch(() => {});
     } else if (route === "exam-duties") {
       cachedFetch(`exam-teachers-${pid}`, () => api.listTeachers(pid), 60_000).catch(() => {});
       cachedFetch(`exam-subjects-${pid}`, () => api.listSubjects(pid), 60_000).catch(() => {});
@@ -97,6 +100,20 @@ export function prefetchRoute(route: string, projectId: number): void {
       cachedFetch(`duty-areas-${pid}`, () => api.listDutyAreas(pid), 15_000).catch(() => {});
       cachedFetch(`duty-rows-${pid}`, () => api.listDutyRosterRows(pid), 15_000).catch(() => {});
       cachedFetch(`duty-entries-${pid}`, () => api.listDutyEntriesV2(pid), 15_000).catch(() => {});
+    } else if (route === "committees") {
+      cachedFetch(`comm-teachers-${pid}`, () => api.listTeachers(pid), 60_000).catch(() => {});
+      cachedFetch(`comm-list-${pid}`, () => api.listCommittees(pid), 15_000).catch(() => {});
     }
   }).catch(() => {});
 }
+
+/**
+ * Pre-warm ALL module tabs at once. Called once when timetable is generated
+ * so all 4 tabs open instantly.
+ */
+export function prefetchAllModules(projectId: number): void {
+  for (const route of ["dashboard", "substitution", "duty-roster", "exam-duties", "committees"]) {
+    prefetchRoute(route, projectId);
+  }
+}
+

@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
 import { useProjectProgress } from "../hooks/useProjectProgress";
-import { prefetchRoute } from "../hooks/prefetchCache";
+import { prefetchRoute, prefetchAllModules } from "../hooks/prefetchCache";
 import ErrorBoundary from "./ErrorBoundary";
 import "./AppShell.css";
 
@@ -177,6 +177,13 @@ export default function AppShell() {
   useEffect(() => {
     setDropdownOpen(false);
   }, [location.pathname]);
+
+  // Auto-prefetch all module data when timetable is generated
+  useEffect(() => {
+    if (progress.hasGenerated && projectId) {
+      prefetchAllModules(Number(projectId));
+    }
+  }, [progress.hasGenerated, projectId]);
 
   function handleTabClick(tab: Tab) {
     // Check if tab is locked
