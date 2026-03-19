@@ -15,6 +15,7 @@ interface Tab {
   pathSegments: string[];
   segment:      string | null;
   hasDropdown?: boolean;
+  adminOnly?:   boolean;
 }
 
 const TABS: Tab[] = [
@@ -77,6 +78,14 @@ const TABS: Tab[] = [
     pathSegments: ["/contact"],
     segment:      "contact",
   },
+  {
+    id:           "admin",
+    label:        "Admin",
+    icon:         "⚙️",
+    pathSegments: ["/admin"],
+    segment:      null,
+    adminOnly:    true,
+  },
 ];
 
 const DROPDOWN_GROUPS = [
@@ -128,7 +137,7 @@ export default function AppShell() {
 
   // Compute which tabs are enabled
   const enabledTabs = useMemo(() => {
-    const set = new Set<string>(["zynca", "timetable", "contact"]); // always enabled
+    const set = new Set<string>(["zynca", "timetable", "contact", "admin"]); // always enabled
     if (progress.hasGenerated) {
       set.add("dashboard");
       set.add("substitution");
@@ -138,6 +147,11 @@ export default function AppShell() {
     }
     return set;
   }, [progress.hasGenerated]);
+
+  // Filter tabs: hide admin-only tabs from non-admins
+  const visibleTabs = useMemo(() =>
+    TABS.filter(tab => !tab.adminOnly || user?.role === "platform_admin")
+  , [user?.role]);
 
   // Determine active tab
   const activeTab =
@@ -175,7 +189,9 @@ export default function AppShell() {
       return;
     }
     setDropdownOpen(false);
-    if (tab.id === "dashboard") {
+    if (tab.id === "admin") {
+      navigate("/admin/users");
+    } else if (tab.id === "dashboard") {
       navigate(projectId ? `/project/${projectId}/dashboard` : "/");
     } else if (tab.segment && projectId) {
       navigate(`/project/${projectId}/${tab.segment}`);
@@ -208,7 +224,7 @@ export default function AppShell() {
 
         {/* Tabs */}
         <nav className="top-tabs" role="tablist">
-          {TABS.map((tab) => {
+          {visibleTabs.map((tab) => {
             const isActive = activeTab.id === tab.id;
             return (
               <div
