@@ -70,3 +70,33 @@ export function invalidateCachePrefix(prefix: string): void {
     }
   }
 }
+
+/**
+ * Pre-warm cache for a route. Call on tab hover so data is ready
+ * when the user navigates. Does nothing if already cached.
+ */
+export function prefetchRoute(route: string, projectId: number): void {
+  // Only import api lazily to avoid circular deps
+  import("../api").then(api => {
+    const pid = projectId;
+    if (route === "dashboard") {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const key = `dash-${pid}`;
+      if (!cache.has(key)) {
+        api.api(`/api/projects/${pid}/dashboard?tz=${encodeURIComponent(tz)}`)
+          .then(d => cache.set(key, { data: d, timestamp: Date.now() }))
+          .catch(() => {});
+      }
+    } else if (route === "exam-duties") {
+      cachedFetch(`exam-teachers-${pid}`, () => api.listTeachers(pid), 60_000).catch(() => {});
+      cachedFetch(`exam-subjects-${pid}`, () => api.listSubjects(pid), 60_000).catch(() => {});
+      cachedFetch(`exam-rooms-${pid}`, () => api.listRooms(pid), 60_000).catch(() => {});
+      cachedFetch(`exam-sessions-${pid}`, () => api.listExamSessions(pid), 15_000).catch(() => {});
+    } else if (route === "duty-roster") {
+      cachedFetch(`duty-teachers-${pid}`, () => api.listTeachers(pid), 60_000).catch(() => {});
+      cachedFetch(`duty-areas-${pid}`, () => api.listDutyAreas(pid), 15_000).catch(() => {});
+      cachedFetch(`duty-rows-${pid}`, () => api.listDutyRosterRows(pid), 15_000).catch(() => {});
+      cachedFetch(`duty-entries-${pid}`, () => api.listDutyEntriesV2(pid), 15_000).catch(() => {});
+    }
+  }).catch(() => {});
+}

@@ -137,16 +137,14 @@
 
 /* ── Tab dropdown ────────────────────────────────────────────── */
 .tab-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
+  position: fixed;
   min-width: 220px;
   background: #1C2E4A;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
   padding: 8px 0;
   box-shadow: var(--shadow-lg, 0 20px 40px rgba(0,0,0,0.3));
-  z-index: 200;
+  z-index: 9999;
   animation: slideDown 0.15s ease;
 }
 

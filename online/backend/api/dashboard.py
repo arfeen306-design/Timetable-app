@@ -21,6 +21,27 @@ from backend.services.workload_service import get_all_workloads
 
 router = APIRouter()
 
+# ── Simple in-memory response cache (10 s TTL) ──────────────────────────────
+import time as _time
+_dash_cache: dict[str, tuple[float, dict]] = {}
+_DASH_TTL = 10  # seconds
+
+
+def _get_cached(key: str) -> dict | None:
+    entry = _dash_cache.get(key)
+    if entry and (_time.monotonic() - entry[0]) < _DASH_TTL:
+        return entry[1]
+    return None
+
+
+def _set_cached(key: str, data: dict) -> None:
+    _dash_cache[key] = (_time.monotonic(), data)
+    # Evict old entries (max 50)
+    if len(_dash_cache) > 50:
+        oldest = sorted(_dash_cache, key=lambda k: _dash_cache[k][0])
+        for k in oldest[:20]:
+            _dash_cache.pop(k, None)
+
 
 @router.get("")
 def get_dashboard(
@@ -32,6 +53,12 @@ def get_dashboard(
     db: Session = Depends(get_db),
 ):
     """Main dashboard data aggregation — single call for the project command center."""
+    # ── Server-side cache (10 s) ─────────────────────────────────────────
+    _cache_key = f"dash-{project_id}-{dt or 'today'}"
+    cached = _get_cached(_cache_key)
+    if cached:
+        return cached
+
     # Use client timezone if provided, otherwise fall back to UTC
     try:
         user_tz = ZoneInfo(tz) if tz else None
@@ -488,7 +515,7 @@ def get_dashboard(
     else:
         attendance_pct = round((present_count / total_teachers * 100) if total_teachers else 0)
 
-    return {
+    result = {
         "school_name": school_name,
         "academic_year": academic_year_name,
         "week_label": week_label,
@@ -533,6 +560,8 @@ def get_dashboard(
         ],
         "live_teachers": live_teachers,
     }
+    _set_cached(_cache_key, result)
+    return result
 
 
 @router.get("/stats")

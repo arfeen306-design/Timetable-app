@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
 import { useProjectProgress } from "../hooks/useProjectProgress";
+import { prefetchRoute } from "../hooks/prefetchCache";
 import ErrorBoundary from "./ErrorBoundary";
 import "./AppShell.css";
 
@@ -220,6 +221,11 @@ export default function AppShell() {
                   aria-selected={isActive}
                   className={`top-tab ${isActive ? "active" : ""} ${!enabledTabs.has(tab.id) ? "tab-locked" : ""}`}
                   onClick={() => handleTabClick(tab)}
+                  onMouseEnter={() => {
+                    if (projectId && enabledTabs.has(tab.id)) {
+                      prefetchRoute(tab.id, Number(projectId));
+                    }
+                  }}
                   title={!enabledTabs.has(tab.id) ? "Generate a timetable first" : undefined}
                 >
                   <span className="tab-icon" aria-hidden="true">{tab.icon}</span>
@@ -231,8 +237,13 @@ export default function AppShell() {
                 </button>
 
                 {/* Dropdown for Home tab */}
-                {tab.hasDropdown && dropdownOpen && (
-                  <div className="tab-dropdown">
+                {tab.hasDropdown && dropdownOpen && (() => {
+                  const rect = dropdownRef.current?.getBoundingClientRect();
+                  return (
+                  <div className="tab-dropdown" style={{
+                    top: rect ? rect.bottom : 48,
+                    left: rect ? rect.left : 80,
+                  }}>
                     <button
                       className={`tab-dropdown-item ${location.pathname.includes("/new-timetable") ? "active" : ""}`}
                       onClick={() => handleDropdownItemClick("new-timetable")}
@@ -261,7 +272,8 @@ export default function AppShell() {
                       </div>
                     ))}
                   </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}
