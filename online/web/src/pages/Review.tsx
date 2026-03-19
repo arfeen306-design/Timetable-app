@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import * as api from "../api";
 import { useToast } from "../context/ToastContext";
@@ -102,8 +102,27 @@ export default function Review() {
   const [exporting, setExporting] = useState<string | null>(null);
   const [dragEntry, setDragEntry] = useState<Entry | null>(null);
   const [dragOver, setDragOver] = useState<{ day: number; period: number } | null>(null);
+  const dragOverRef = useRef<{ day: number; period: number } | null>(null);
   const [moving, setMoving] = useState(false);
   const [conflictModal, setConflictModal] = useState<{ msgs: string; resolve: (force: boolean) => void } | null>(null);
+
+  /* ── O(1) entry lookup map: key = "day_period" ── */
+  const entryMap = useMemo(() => {
+    const m = new Map<string, Entry>();
+    for (const e of entries) m.set(`${e.day_index}_${e.period_index}`, e);
+    return m;
+  }, [entries]);
+
+  /* ── Throttled dragOver to avoid re-render spam ── */
+  const handleDragOver = useCallback((e: React.DragEvent, day: number, period: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const prev = dragOverRef.current;
+    if (!prev || prev.day !== day || prev.period !== period) {
+      dragOverRef.current = { day, period };
+      setDragOver({ day, period });
+    }
+  }, []);
 
   /** Show a custom conflict modal and return a promise that resolves to true (force) or false (cancel). */
   function askForceMove(msgs: string): Promise<boolean> {
@@ -180,49 +199,54 @@ export default function Review() {
     return { regularSlots: regular, fridaySlots: friday, hasFridayDiff: fridayDiff, fridayDayIndex: friDayIdx, workingDayIndices: workDays };
   }, [settings]);
 
-  /* ── Drag & Drop ── */
+  /* ── Drag & Drop (optimistic UI) ── */
   function onDragStart(e: React.DragEvent, entry: Entry) {
     setDragEntry(entry); e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", String(entry.id));
   }
   async function onDrop(e: React.DragEvent, newDay: number, newPeriod: number) {
-    e.preventDefault(); setDragOver(null);
+    e.preventDefault(); setDragOver(null); dragOverRef.current = null;
     if (!dragEntry || moving) return;
     if (dragEntry.day_index === newDay && dragEntry.period_index === newPeriod) { setDragEntry(null); return; }
 
-    // Capture original position for safety
     const entryId = dragEntry.id;
+    const origDay = dragEntry.day_index;
+    const origPeriod = dragEntry.period_index;
+
+    // ✨ OPTIMISTIC: move cell instantly in state
+    setEntries(prev => prev.map(en => en.id === entryId ? { ...en, day_index: newDay, period_index: newPeriod } : en));
+    setDragEntry(null);
     setMoving(true);
 
     try {
-      // Step 1: Ask backend to validate — DO NOT move in state yet
       const result = await api.moveEntry(pid, entryId, newDay, newPeriod, false);
 
       if (result.success) {
-        // Backend accepted — now update state
-        setEntries(prev => prev.map(en => en.id === entryId ? { ...en, day_index: newDay, period_index: newPeriod } : en));
         toast("success", result.message || "Moved.");
       } else if (result.conflicts && result.conflicts.length > 0) {
-        // Conflict detected — entry is still at original position (never moved)
+        // Conflict — revert optimistic move, show modal
+        setEntries(prev => prev.map(en => en.id === entryId ? { ...en, day_index: origDay, period_index: origPeriod } : en));
         const msgs = result.conflicts.map(c => c.message).join("\n");
-        // Show custom modal with "Force to Move" button
         const shouldForce = await askForceMove(msgs);
         if (shouldForce) {
+          // Force move — optimistic again
+          setEntries(prev => prev.map(en => en.id === entryId ? { ...en, day_index: newDay, period_index: newPeriod } : en));
           const forced = await api.moveEntry(pid, entryId, newDay, newPeriod, true);
           if (forced.success) {
-            setEntries(prev => prev.map(en => en.id === entryId ? { ...en, day_index: newDay, period_index: newPeriod } : en));
             toast("success", forced.message || "Moved (forced).");
           } else {
+            // Force rejected — revert
+            setEntries(prev => prev.map(en => en.id === entryId ? { ...en, day_index: origDay, period_index: origPeriod } : en));
             toast("error", "Force move was rejected by the server.");
           }
         }
-        // If user clicked Cancel — nothing happens, entry stays at original slot ✓
       }
     } catch (err) {
+      // Error — revert optimistic move
+      setEntries(prev => prev.map(en => en.id === entryId ? { ...en, day_index: origDay, period_index: origPeriod } : en));
       toast("error", err instanceof Error ? err.message : "Move failed");
     } finally {
       setMoving(false);
-      setDragEntry(null);
     }
   }
 
@@ -399,13 +423,13 @@ export default function Review() {
                         }
 
                         // Lesson column — look for entry
-                        const entry = entries.find(e => e.day_index === dayIdx && e.period_index === slot.periodIndex);
+                        const entry = entryMap.get(`${dayIdx}_${slot.periodIndex}`);
                         const isDragTarget = dragOver?.day === dayIdx && dragOver?.period === slot.periodIndex;
                         const isDragSource = dragEntry?.day_index === dayIdx && dragEntry?.period_index === slot.periodIndex;
 
                         return (
                           <td key={colIdx}
-                            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOver({ day: dayIdx, period: slot.periodIndex }); }}
+                            onDragOver={e => handleDragOver(e, dayIdx, slot.periodIndex)}
                             onDragLeave={() => setDragOver(null)}
                             onDrop={e => onDrop(e, dayIdx, slot.periodIndex)}
                             style={{
