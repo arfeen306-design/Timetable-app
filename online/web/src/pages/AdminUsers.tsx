@@ -54,6 +54,12 @@ export default function AdminUsers() {
   }
 
   async function handleToggleStatus(u: UserRow, action: "approve" | "deactivate") {
+    // Optimistic update
+    setUsers(prev => prev.map(x => x.id === u.id ? {
+      ...x,
+      is_approved: action === "approve",
+      is_active: action === "approve",
+    } : x));
     try {
       const res = await fetch(`/api/admin/users/${u.id}/toggle-status`, {
         method: "POST",
@@ -63,8 +69,9 @@ export default function AdminUsers() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Failed");
       showToast(data.message || `${u.email} ${action}d`);
-      fetchUsers();
     } catch (err) {
+      // Revert on error
+      setUsers(prev => prev.map(x => x.id === u.id ? u : x));
       showToast(err instanceof Error ? err.message : "Failed");
     }
   }
@@ -90,18 +97,22 @@ export default function AdminUsers() {
 
   async function handleDeleteUser() {
     if (!deleteModal) return;
+    const target = deleteModal;
     setDeleting(true);
+    // Optimistic: remove from list immediately
+    setUsers(prev => prev.filter(x => x.id !== target.id));
+    setDeleteModal(null);
     try {
-      const res = await fetch(`/api/admin/users/${deleteModal.id}`, {
+      const res = await fetch(`/api/admin/users/${target.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Failed");
       showToast(data.message || "User deleted");
-      setDeleteModal(null);
-      fetchUsers();
     } catch (err) {
+      // Revert on error
+      setUsers(prev => [...prev, target].sort((a, b) => b.id - a.id));
       showToast(err instanceof Error ? err.message : "Failed");
     } finally { setDeleting(false); }
   }

@@ -37,19 +37,22 @@ class AdminToggleStatus(BaseModel):
 
 @router.get("/users")
 def list_users(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """List all registered users with school info."""
+    """List all registered users with school info — single JOIN query."""
     _require_platform_admin(current_user)
 
-    users = db.query(User).order_by(User.created_at.desc()).all()
-    result = []
-    for u in users:
-        # Get school name via membership
-        membership = db.query(SchoolMembership).filter(SchoolMembership.user_id == u.id).first()
-        school_name = ""
-        if membership:
-            school = db.query(School).filter(School.id == membership.school_id).first()
-            school_name = school.name if school else ""
+    from sqlalchemy import func
 
+    # Single query with JOIN instead of N+1
+    rows = (
+        db.query(User, func.coalesce(School.name, "").label("school_name"))
+        .outerjoin(SchoolMembership, SchoolMembership.user_id == User.id)
+        .outerjoin(School, School.id == SchoolMembership.school_id)
+        .order_by(User.created_at.desc())
+        .all()
+    )
+
+    result = []
+    for u, school_name in rows:
         result.append({
             "id": u.id,
             "name": u.name,
