@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api, getFreeTeachers, assignSubstitute, type FreeTeacher } from "../api";
 import { cachedFetch, invalidateCachePrefix } from "../hooks/prefetchCache";
 import { useLivePeriod } from "../hooks/useLivePeriod";
+import { useTheme } from "../context/ThemeContext";
 
 /* ── Types ── */
 interface LiveTeacher {
@@ -83,6 +84,8 @@ const E_LT: LiveTeacher[] = [];
 export default function ProjectDashboard() {
   const { projectId } = useParams();
   const pid = Number(projectId);
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [clock, setClock] = useState(() => new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }));
@@ -280,7 +283,7 @@ export default function ProjectDashboard() {
       {uncovered > 0 && (
         <div style={{
           display: "flex", alignItems: "center", gap: 10,
-          background: "#FFF0F2", border: "2px solid #F8C0C8", borderRadius: 10,
+          background: isDark ? "rgba(232,51,74,0.12)" : "#FFF0F2", border: isDark ? "2px solid rgba(232,51,74,0.25)" : "2px solid #F8C0C8", borderRadius: 10,
           padding: "10px 20px", animation: "fadeUp 0.3s ease",
         }}>
           <div style={{
@@ -288,8 +291,8 @@ export default function ProjectDashboard() {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: "0.6rem", color: "#fff", fontWeight: 700, flexShrink: 0,
           }}>!</div>
-          <div style={{ flex: 1, fontSize: "0.78rem", fontWeight: 600, color: "#8A1526" }}>
-            {uncovered} unassigned lesson{uncovered !== 1 ? "s" : ""} <span style={{ fontWeight: 400, color: "#C0293E" }}>
+          <div style={{ flex: 1, fontSize: "0.78rem", fontWeight: 600, color: isDark ? "#FCA5A5" : "#8A1526" }}>
+            {uncovered} unassigned lesson{uncovered !== 1 ? "s" : ""} <span style={{ fontWeight: 400, color: isDark ? "#F87171" : "#C0293E" }}>
               — {unassigned.slice(0, 3).map(u => `${u.teacher_name} (Lesson ${u.period_index + 1})`).join(", ")}
               {uncovered > 3 ? ` + ${uncovered - 3} more` : ""}
             </span>
@@ -321,8 +324,8 @@ export default function ProjectDashboard() {
             {d.is_off_day ? "—" : s.present_today}
           </div>
           <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>{d.is_off_day ? "Off day" : `of ${s.total_teachers} teachers`}</div>
-          {!d.is_off_day && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#E8FAF4", color: "#076644" }}>{s.attendance_pct}% attendance</div>}
-          {d.is_off_day && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#FEF3DC", color: "#8A5A00" }}>🏖️ Holiday</div>}
+          {!d.is_off_day && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: isDark ? "rgba(14,168,117,0.15)" : "#E8FAF4", color: isDark ? "#34D399" : "#076644" }}>{s.attendance_pct}% attendance</div>}
+          {d.is_off_day && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: isDark ? "rgba(245,158,11,0.15)" : "#FEF3DC", color: isDark ? "#FBBF24" : "#8A5A00" }}>🏖️ Holiday</div>}
         </div>
 
         {/* Absent */}
@@ -343,7 +346,7 @@ export default function ProjectDashboard() {
             {d.is_off_day ? "—" : s.absent_today}
           </div>
           <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>{d.is_off_day ? "No school" : "marked this morning"}</div>
-          {!d.is_off_day && uncovered > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#FDEAED", color: "#8A1526" }}>{uncovered} lessons uncovered</div>}
+          {!d.is_off_day && uncovered > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: isDark ? "rgba(232,51,74,0.15)" : "#FDEAED", color: isDark ? "#FCA5A5" : "#8A1526" }}>{uncovered} lessons uncovered</div>}
         </div>
 
         {/* Busy */}
@@ -366,7 +369,7 @@ export default function ProjectDashboard() {
           <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>
             {d.is_off_day ? "No lessons" : curLesson ? `in Lesson ${curLesson.lesson_number}` : "between lessons"}
           </div>
-          {!d.is_off_day && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#ECEAFD", color: "#3D32B0" }}>{s.free_now} teachers free</div>}
+          {!d.is_off_day && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: isDark ? "rgba(91,78,232,0.15)" : "#ECEAFD", color: isDark ? "#A5B4FC" : "#3D32B0" }}>{s.free_now} teachers free</div>}
         </div>
 
         {/* Workload */}
@@ -375,7 +378,7 @@ export default function ProjectDashboard() {
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Avg. workload</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#E8A020", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>{s.avg_workload}</div>
           <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>lessons this week</div>
-          {s.over_max > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#FDEAED", color: "#8A1526" }}>{s.over_max} over max limit</div>}
+          {s.over_max > 0 && <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: isDark ? "rgba(232,51,74,0.15)" : "#FDEAED", color: isDark ? "#FCA5A5" : "#8A1526" }}>{s.over_max} over max limit</div>}
         </div>
 
         {/* Classes */}
@@ -384,15 +387,15 @@ export default function ProjectDashboard() {
           <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--slate-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Total classes</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#F06830", lineHeight: 1, letterSpacing: "-0.03em", fontFamily: "var(--font-mono)" }}>{s.total_classes}</div>
           <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 5 }}>{s.total_grades || 0} grades</div>
-          <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: "#FEF0E8", color: "#8A3200" }}>{s.total_lessons} lessons / week</div>
+          <div style={{ display: "inline-flex", fontSize: "0.6rem", fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginTop: 6, background: isDark ? "rgba(240,104,48,0.15)" : "#FEF0E8", color: isDark ? "#FB923C" : "#8A3200" }}>{s.total_lessons} lessons / week</div>
         </div>
       </div>
 
       {/* ═══ LIVE NOW PANEL — light colorful theme ═══ */}
       {d.is_off_day ? (
         <div style={{
-          background: "linear-gradient(135deg, #FEFCE8 0%, #F0FDF4 50%, #FDF2F8 100%)",
-          border: "1px solid #E9D5FF", borderRadius: 14, padding: "18px 20px",
+          background: isDark ? "linear-gradient(135deg, #1B2838 0%, #162232 50%, #1C2B3D 100%)" : "linear-gradient(135deg, #FEFCE8 0%, #F0FDF4 50%, #FDF2F8 100%)",
+          border: isDark ? "1px solid var(--border-default)" : "1px solid #E9D5FF", borderRadius: 14, padding: "18px 20px",
           position: "relative", overflow: "hidden",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
@@ -405,8 +408,8 @@ export default function ProjectDashboard() {
         </div>
       ) : (
         <div style={{
-          background: "linear-gradient(135deg, #FEFCE8 0%, #F0FDF4 50%, #FDF2F8 100%)",
-          border: "1px solid #E9D5FF", borderRadius: 14, position: "relative", overflow: "hidden",
+          background: isDark ? "linear-gradient(135deg, #1B2838 0%, #162232 50%, #1C2B3D 100%)" : "linear-gradient(135deg, #FEFCE8 0%, #F0FDF4 50%, #FDF2F8 100%)",
+          border: isDark ? "1px solid var(--border-default)" : "1px solid #E9D5FF", borderRadius: 14, position: "relative", overflow: "hidden",
         }}>
 
           {/* Live header */}
@@ -427,8 +430,8 @@ export default function ProjectDashboard() {
               {cardFilter && (
                 <span style={{
                   display: "inline-flex", alignItems: "center", gap: 5,
-                  background: cardFilter === "present" ? "#E8FAF4" : cardFilter === "absent" ? "#FDEAED" : "#ECEAFD",
-                  color: cardFilter === "present" ? "#076644" : cardFilter === "absent" ? "#8A1526" : "#3D32B0",
+                  background: cardFilter === "present" ? (isDark ? "rgba(14,168,117,0.15)" : "#E8FAF4") : cardFilter === "absent" ? (isDark ? "rgba(232,51,74,0.15)" : "#FDEAED") : (isDark ? "rgba(91,78,232,0.15)" : "#ECEAFD"),
+                  color: cardFilter === "present" ? (isDark ? "#34D399" : "#076644") : cardFilter === "absent" ? (isDark ? "#FCA5A5" : "#8A1526") : (isDark ? "#A5B4FC" : "#3D32B0"),
                   fontSize: "0.62rem", fontWeight: 700, padding: "3px 10px",
                   borderRadius: 20, animation: "fadeUp 0.2s ease",
                 }}>
@@ -582,7 +585,7 @@ export default function ProjectDashboard() {
       {uncovered > 0 && !d.is_off_day && (
         <div style={{ background: "var(--card-bg)", border: "1px solid var(--danger-200, #FCCDD3)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{
-            background: "#FFF0F2", padding: "12px 18px", display: "flex", alignItems: "center", gap: 8,
+            background: isDark ? "rgba(232,51,74,0.12)" : "#FFF0F2", padding: "12px 18px", display: "flex", alignItems: "center", gap: 8,
             borderBottom: "1px solid #FCCDD3",
           }}>
             <div style={{
@@ -590,7 +593,7 @@ export default function ProjectDashboard() {
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: "0.55rem", color: "#fff", fontWeight: 700, flexShrink: 0,
             }}>!</div>
-            <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#8A1526" }}>Unassigned lessons — Quick Assign available</div>
+            <div style={{ fontSize: "0.78rem", fontWeight: 700, color: isDark ? "#FCA5A5" : "#8A1526" }}>Unassigned lessons — Quick Assign available</div>
             <div style={{
               marginLeft: "auto", background: "#E8334A", color: "#fff",
               fontSize: "0.6rem", fontWeight: 700, padding: "2px 7px", borderRadius: 10,
