@@ -671,7 +671,7 @@ export default function ProjectDashboard() {
               {qaMsg}
             </div>
           )}
-          <div style={{ flex: 1, overflowY: "auto" }}>
+          <div className="scroll-on-hover" style={{ flex: 1 }}>
             {unassigned.map((u, i) => {
               const key = `${u.teacher_id}-${u.period_index}`;
               const isExpanded = qaExpanded === key;
@@ -835,7 +835,7 @@ export default function ProjectDashboard() {
           </div>
 
           {(
-            <div style={{ flex: 1, overflowY: "auto" }}>
+            <div className="scroll-on-hover" style={{ flex: 1 }}>
               {subs.length === 0 ? (
                 <div style={{ padding: "2rem", textAlign: "center", color: "var(--slate-400)", fontSize: "0.78rem" }}>No substitutions assigned</div>
               ) : subs.map((sub, i) => (
@@ -878,7 +878,7 @@ export default function ProjectDashboard() {
             </div>
             <span className="live-indicator" />
           </div>
-          <div style={{ flex: 1, overflowY: "auto" }}>
+          <div className="scroll-on-hover" style={{ flex: 1 }}>
             {subs.map(sub => (
               <div key={`s${sub.id}`} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 18px", borderBottom: "1px solid var(--slate-50)" }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>

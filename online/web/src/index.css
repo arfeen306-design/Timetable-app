@@ -5,6 +5,16 @@
 @import './styles/animations.css';
 
 * { box-sizing: border-box; }
+
+/* ── Utility: panels scroll only on hover, page scrolls normally ── */
+.scroll-on-hover {
+  overflow: hidden;
+  transition: overflow 0s 0.1s;
+}
+.scroll-on-hover:hover {
+  overflow-y: auto;
+  transition-delay: 0s;
+}
 body {
   margin: 0;
   font-family: var(--font-body, var(--font-sans));
