@@ -27,16 +27,56 @@ function useCountUp(target: number, duration = 2000, delay = 0) {
   return value;
 }
 
-// ── Feature callouts ──────────────────────────────────────────
-const FEATURES = [
-  { icon: "⚡", title: "Clash-free in seconds",
-    desc: "OR-Tools solver generates complete, conflict-free timetables automatically." },
-  { icon: "🔄", title: "Smart substitutions",
-    desc: "When a teacher is absent, the system finds free teachers instantly." },
-  { icon: "📊", title: "Workload intelligence",
-    desc: "Track every teacher's load across 40 weeks. Spot burnout before it happens." },
-  { icon: "📋", title: "Exam duties & committees",
-    desc: "Auto-assign invigilators. Manage school committees with one click." },
+// ── Feature Slides — showcasing each page ──────────────────────
+const SLIDES = [
+  {
+    icon: "📊",
+    title: "Live Dashboard",
+    subtitle: "Real-time school intelligence",
+    desc: "See who's present, absent, and teaching right now. Interactive stat cards with one-click filtering, workload charts, and substitution alerts — all updating live.",
+    color: "#0EA875",
+    features: ["Live attendance tracking", "Interactive stat cards", "Workload heatmap", "Auto-alert system"],
+  },
+  {
+    icon: "🗓️",
+    title: "Timetable Generator",
+    subtitle: "AI-powered constraint solver",
+    desc: "Our OR-Tools engine generates clash-free timetables in seconds. Define constraints — max periods, room conflicts, teacher preferences — and let the solver do the rest.",
+    color: "#5B4EE8",
+    features: ["Zero-clash guarantee", "Room optimization", "Teacher preferences", "Multi-section support"],
+  },
+  {
+    icon: "🔄",
+    title: "Smart Substitutions",
+    subtitle: "Instant coverage when teachers are absent",
+    desc: "Mark a teacher absent and instantly see available substitutes ranked by workload, subject expertise, and schedule fit. One-click assignment with full audit trail.",
+    color: "#E8334A",
+    features: ["Best-fit ranking", "Workload-aware", "One-click assign", "History & audit log"],
+  },
+  {
+    icon: "📈",
+    title: "Workload Intelligence",
+    subtitle: "Prevent burnout before it happens",
+    desc: "Track every teacher's lessons across 40 weeks. Visual heatmaps highlight overloaded staff, substitution counts, and weekly trends at a glance.",
+    color: "#E8A020",
+    features: ["40-week tracking", "Visual heatmaps", "Substitution counts", "Exportable reports"],
+  },
+  {
+    icon: "🛡️",
+    title: "Duty Roster Builder",
+    subtitle: "Gate, canteen, corridor — all managed",
+    desc: "Build rotating duty schedules for any location. Auto-distribute fairly across teachers, handle Friday exceptions, and export printable rosters.",
+    color: "#0891B2",
+    features: ["Location-based duties", "Fair rotation", "Friday schedules", "Print-ready export"],
+  },
+  {
+    icon: "📋",
+    title: "Exam Duties & Committees",
+    subtitle: "Automate exam invigilation",
+    desc: "Upload exam schedules and auto-assign invigilators. Manage school committees with drag-and-drop member assignment and role management.",
+    color: "#7C3AED",
+    features: ["Auto-assign invigilators", "Conflict detection", "Committee builder", "Role management"],
+  },
 ];
 
 // ── Main component ────────────────────────────────────────────
@@ -55,6 +95,23 @@ export default function Login() {
   const [error,        setError]        = useState("");
   const [success,      setSuccess]      = useState("");
   const [searchParams] = useSearchParams();
+
+  // Slide auto-rotation
+  const [activeSlide, setActiveSlide] = useState(0);
+  const slideTimer = useRef<ReturnType<typeof setInterval>>();
+  useEffect(() => {
+    slideTimer.current = setInterval(() => {
+      setActiveSlide(s => (s + 1) % SLIDES.length);
+    }, 5000);
+    return () => clearInterval(slideTimer.current);
+  }, []);
+  const goToSlide = (i: number) => {
+    setActiveSlide(i);
+    clearInterval(slideTimer.current);
+    slideTimer.current = setInterval(() => {
+      setActiveSlide(s => (s + 1) % SLIDES.length);
+    }, 5000);
+  };
 
   // Count-up stats
   const years = useCountUp(12, 2200, 400);
@@ -144,14 +201,41 @@ export default function Login() {
               and mathematical optimization. Zero clashes guaranteed.
             </p>
 
-            <div className="feature-grid">
-              {FEATURES.map((f, i) => (
-                <div key={i} className="feature-card">
-                  <div className="feature-card-icon">{f.icon}</div>
-                  <div className="feature-card-title">{f.title}</div>
-                  <div className="feature-card-desc">{f.desc}</div>
+            {/* ── Feature Showcase Carousel ── */}
+            <div className="slide-carousel">
+              {SLIDES.map((slide, i) => (
+                <div
+                  key={i}
+                  className={`slide-card ${i === activeSlide ? "slide-active" : ""}`}
+                  style={{ "--slide-accent": slide.color } as React.CSSProperties}
+                >
+                  <div className="slide-badge">
+                    <span className="slide-badge-icon">{slide.icon}</span>
+                    <span className="slide-badge-label">{slide.title}</span>
+                  </div>
+                  <div className="slide-subtitle">{slide.subtitle}</div>
+                  <p className="slide-desc">{slide.desc}</p>
+                  <div className="slide-features">
+                    {slide.features.map((f, j) => (
+                      <span key={j} className="slide-feature-tag">
+                        <span className="slide-check">✓</span> {f}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               ))}
+              <div className="slide-dots">
+                {SLIDES.map((_, i) => (
+                  <button
+                    key={i}
+                    className={`slide-dot ${i === activeSlide ? "active" : ""}`}
+                    onClick={() => goToSlide(i)}
+                    aria-label={`Go to slide ${i + 1}`}
+                  >
+                    {i === activeSlide && <span className="slide-dot-progress" />}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Count-up Stats */}
@@ -312,9 +396,7 @@ export default function Login() {
                 </button>
               </div>
 
-              <div className="lf-demo-hint">
-                Demo: <strong>admin@school.demo</strong> / <strong>admin123</strong>
-              </div>
+
             </div>
           </div>
         </div>
