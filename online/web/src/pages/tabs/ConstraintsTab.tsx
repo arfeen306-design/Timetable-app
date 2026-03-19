@@ -353,14 +353,14 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
 
       {/* ── Entity selector row ── */}
       <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap" }}>
-        <label style={{ fontWeight: 600, color: "#475569", fontSize: "0.9rem" }}>Entity Type:</label>
+        <label style={{ fontWeight: 600, color: "var(--text-secondary)", fontSize: "0.9rem" }}>Entity Type:</label>
         <select value={entityType} onChange={e => { setEntityType(e.target.value as "teacher" | "class" | "room"); }} style={{ minWidth: 120 }}>
           <option value="teacher">Teacher</option>
           <option value="class">Class</option>
           <option value="room">Room</option>
         </select>
 
-        <label style={{ fontWeight: 600, color: "#475569", fontSize: "0.9rem", marginLeft: "0.5rem" }}>Select:</label>
+        <label style={{ fontWeight: 600, color: "var(--text-secondary)", fontSize: "0.9rem", marginLeft: "0.5rem" }}>Select:</label>
         <select
           value={allMode ? "__ALL__" : (entityId ?? "")}
           onChange={e => {
@@ -389,7 +389,7 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
       {/* ── Availability Grid ── */}
       {(entityId != null || allMode) && (
         <>
-          <p style={{ fontWeight: 600, fontSize: "0.85rem", color: "#64748b", marginBottom: "0.75rem" }}>
+          <p style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
             Availability Grid {allMode ? "(shared across all)" : ""} — uncheck to mark unavailable
           </p>
           <div style={{ overflowX: "auto" }}>
@@ -404,8 +404,8 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
               </thead>
               <tbody>
                 {/* Unavailable whole day row */}
-                <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                  <td style={{ fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Unavailable whole day</td>
+                <tr style={{ background: "var(--surface-raised)", borderBottom: "2px solid var(--border-default)" }}>
+                  <td style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-secondary)" }}>Unavailable whole day</td>
                   {workingDayIndices.map((dayIdx) => (
                     <td key={dayIdx} style={{ textAlign: "center" }}>
                       <input type="checkbox" checked={isWholeDayUnavailable(dayIdx)} onChange={() => toggleWholeDay(dayIdx)}
@@ -416,7 +416,7 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
                 {/* Period rows */}
                 {Array.from({ length: numPeriods }, (_, pIdx) => (
                   <tr key={pIdx}>
-                    <td style={{ fontWeight: 500, color: "#334155", fontSize: "0.9rem" }}>Lesson {pIdx + 1}</td>
+                    <td style={{ fontWeight: 500, color: "var(--text-primary)", fontSize: "0.9rem" }}>Lesson {pIdx + 1}</td>
                     {workingDayIndices.map((dayIdx) => (
                       <td key={dayIdx} style={{ textAlign: "center" }}>
                         <input type="checkbox" checked={isAvailable(dayIdx, pIdx)} onChange={() => toggleSlot(dayIdx, pIdx)}
@@ -450,9 +450,9 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
       {/* ═══════════════════════════════════════════════════ */}
       {/* DAILY SUBJECT LIMITS SECTION                       */}
       {/* ═══════════════════════════════════════════════════ */}
-      <div style={{ marginTop: "2.5rem", borderTop: "2px solid #e2e8f0", paddingTop: "1.5rem" }}>
-        <h3 style={{ margin: "0 0 0.25rem", color: "#1e293b", fontSize: "1.15rem" }}>📊 Daily Subject Limits</h3>
-        <p style={{ color: "#64748b", fontSize: "0.85rem", marginBottom: "1.25rem" }}>
+      <div style={{ marginTop: "2.5rem", borderTop: "2px solid var(--border-default)", paddingTop: "1.5rem" }}>
+        <h3 style={{ margin: "0 0 0.25rem", color: "var(--text-primary)", fontSize: "1.15rem" }}>📊 Daily Subject Limits</h3>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "1.25rem" }}>
           Control how many times a subject can appear per day for a given teacher-class assignment. The solver will enforce these limits.
         </p>
 
@@ -482,8 +482,8 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
         </div>
 
         {/* Global default */}
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.25rem", background: "#f1f5f9", padding: "0.75rem 1rem", borderRadius: 8 }}>
-          <label style={{ fontWeight: 600, color: "#334155", fontSize: "0.9rem", whiteSpace: "nowrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.25rem", background: "var(--surface-raised)", padding: "0.75rem 1rem", borderRadius: 8 }}>
+          <label style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "0.9rem", whiteSpace: "nowrap" }}>
             Default max lessons per subject/day:
           </label>
           <select
@@ -595,9 +595,9 @@ export default function ConstraintsTab({ pid, constraints, teachers, classes, ro
 
         {/* ── Double Period Override ── */}
         {dailyLimits.force_spread && lessons.length > 0 && (
-          <div style={{ marginTop: "1.5rem", borderTop: "1px solid #e2e8f0", paddingTop: "1rem" }}>
-            <h4 style={{ margin: "0 0 0.25rem", color: "#1e293b", fontSize: "1rem" }}>🔗 Double Period Overrides</h4>
-            <p style={{ color: "#64748b", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
+          <div style={{ marginTop: "1.5rem", borderTop: "1px solid var(--border-default)", paddingTop: "1rem" }}>
+            <h4 style={{ margin: "0 0 0.25rem", color: "var(--text-primary)", fontSize: "1rem" }}>🔗 Double Period Overrides</h4>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
               Select lessons that are allowed to have back-to-back double periods on the same day, even when spread is forced (e.g., Lab sessions).
             </p>
             <div style={{ overflowX: "auto", maxHeight: 300, overflowY: "auto" }}>
