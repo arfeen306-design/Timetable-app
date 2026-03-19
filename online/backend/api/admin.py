@@ -85,6 +85,8 @@ def admin_reset_password(
         raise HTTPException(404, "User not found")
 
     user.password_hash = get_password_hash(data.new_password)
+    user.is_active = True
+    user.is_approved = True
     user.updated_at = datetime.utcnow()
     db.commit()
 
