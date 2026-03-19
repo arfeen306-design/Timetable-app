@@ -32,6 +32,7 @@ class RegisterRequest(BaseModel):
     school_name: str
     email: str
     password: str
+    phone: str
 
 
 class LoginResponse(BaseModel):
@@ -45,7 +46,12 @@ class UserResponse(BaseModel):
     email: str
     name: str
     role: str
+    phone: Optional[str] = None
     school_id: Optional[int] = None
+
+
+class UpdatePhoneRequest(BaseModel):
+    phone: str
 
 
 # ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -110,8 +116,11 @@ def _send_verification_email(to_email: str, token: str):
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
     """Register new user + school. Sends verification email if SMTP configured."""
     email = data.email.strip().lower()
+    phone = re.sub(r"[^\d+]", "", data.phone.strip())  # keep digits and +
     if not email or not data.password or not data.school_name.strip():
         raise HTTPException(400, "School name, email, and password are required")
+    if not phone or len(phone) < 7:
+        raise HTTPException(400, "A valid mobile number is required")
     if len(data.password) < 6:
         raise HTTPException(400, "Password must be at least 6 characters")
     if not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
@@ -131,6 +140,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
         password_hash=get_password_hash(data.password),
         name=data.school_name.strip(),
         role="school_admin",
+        phone=phone,
         is_active=True,
         is_approved=False,  # Requires admin approval
         email_verified_at=datetime.utcnow(),
@@ -218,16 +228,39 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 # ─── ME / LOGOUT ─────────────────────────────────────────────────────────────
 
 @router.get("/me", response_model=UserResponse)
-def me(current_user: dict = Depends(get_current_user_optional)):
+def me(current_user: dict = Depends(get_current_user_optional), db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(401, "Not authenticated")
+    # Fetch phone from DB (not stored in JWT)
+    phone = None
+    uid = current_user.get("id")
+    if uid:
+        u = db.query(User).filter(User.id == uid).first()
+        phone = u.phone if u else None
     return UserResponse(
-        id=current_user.get("id") or 0,
+        id=uid or 0,
         email=current_user.get("email") or "",
         name=current_user.get("name") or "",
         role=current_user.get("role") or "school_admin",
+        phone=phone,
         school_id=current_user.get("school_id"),
     )
+
+
+@router.post("/update-phone")
+def update_phone(data: UpdatePhoneRequest, current_user: dict = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    """Set mobile number for OAuth users (or anyone missing phone)."""
+    if not current_user:
+        raise HTTPException(401, "Not authenticated")
+    phone = re.sub(r"[^\d+]", "", data.phone.strip())
+    if not phone or len(phone) < 7:
+        raise HTTPException(400, "A valid mobile number is required")
+    user = db.query(User).filter(User.id == current_user["id"]).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    user.phone = phone
+    db.commit()
+    return {"ok": True, "phone": phone}
 
 
 @router.post("/logout")

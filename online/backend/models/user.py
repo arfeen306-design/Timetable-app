@@ -17,6 +17,7 @@ class User(Base):
     role = Column(String(50), nullable=False, default="school_admin")  # platform_admin | school_admin
     is_active = Column(Boolean, nullable=False, default=True)
     is_approved = Column(Boolean, nullable=False, default=False, server_default="false")
+    phone = Column(String(20), nullable=True)
     email_verified_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -90,6 +90,7 @@ export default function Login() {
   const [password,     setPassword]     = useState("");
   const [confirmPwd,   setConfirmPwd]   = useState("");
   const [schoolName,   setSchoolName]   = useState("");
+  const [phone,        setPhone]        = useState("");
   const [showPass,     setShowPass]     = useState(false);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
@@ -132,13 +133,14 @@ export default function Login() {
       if (password !== confirmPwd) { setError("Passwords do not match"); return; }
       if (password.length < 6)     { setError("Password must be at least 6 characters"); return; }
       if (!schoolName.trim())      { setError("School name is required"); return; }
+      if (!phone.trim() || phone.replace(/\D/g, "").length < 7) { setError("A valid mobile number is required"); return; }
     }
     setLoading(true);
     try {
       if (isSignUp) {
         const res = await fetch("/api/auth/register", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ school_name: schoolName.trim(), email: email.trim(), password }),
+          body: JSON.stringify({ school_name: schoolName.trim(), email: email.trim(), password, phone: phone.trim() }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
@@ -296,6 +298,21 @@ export default function Login() {
                     <div className="lf-input-wrap">
                       <input className="lf-input no-icon" type="text" placeholder="e.g. City Public School"
                         value={schoolName} onChange={e => { setSchoolName(e.target.value); setError(""); }}
+                        disabled={loading} required />
+                    </div>
+                  </div>
+                )}
+
+                {isSignUp && (
+                  <div className="lf-field">
+                    <label className="lf-label">Mobile number</label>
+                    <div className="lf-input-wrap">
+                      <svg className="lf-input-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <rect x="4" y="1" width="8" height="14" rx="1.5" />
+                        <line x1="6.5" y1="12" x2="9.5" y2="12" />
+                      </svg>
+                      <input className="lf-input" type="tel" placeholder="+92 300 1234567"
+                        value={phone} onChange={e => { setPhone(e.target.value); setError(""); }}
                         disabled={loading} required />
                     </div>
                   </div>

@@ -205,6 +205,9 @@ def _handle_oauth_user(db: Session, email: str, name: str, provider: str, settin
         }
         token = create_access_token(subject=user.email, payload=payload)
         log.info("OAuth login: existing user %s, redirecting with token", email)
+        # If phone is missing, redirect to complete-profile
+        if not user.phone:
+            return RedirectResponse(f"{settings.app_url}/complete-profile?token={token}", status_code=302)
         return RedirectResponse(f"{settings.app_url}/oauth-callback?token={token}", status_code=302)
 
     # New user — create with is_approved=True (OAuth users are trusted)
@@ -239,7 +242,7 @@ def _handle_oauth_user(db: Session, email: str, name: str, provider: str, settin
 
     log.info("New OAuth user (%s) registered via %s: %s", email, provider, name)
 
-    # Auto-login: issue JWT immediately
+    # New user has no phone — redirect to complete-profile
     school_id = school.id
     payload = {
         "id": user.id, "email": user.email,
@@ -247,5 +250,6 @@ def _handle_oauth_user(db: Session, email: str, name: str, provider: str, settin
         "school_id": school_id,
     }
     token = create_access_token(subject=user.email, payload=payload)
-    log.info("OAuth login: new user %s created via %s, redirecting with token", email, provider)
-    return RedirectResponse(f"{settings.app_url}/oauth-callback?token={token}", status_code=302)
+    log.info("OAuth login: new user %s created via %s, redirecting to complete-profile", email, provider)
+    return RedirectResponse(f"{settings.app_url}/complete-profile?token={token}", status_code=302)
+
