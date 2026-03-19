@@ -78,3 +78,20 @@ def init_db() -> None:
     """Create all tables and run lightweight migrations."""
     Base.metadata.create_all(bind=engine)
     _run_migrations()
+    # One-time: auto-promote platform admin
+    _auto_promote_admin()
+
+
+def _auto_promote_admin() -> None:
+    """Promote the owner account to platform_admin if not already."""
+    from sqlalchemy import text
+    OWNER_EMAIL = "saimarauf284@gmail.com"
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE users SET role = 'platform_admin', is_approved = true, is_active = true "
+                "WHERE email = :email AND (role IS NULL OR role != 'platform_admin')"
+            ), {"email": OWNER_EMAIL})
+    except Exception:
+        pass  # Silently ignore if table doesn't exist yet
+
