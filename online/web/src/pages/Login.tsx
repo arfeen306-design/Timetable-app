@@ -1,54 +1,31 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import AntiGravityCanvas from "../components/AntiGravityCanvas";
 import "./Login.css";
 
-// ── Animated timetable grid ───────────────────────────────────
-const DAYS    = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-const PERIODS = ["P1", "P2", "P3", "P4", "P5", "P6"];
-const SUBJECTS = [
-  { name: "Mathematics", color: "#4F46E5" },
-  { name: "Physics",     color: "#0891B2" },
-  { name: "English",     color: "#D97706" },
-  { name: "Biology",     color: "#16A34A" },
-  { name: "History",     color: "#7C3AED" },
-  { name: "Chemistry",   color: "#DC2626" },
-  { name: "Comp Sci",    color: "#0F766E" },
-];
-
-const GRID = PERIODS.map(() =>
-  DAYS.map(() => Math.random() > 0.25 ? SUBJECTS[Math.floor(Math.random() * SUBJECTS.length)] : null)
-);
-
-function AnimatedGrid() {
-  return (
-    <div className="bg-grid" aria-hidden="true">
-      <div className="bg-grid-inner">
-        <div className="bg-grid-header">
-          <div className="bg-grid-corner" />
-          {DAYS.map(d => <div key={d} className="bg-grid-day">{d}</div>)}
-        </div>
-        {GRID.map((row, pi) => (
-          <div key={pi} className="bg-grid-row">
-            <div className="bg-grid-period">{PERIODS[pi]}</div>
-            {row.map((cell, di) => (
-              <div
-                key={di}
-                className={`bg-grid-cell ${cell ? "filled" : "empty"}`}
-                style={cell ? {
-                  "--cell-color": cell.color,
-                  animationDelay: `${(pi * 5 + di) * 0.08}s`,
-                } as React.CSSProperties : undefined}
-              >
-                {cell && <span className="bg-cell-label">{cell.name}</span>}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+// ── Count-Up hook ─────────────────────────────────────────────
+function useCountUp(target: number, duration = 2000, delay = 0) {
+  const [value, setValue] = useState(0);
+  const started = useRef(false);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (started.current) return;
+      started.current = true;
+      const start = performance.now();
+      const tick = (now: number) => {
+        const progress = Math.min((now - start) / duration, 1);
+        // Ease-out cubic
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setValue(Math.round(eased * target));
+        if (progress < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [target, duration, delay]);
+  return value;
 }
 
 // ── Feature callouts ──────────────────────────────────────────
@@ -80,6 +57,11 @@ export default function Login() {
   const [success,      setSuccess]      = useState("");
   const [activeFeature, setActiveFeature] = useState(0);
   const [searchParams] = useSearchParams();
+
+  // Count-up stats
+  const years = useCountUp(12, 2200, 400);
+  const weeks = useCountUp(40, 2000, 600);
+  const clashes = useCountUp(0, 100, 800);
 
   // Pick up OAuth error/success from URL params
   useEffect(() => {
@@ -142,7 +124,17 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      <AnimatedGrid />
+      {/* Anti-Gravity particle canvas */}
+      <AntiGravityCanvas />
+
+      {/* Gaussian curve watermark */}
+      <svg className="ag-watermark" viewBox="0 0 600 200" aria-hidden="true">
+        <path d="M0 180 Q50 178 100 170 Q150 150 200 110 Q250 50 300 20 Q350 50 400 110 Q450 150 500 170 Q550 178 600 180"
+          fill="none" stroke="rgba(0,206,200,0.04)" strokeWidth="2" />
+        <path d="M0 185 Q80 183 160 175 Q240 155 300 80 Q360 155 440 175 Q520 183 600 185"
+          fill="none" stroke="rgba(0,206,200,0.025)" strokeWidth="1.5" />
+      </svg>
+
       <div className="login-overlay" />
 
       {/* Theme Toggle */}
@@ -170,18 +162,17 @@ export default function Login() {
             </div>
             <div className="login-brand-text">
               <span className="login-brand-name">Myzynca</span>
-              <span className="login-brand-tag">School OS</span>
+              <span className="login-brand-tag">Precision Scheduling</span>
             </div>
           </div>
 
           <h1 className="login-headline">
-            The last timetable<br />
-            software your school<br />
-            will ever need.
+            The mathematics of<br />
+            <span className="ag-headline-accent">perfect</span> scheduling.
           </h1>
           <p className="login-sub">
-            Built for schools worldwide. Powered by constraint solving.<br />
-            Zero clashes guaranteed.
+            Built for schools worldwide. Powered by constraint-satisfaction<br />
+            and mathematical optimization. Zero clashes guaranteed.
           </p>
 
           <div className="feature-showcase">
@@ -200,20 +191,39 @@ export default function Login() {
             ))}
           </div>
 
+          {/* Count-up Stats */}
           <div className="login-stats">
             <div className="login-stat">
-              <span className="stat-num">40</span>
-              <span className="stat-label">weeks tracked</span>
+              <span className="stat-num ag-countup">{years}</span>
+              <span className="stat-label">Years Excellence</span>
             </div>
             <div className="stat-divider" />
             <div className="login-stat">
-              <span className="stat-num">0</span>
-              <span className="stat-label">clashes guaranteed</span>
+              <span className="stat-num ag-countup">{weeks}</span>
+              <span className="stat-label">Weeks Tracked</span>
             </div>
             <div className="stat-divider" />
             <div className="login-stat">
-              <span className="stat-num">∞</span>
-              <span className="stat-label">schools supported</span>
+              <span className="stat-num ag-countup">{clashes}</span>
+              <span className="stat-label">Clashes guaranteed</span>
+            </div>
+          </div>
+
+          {/* Founder's Note — Glassmorphism */}
+          <div className="ag-founders-note">
+            <div className="ag-fn-glow" />
+            <div className="ag-fn-quote">"</div>
+            <p className="ag-fn-text">
+              As a Data Scientist and Mathematics teacher for over a decade,
+              I believe school management should be driven by <em>logic</em>, not manual labor.
+              Myzynca is the result of 12 years in education meeting modern data engineering.
+            </p>
+            <div className="ag-fn-author">
+              <div className="ag-fn-avatar">ZA</div>
+              <div>
+                <div className="ag-fn-name">Zain ul Arfeen</div>
+                <div className="ag-fn-role">Founder · Data Scientist & Educator</div>
+              </div>
             </div>
           </div>
         </div>
