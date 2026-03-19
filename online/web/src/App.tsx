@@ -22,6 +22,7 @@ const DutyRosterPage   = lazy(() => import("./pages/DutyRoster"));
 const CommitteesPage   = lazy(() => import("./pages/Committees"));
 const ExamDutiesPage   = lazy(() => import("./pages/ExamDuties"));
 const ZyncaWelcome     = lazy(() => import("./pages/ZyncaWelcome"));
+const ContactUs        = lazy(() => import("./pages/ContactUs"));
 
 function PageLoader() {
   return (
@@ -103,6 +104,9 @@ export default function App() {
         } />
         <Route path="project/:projectId/zynca" element={
           <Suspense fallback={<PageLoader />}><ZyncaWelcome /></Suspense>
+        } />
+        <Route path="project/:projectId/contact" element={
+          <Suspense fallback={<PageLoader />}><ContactUs /></Suspense>
         } />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

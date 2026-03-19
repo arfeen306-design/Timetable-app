@@ -332,6 +332,11 @@ export default function Login() {
         <div className="dev-console-row">
           <span className="dev-console-prompt">$</span>
           <span className="dev-console-key">Email:</span>
+          <a href="mailto:info@myzynca.com" className="dev-console-link">info@myzynca.com</a>
+        </div>
+        <div className="dev-console-row">
+          <span className="dev-console-prompt">$</span>
+          <span className="dev-console-key">Dev:</span>
           <a href="mailto:arfeen306@live.com" className="dev-console-link">arfeen306@live.com</a>
         </div>
         <div className="dev-console-note">Available for technical consultations and enterprise inquiries.</div>
