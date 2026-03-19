@@ -60,6 +60,10 @@ def _run_migrations() -> None:
         # Duty roster v2 columns
         ("duty_roster", "row_id", "INTEGER"),
         ("duty_roster", "column_index", "INTEGER DEFAULT 0"),
+        # User profile columns
+        ("users", "phone", "VARCHAR(20)"),
+        ("users", "updated_at", "TIMESTAMP"),
+        ("users", "role", "VARCHAR(30) DEFAULT 'school_admin'"),
     ]
 
     with engine.begin() as conn:
