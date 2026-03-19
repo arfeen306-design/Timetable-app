@@ -217,6 +217,13 @@
 .live-now-pill:hover {
   background: rgba(16,185,129,0.18);
 }
+.live-now-pill.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.live-now-pill.disabled:hover {
+  background: rgba(16,185,129,0.1);
+}
 .live-dot {
   width: 6px;
   height: 6px;

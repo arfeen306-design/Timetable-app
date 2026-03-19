@@ -283,10 +283,17 @@ export default function AppShell() {
         <div className="top-bar-right">
           {/* Live Now pill */}
           <div
-            className="live-now-pill"
-            onClick={() => navigate(projectId ? `/project/${projectId}/dashboard` : "/")}
+            className={`live-now-pill${!progress.hasGenerated ? " disabled" : ""}`}
+            onClick={() => {
+              if (!progress.hasGenerated) {
+                toast("info", "Generate a timetable first to use Live Now");
+                return;
+              }
+              navigate(projectId ? `/project/${projectId}/live-now` : "/");
+            }}
             role="button"
             tabIndex={0}
+            title={!progress.hasGenerated ? "Generate a timetable first" : undefined}
           >
             <span className="live-dot" />
             <span className="live-text">Live Now</span>
