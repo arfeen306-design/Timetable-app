@@ -767,7 +767,7 @@ def pending_with_suggestions(
             free[0]["best_fit"] = True
 
         key = f"{slot['teacher_id']}-{pi}"
-        suggestions[key] = free[:3]
+        suggestions[key] = free[:10]
 
     return {"slots": pending, "suggestions": suggestions}
 

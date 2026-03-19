@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, getFreeTeachers, assignSubstitute, type FreeTeacher } from "../api";
+import { api, listPendingWithSuggestions, assignSubstitute, type SuggestionTeacher } from "../api";
 import { cachedFetch, invalidateCachePrefix } from "../hooks/prefetchCache";
 import { useLivePeriod } from "../hooks/useLivePeriod";
 import { useTheme } from "../context/ThemeContext";
@@ -165,25 +165,29 @@ export default function ProjectDashboard() {
 
   /* ── Quick Assign state ── */
   const [qaExpanded, setQaExpanded] = useState<string | null>(null);
-  const [qaFree, setQaFree] = useState<FreeTeacher[]>([]);
-  const [qaLoading, setQaLoading] = useState(false);
+  const [qaSuggestions, setQaSuggestions] = useState<Record<string, SuggestionTeacher[]>>({});
   const [qaAssigning, setQaAssigning] = useState(false);
   const [qaMsg, setQaMsg] = useState("");
 
-  async function handleQaExpand(u: DashboardData["unassigned"][0]) {
+  // Preload free-teacher suggestions for ALL unassigned slots in one call
+  useEffect(() => {
+    if (!pid || !data?.date || !data?.unassigned?.length) return;
+    listPendingWithSuggestions(pid, data.date)
+      .then(r => setQaSuggestions(r.suggestions || {}))
+      .catch(() => setQaSuggestions({}));
+  }, [pid, data?.date, data?.unassigned?.length]);
+
+  function handleQaExpand(u: DashboardData["unassigned"][0]) {
     const key = `${u.teacher_id}-${u.period_index}`;
     if (qaExpanded === key) { setQaExpanded(null); return; }
-    setQaLoading(true);
-    try {
-      const absentIds = data?.absent_teachers?.map(a => a.teacher_id) || [];
-      const free = await getFreeTeachers(pid, data?.date || "", u.period_index, absentIds);
-      setQaFree(free);
-      setQaExpanded(key);
-    } catch { setQaFree([]); }
-    finally { setQaLoading(false); }
+    setQaExpanded(key);
   }
 
-  async function handleQaAssign(u: DashboardData["unassigned"][0], ft: FreeTeacher, force = false) {
+  // Derive free teachers for expanded row from preloaded suggestions
+  const qaFreeKey = qaExpanded || "";
+  const qaFree: SuggestionTeacher[] = qaSuggestions[qaFreeKey] || [];
+
+  async function handleQaAssign(u: DashboardData["unassigned"][0], ft: SuggestionTeacher, force = false) {
     setQaAssigning(true);
     // Optimistic: remove from unassigned immediately
     const prevData = data;
@@ -704,9 +708,7 @@ export default function ProjectDashboard() {
                   {/* Inline free teachers panel */}
                   {isExpanded && (
                     <div style={{ padding: "8px 18px 12px", background: "#FAFBFE", borderBottom: "1px solid #FEE8EB" }}>
-                      {qaLoading ? (
-                        <div style={{ fontSize: "0.75rem", color: "var(--slate-400)", padding: "8px 0" }}>⏳ Finding free teachers...</div>
-                      ) : qaFree.length === 0 ? (
+                      {qaFree.length === 0 ? (
                         <div style={{ fontSize: "0.75rem", color: "var(--slate-400)", padding: "8px 0" }}>No free teachers available for this lesson.</div>
                       ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
