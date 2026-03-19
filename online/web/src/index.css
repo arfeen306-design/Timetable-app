@@ -522,6 +522,265 @@ th { background: #1C2E4A; font-weight: 600; color: #FFFFFF; font-size: 0.75rem; 
 [data-theme="dark"] ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
+/* ── Tables ── */
+[data-theme="dark"] th {
+  background: #162232;
+  color: #94A3B8;
+  border-bottom-color: var(--border-default);
+}
+[data-theme="dark"] td {
+  border-bottom-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+[data-theme="dark"] .data-table tbody tr:hover {
+  background: var(--surface-raised);
+}
+[data-theme="dark"] .data-table tbody tr.selected {
+  background: rgba(37,99,235,0.15);
+}
+
+/* ── Tabs ── */
+[data-theme="dark"] .tabs button {
+  background: var(--surface-card);
+  color: var(--text-muted);
+  border-color: var(--border-default);
+}
+[data-theme="dark"] .tabs button:hover {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+[data-theme="dark"] .tabs button.active {
+  color: #fff; /* keeps primary gradient — override dark text back to white */
+}
+
+/* ── Modals ── */
+[data-theme="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+[data-theme="dark"] .modal-dialog {
+  background: var(--surface-card);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+[data-theme="dark"] .modal-dialog h3 {
+  color: var(--text-primary);
+}
+[data-theme="dark"] .modal-label {
+  color: var(--text-secondary);
+}
+[data-theme="dark"] .modal-actions {
+  border-top-color: var(--border-default);
+}
+
+/* ── Stat cards ── */
+[data-theme="dark"] .stat-card {
+  background: var(--surface-card);
+  border-color: var(--border-default);
+}
+[data-theme="dark"] .stat-card-label {
+  color: var(--text-muted);
+}
+
+/* ── Settings ── */
+[data-theme="dark"] .settings-card {
+  background: var(--surface-card);
+  border-color: var(--border-default);
+}
+[data-theme="dark"] .settings-card h2 {
+  color: var(--text-primary);
+}
+[data-theme="dark"] .settings-section {
+  border-top-color: var(--border-default);
+}
+[data-theme="dark"] .settings-section-title {
+  color: var(--text-primary);
+}
+[data-theme="dark"] .settings-label {
+  color: var(--text-secondary);
+}
+[data-theme="dark"] .settings-hint {
+  color: var(--text-muted);
+}
+[data-theme="dark"] .settings-footer {
+  border-top-color: var(--border-default);
+}
+[data-theme="dark"] .setup-progress-panel {
+  background: var(--surface-raised);
+  border-color: var(--border-default);
+}
+[data-theme="dark"] .nav-footer {
+  border-top-color: var(--border-default);
+}
+
+/* ── Break cards ── */
+[data-theme="dark"] .break-card {
+  background: linear-gradient(135deg, var(--surface-card) 0%, var(--surface-raised) 100%);
+  border-color: var(--border-default);
+}
+[data-theme="dark"] .break-card-friday {
+  background: linear-gradient(135deg, rgba(45,31,0,0.4) 0%, rgba(59,42,6,0.4) 100%);
+  border-color: var(--border-default);
+}
+
+/* ── Weekend checkboxes ── */
+[data-theme="dark"] .weekend-checkbox {
+  background: var(--surface-card);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+[data-theme="dark"] .weekend-checkbox:hover {
+  background: var(--surface-raised);
+}
+[data-theme="dark"] .weekend-checkbox.checked {
+  background: rgba(37,99,235,0.15);
+  color: var(--primary-300);
+  border-color: rgba(37,99,235,0.3);
+}
+
+/* ── Warning banner ── */
+[data-theme="dark"] .warning-banner {
+  background: linear-gradient(135deg, var(--warning-50), var(--warning-100));
+  border-color: var(--border-default);
+}
+
+/* ── Empty state ── */
+[data-theme="dark"] .empty-state-title {
+  color: var(--text-secondary);
+}
+[data-theme="dark"] .empty-state-desc {
+  color: var(--text-muted);
+}
+
+/* ── Duty chips — darken tints ── */
+[data-theme="dark"] .duty-chip-gate    { background: rgba(37,99,235,0.15);  color: var(--primary-300); border-color: rgba(37,99,235,0.3); }
+[data-theme="dark"] .duty-chip-canteen { background: rgba(245,158,11,0.12); color: var(--warning-400); border-color: rgba(245,158,11,0.25); }
+[data-theme="dark"] .duty-chip-library { background: rgba(168,85,247,0.12); color: #C084FC; border-color: rgba(168,85,247,0.25); }
+[data-theme="dark"] .duty-chip-hall    { background: rgba(59,130,246,0.12); color: var(--blue-400); border-color: rgba(59,130,246,0.25); }
+[data-theme="dark"] .duty-chip-break   { background: rgba(34,197,94,0.12);  color: var(--success-500); border-color: rgba(34,197,94,0.25); }
+[data-theme="dark"] .duty-chip-corridor { background: rgba(20,184,166,0.12); color: var(--teal-500); border-color: rgba(20,184,166,0.25); }
+[data-theme="dark"] .duty-chip-exam    { background: rgba(168,85,247,0.12); color: #C084FC; border-color: rgba(168,85,247,0.25); }
+[data-theme="dark"] .duty-chip-other   { background: var(--surface-raised); color: var(--text-muted); border-color: var(--border-default); }
+[data-theme="dark"] .duty-chip-empty   { border-color: var(--border-default); color: var(--text-muted); }
+[data-theme="dark"] .duty-chip-empty:hover { border-color: var(--primary-400); color: var(--primary-300); background: rgba(37,99,235,0.1); }
+[data-theme="dark"] .duty-edit-strip {
+  background: var(--surface-card);
+  border-color: rgba(37,99,235,0.25);
+}
+
+/* ── Dashboard intro ── */
+[data-theme="dark"] .intro-title  { color: var(--text-primary); }
+[data-theme="dark"] .intro-subtitle { color: var(--text-muted); }
+[data-theme="dark"] .intro-project-list li { border-bottom-color: var(--border-subtle); }
+[data-theme="dark"] .subheading   { color: var(--text-muted); }
+
+/* ── Toasts — already use gradients, but ensure border ── */
+[data-theme="dark"] .toast { border: 1px solid var(--border-default); }
+
+/* ── Headings & global text ── */
+[data-theme="dark"] .friday-section-title { color: var(--text-primary); }
+[data-theme="dark"] .color-swatch { border-color: rgba(255,255,255,0.12); }
+
+/* ── Dashboard pages inline style overrides ── */
+[data-theme="dark"] .dash-hero {
+  background: var(--surface-card) !important;
+  border-color: var(--border-default) !important;
+}
+[data-theme="dark"] .dash-features > div {
+  background: var(--surface-card) !important;
+  border-color: var(--border-default) !important;
+}
+[data-theme="dark"] .dash-project-row {
+  border-bottom-color: var(--border-subtle) !important;
+}
+[data-theme="dark"] .dash-project-row:hover {
+  background: var(--surface-raised) !important;
+}
+
+/* ── Project Dashboard: override inline backgrounds ── */
+[data-theme="dark"] .sc {
+  background: var(--surface-card) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-primary) !important;
+}
+[data-theme="dark"] .sc:hover {
+  background: var(--surface-raised) !important;
+}
+[data-theme="dark"] .pd-stat-grid .sc {
+  background: var(--surface-card) !important;
+}
+[data-theme="dark"] .pd-live-grid > div,
+[data-theme="dark"] .pd-live-grid > div > div {
+  background: var(--surface-card) !important;
+  border-color: var(--border-default) !important;
+}
+[data-theme="dark"] .pd-body-grid > div {
+  background: var(--surface-card) !important;
+  border-color: var(--border-default) !important;
+}
+
+/* ── Live panel header gradient → dark ── */
+[data-theme="dark"] [style*="linear-gradient(135deg, #FEFCE8"] {
+  background: linear-gradient(135deg, #1B2838 0%, #162232 50%, #1C2B3D 100%) !important;
+}
+
+/* ── Teacher cards inside Live Now ── */
+[data-theme="dark"] .pd-live-grid [style*="background: \"#fff\""],
+[data-theme="dark"] [style*="background: #fff"] {
+  background: var(--surface-card) !important;
+}
+
+/* ── Substitution detail panel ── */
+[data-theme="dark"] [style*="background: \"#FAFBFE\""],
+[data-theme="dark"] [style*="background: #FAFBFE"] {
+  background: var(--surface-raised) !important;
+}
+
+/* ── Candidate list in substitution panel ── */
+[data-theme="dark"] [style*="background: \"#EEF2FF\""],
+[data-theme="dark"] [style*="background: #EEF2FF"] {
+  background: rgba(37,99,235,0.12) !important;
+}
+
+/* ── General text color for dark theme inline styled divs ── */
+[data-theme="dark"] .pd-page [style*="color: \"var(--slate-400)\""] {
+  color: var(--text-muted) !important;
+}
+[data-theme="dark"] .pd-page [style*="color: \"var(--slate-700)\""] {
+  color: var(--text-primary) !important;
+}
+
+/* ── Workload chart axis labels ── */
+[data-theme="dark"] .wl-label {
+  color: var(--text-muted) !important;
+}
+
+/* ── Attendance-pct badges inside stat cards ── */
+[data-theme="dark"] [style*="background: \"#E8FAF4\""] {
+  background: rgba(14,168,117,0.15) !important;
+}
+[data-theme="dark"] [style*="background: \"#FDEAED\""] {
+  background: rgba(232,51,74,0.15) !important;
+}
+[data-theme="dark"] [style*="background: \"#ECEAFD\""] {
+  background: rgba(91,78,232,0.15) !important;
+}
+[data-theme="dark"] [style*="background: \"#FEF3DC\""] {
+  background: rgba(245,158,11,0.15) !important;
+}
+[data-theme="dark"] [style*="background: \"#FEF0E8\""] {
+  background: rgba(240,104,48,0.15) !important;
+}
+
+/* ── QA panel red border ── */
+[data-theme="dark"] [style*="border: \"1px solid #FCCDD3\""],
+[data-theme="dark"] [style*="border: 1px solid #FCCDD3"] {
+  border-color: rgba(232,51,74,0.2) !important;
+}
+[data-theme="dark"] [style*="background: \"#FFF0F2\""],
+[data-theme="dark"] [style*="background: #FFF0F2"] {
+  background: rgba(232,51,74,0.1) !important;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE — content pages
    ══════════════════════════════════════════════════════════════════════════ */
