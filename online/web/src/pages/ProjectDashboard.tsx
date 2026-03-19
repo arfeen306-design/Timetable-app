@@ -10,6 +10,7 @@ interface LiveTeacher {
   teacher_id: number; name: string; initials: string;
   status: "busy" | "free" | "sub"; class_name: string;
   subject_name: string; color: string;
+  today_lessons?: number;
 }
 interface DashboardData {
   school_name: string; academic_year: string; week_label: string;
@@ -74,7 +75,7 @@ const E_SLOTS: DashboardData["lesson_slots"] = [];
 const E_UN: DashboardData["unassigned"] = [];
 const E_SUB: DashboardData["substitutions_today"] = [];
 const E_WC: DashboardData["workload_chart"] = [];
-const E_SH: DashboardData["substitution_history"] = [];
+
 const E_AT: DashboardData["absent_teachers"] = [];
 const E_LT: LiveTeacher[] = [];
 
@@ -91,7 +92,7 @@ export default function ProjectDashboard() {
   const [clock, setClock] = useState(() => new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }));
   // timezone handled via ipapi
   const [cc, setCc] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   // Interactive card filter: click a stat card to filter the Live Now grid
   const [cardFilter, setCardFilter] = useState<"present" | "absent" | "busy" | null>(null);
 
@@ -148,6 +149,19 @@ export default function ProjectDashboard() {
     cachedFetch(`dash-${pid}`, () => api<DashboardData>(url), 30_000)
       .then(setData).catch(console.error).finally(() => setLoading(false));
   }, [pid]);
+
+  // Refresh handler — force fresh data
+  const refreshDash = async () => {
+    if (!pid || refreshing) return;
+    setRefreshing(true);
+    const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const url = `/api/projects/${pid}/dashboard?tz=${encodeURIComponent(clientTz)}`;
+    try {
+      const fresh = await api<DashboardData>(url);
+      setData(fresh);
+    } catch (e) { console.error(e); }
+    setRefreshing(false);
+  };
 
   /* ── Quick Assign state ── */
   const [qaExpanded, setQaExpanded] = useState<string | null>(null);
@@ -232,7 +246,7 @@ export default function ProjectDashboard() {
   const unassigned = d.unassigned || E_UN;
   const subs = d.substitutions_today || E_SUB;
   const wChart = d.workload_chart || E_WC;
-  const subHist = d.substitution_history || E_SH;
+
   const absent = d.absent_teachers || E_AT;
   const liveT = d.live_teachers || E_LT;
   const chartMax = Math.max(...wChart.map(w => w.total), 1);
@@ -270,11 +284,12 @@ export default function ProjectDashboard() {
             <span>{cc ? countryFlag(cc) : "🌐"}</span>
             <span>{clock}</span>
           </div>
-          <button className="btn" onClick={() => setShowHistory(!showHistory)} style={{ fontSize: "0.72rem", padding: "5px 12px", display: "flex", alignItems: "center", gap: 5 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          <button className="btn" onClick={refreshDash} disabled={refreshing} style={{ fontSize: "0.72rem", padding: "5px 12px", display: "flex", alignItems: "center", gap: 5 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "transform 0.4s", transform: refreshing ? "rotate(360deg)" : "none" }}>
+              <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
             </svg>
-            {showHistory ? "Close" : "History"}
+            {refreshing ? "Refreshing..." : "Refresh"}
           </button>
         </div>
       </div>
@@ -503,55 +518,107 @@ export default function ProjectDashboard() {
               );
             }
             return filtered.length > 0 ? (
-            <div className="pd-live-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "0 14px 14px", position: "relative" }}>
-              {filtered.map((t, i) => (
-                <div key={t.teacher_id || i} style={{
-                  borderRadius: 10, padding: "10px 12px",
-                  background: "var(--card-bg)",
-                  border: "1px solid var(--border-default)",
-                  animation: cardFilter ? `fadeUp 0.2s ease ${i * 0.03}s both` : undefined,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
-                    <div style={{
-                      width: 26, height: 26, borderRadius: "50%", background: t.color,
-                      fontSize: "0.55rem", fontWeight: 700, color: "#fff",
-                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                    }}>{t.initials}</div>
-                    <div>
-                      <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text-primary)" }}>{t.name}</div>
-                      <div style={{
-                        fontSize: "0.62rem", marginTop: 1,
-                        color: t.status === "free" ? "#16A34A" : t.status === "sub" ? "#7C3AED" : "#64748B",
-                      }}>
-                        {t.status === "busy" ? "Teaching" : t.status === "sub" ? "On substitution" : "Free this lesson"}
-                      </div>
-                    </div>
-                  </div>
-                  {t.status === "busy" && (
-                    <div style={{ fontSize: "0.6rem", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 4 }}>
-                      <span style={{
-                        background: "#EEF2FF", color: "#4F46E5",
-                        fontSize: "0.58rem", fontWeight: 600, padding: "1px 6px", borderRadius: 4,
-                        fontFamily: "var(--font-mono)",
-                      }}>{t.class_name}</span>
-                      <span>{t.subject_name}</span>
-                    </div>
-                  )}
-                  {t.status === "sub" && (
-                    <div style={{ fontSize: "0.6rem", display: "flex", alignItems: "center", gap: 4 }}>
-                      <span style={{
-                        background: "#F5F3FF", color: "#7C3AED",
-                        fontSize: "0.58rem", fontWeight: 700, padding: "1px 6px", borderRadius: 4,
-                        fontFamily: "var(--font-mono)",
-                      }}>{t.class_name}</span>
-                      <span style={{ color: "#7C3AED", fontWeight: 600 }}>↔ {t.subject_name}</span>
-                    </div>
-                  )}
-                  {t.status === "free" && (
-                    <div style={{ fontSize: "0.6rem", color: "#16A34A", fontWeight: 600 }}>Available for substitution</div>
-                  )}
-                </div>
-              ))}
+            <div style={{ padding: "0 14px 14px" }}>
+              {/* ── Ongoing Lessons (busy + sub) ── */}
+              {(() => {
+                const ongoing = filtered.filter(t => t.status === "busy" || t.status === "sub");
+                const free = filtered.filter(t => t.status === "free");
+                return (
+                  <>
+                    {ongoing.length > 0 && (
+                      <>
+                        <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                          📖 Ongoing Lessons ({ongoing.length})
+                        </div>
+                        <div className="pd-live-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: free.length > 0 ? 16 : 0 }}>
+                          {ongoing.map((t, i) => (
+                            <div key={t.teacher_id || i} style={{
+                              borderRadius: 10, padding: "10px 12px",
+                              background: "var(--card-bg)",
+                              border: "1px solid var(--border-default)",
+                              animation: cardFilter ? `fadeUp 0.2s ease ${i * 0.03}s both` : undefined,
+                            }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                                <div style={{
+                                  width: 26, height: 26, borderRadius: "50%", background: t.color,
+                                  fontSize: "0.55rem", fontWeight: 700, color: "#fff",
+                                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                                }}>{t.initials}</div>
+                                <div>
+                                  <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text-primary)" }}>{t.name}</div>
+                                  <div style={{
+                                    fontSize: "0.62rem", marginTop: 1,
+                                    color: t.status === "sub" ? "#7C3AED" : "#64748B",
+                                  }}>
+                                    {t.status === "sub" ? "On substitution" : "Teaching"}
+                                  </div>
+                                </div>
+                              </div>
+                              {t.status === "busy" && (
+                                <div style={{ fontSize: "0.6rem", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 4 }}>
+                                  <span style={{
+                                    background: "#EEF2FF", color: "#4F46E5",
+                                    fontSize: "0.58rem", fontWeight: 600, padding: "1px 6px", borderRadius: 4,
+                                    fontFamily: "var(--font-mono)",
+                                  }}>{t.class_name}</span>
+                                  <span>{t.subject_name}</span>
+                                </div>
+                              )}
+                              {t.status === "sub" && (
+                                <div style={{ fontSize: "0.6rem", display: "flex", alignItems: "center", gap: 4 }}>
+                                  <span style={{
+                                    background: "#F5F3FF", color: "#7C3AED",
+                                    fontSize: "0.58rem", fontWeight: 700, padding: "1px 6px", borderRadius: 4,
+                                    fontFamily: "var(--font-mono)",
+                                  }}>{t.class_name}</span>
+                                  <span style={{ color: "#7C3AED", fontWeight: 600 }}>↔ {t.subject_name}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {free.length > 0 && (
+                      <>
+                        <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                          🟢 Free Teachers ({free.length})
+                          <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: "normal", color: "var(--text-muted)", fontSize: "0.6rem" }}>— sorted by lowest workload today</span>
+                        </div>
+                        <div className="pd-live-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                          {free.map((t, i) => (
+                            <div key={t.teacher_id || i} style={{
+                              borderRadius: 10, padding: "10px 12px",
+                              background: "var(--card-bg)",
+                              border: "1px solid var(--border-default)",
+                              animation: cardFilter ? `fadeUp 0.2s ease ${i * 0.03}s both` : undefined,
+                            }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                                <div style={{
+                                  width: 26, height: 26, borderRadius: "50%", background: t.color,
+                                  fontSize: "0.55rem", fontWeight: 700, color: "#fff",
+                                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                                }}>{t.initials}</div>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text-primary)" }}>{t.name}</div>
+                                  <div style={{ fontSize: "0.62rem", marginTop: 1, color: "#16A34A" }}>Free this lesson</div>
+                                </div>
+                                <div style={{
+                                  fontSize: "0.58rem", fontWeight: 700, padding: "2px 7px",
+                                  borderRadius: 10, fontFamily: "var(--font-mono)",
+                                  background: (t.today_lessons ?? 0) === 0 ? "rgba(14,168,117,0.1)" : "rgba(245,158,11,0.1)",
+                                  color: (t.today_lessons ?? 0) === 0 ? "#0EA875" : "#D97706",
+                                }}>{t.today_lessons ?? 0} today</div>
+                              </div>
+                              <div style={{ fontSize: "0.6rem", color: "#16A34A", fontWeight: 600 }}>Available for substitution</div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           ) : (
             /* Fallback: lesson slot bar if no live teachers */
@@ -762,26 +829,13 @@ export default function ProjectDashboard() {
         <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
-              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>{showHistory ? "Substitution History" : "Substitutions today"}</div>
-              <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>{showHistory ? "Last 30 days" : "Assigned coverage"}</div>
+              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Substitutions today</div>
+              <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Assigned coverage</div>
             </div>
             <span style={{ fontSize: "0.68rem", fontWeight: 700, background: "#FEF0E8", color: "#8A3200", padding: "3px 9px", borderRadius: 20 }}>{subs.length} assigned</span>
           </div>
 
-          {showHistory ? (
-            <div style={{ maxHeight: 280, overflowY: "auto" }}>
-              {subHist.length === 0 ? (
-                <div style={{ padding: "2rem", textAlign: "center", color: "var(--slate-400)", fontSize: "0.78rem" }}>No history</div>
-              ) : subHist.map(h => (
-                <div key={h.date} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 18px", borderBottom: "1px solid var(--slate-50)" }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: "0.72rem" }}>{new Date(h.date + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", weekday: "short" })}</div>
-                    <div style={{ fontSize: "0.6rem", color: "var(--slate-400)" }}>{h.absences} absent · {h.subs} sub{h.subs !== 1 ? "s" : ""}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
+          {(
             <div>
               {subs.length === 0 ? (
                 <div style={{ padding: "2rem", textAlign: "center", color: "var(--slate-400)", fontSize: "0.78rem" }}>No substitutions assigned</div>

@@ -361,7 +361,7 @@ def get_dashboard(
         # Free teachers (not busy, not on sub, not absent)
         all_teacher_ids = set(teachers_by_id.keys())
         free_ids = all_teacher_ids - busy_teacher_ids - sub_teacher_ids - set(absent_ids)
-        for tid in list(free_ids)[:4]:  # max 4 free teachers shown
+        for tid in free_ids:  # show ALL free teachers
             live_teachers.append({
                 "teacher_id": tid,
                 "name": teacher_name(tid),
@@ -370,12 +370,34 @@ def get_dashboard(
                 "class_name": "",
                 "subject_name": "",
                 "color": "#0EA875",
+                "today_lessons": 0,
             })
 
-        # Sort: busy first, then sub, then free; limit to 8
-        order = {"busy": 0, "sub": 1, "free": 2}
-        live_teachers.sort(key=lambda x: order.get(x["status"], 3))
-        live_teachers = live_teachers[:8]
+        # Attach today_lessons count from workloads (computed below)
+        # We'll compute per-teacher lesson count for today's day
+        today_entry_counts = {}
+        all_entries_today = (
+            db.query(TimetableEntry.lesson_id)
+            .filter(
+                TimetableEntry.project_id == project_id,
+                TimetableEntry.day_index == day_index,
+            )
+            .all()
+        )
+        lesson_teacher_map = {l.id: l.teacher_id for l in db.query(Lesson).filter(Lesson.project_id == project_id).all()}
+        for (lid,) in all_entries_today:
+            tid = lesson_teacher_map.get(lid)
+            if tid:
+                today_entry_counts[tid] = today_entry_counts.get(tid, 0) + 1
+
+        for lt in live_teachers:
+            lt["today_lessons"] = today_entry_counts.get(lt["teacher_id"], 0)
+
+        # Sort: busy first, then sub, then free (free sorted by today_lessons ascending)
+        def sort_key(x):
+            order_val = {"busy": 0, "sub": 1, "free": 2}.get(x["status"], 3)
+            return (order_val, x.get("today_lessons", 0))
+        live_teachers.sort(key=sort_key)
     # ── Workload overview ──
     workloads = get_all_workloads(db, project_id)
     avg_workload = round(sum(w.get("total", 0) for w in workloads) / len(workloads)) if workloads else 0
