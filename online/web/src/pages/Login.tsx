@@ -55,7 +55,6 @@ export default function Login() {
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
   const [success,      setSuccess]      = useState("");
-  const [activeFeature, setActiveFeature] = useState(0);
   const [searchParams] = useSearchParams();
 
   // Count-up stats
@@ -71,11 +70,6 @@ export default function Login() {
     if (oauthSuccess) setSuccess(oauthSuccess.replace(/\+/g, " "));
   }, [searchParams]);
 
-  // Auto-cycle feature callouts
-  useEffect(() => {
-    const t = setInterval(() => setActiveFeature(f => (f + 1) % FEATURES.length), 3000);
-    return () => clearInterval(t);
-  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -126,15 +120,6 @@ export default function Login() {
     <div className="login-page">
       {/* Anti-Gravity particle canvas */}
       <AntiGravityCanvas />
-
-      {/* Gaussian curve watermark */}
-      <svg className="ag-watermark" viewBox="0 0 600 200" aria-hidden="true">
-        <path d="M0 180 Q50 178 100 170 Q150 150 200 110 Q250 50 300 20 Q350 50 400 110 Q450 150 500 170 Q550 178 600 180"
-          fill="none" stroke="rgba(0,206,200,0.04)" strokeWidth="2" />
-        <path d="M0 185 Q80 183 160 175 Q240 155 300 80 Q360 155 440 175 Q520 183 600 185"
-          fill="none" stroke="rgba(0,206,200,0.025)" strokeWidth="1.5" />
-      </svg>
-
       <div className="login-overlay" />
 
       {/* Theme Toggle */}
@@ -166,7 +151,7 @@ export default function Login() {
             </div>
           </div>
 
-          <h1 className="login-headline">
+          <h1 className="login-headline ag-shimmer">
             The mathematics of<br />
             <span className="ag-headline-accent">perfect</span> scheduling.
           </h1>
@@ -175,18 +160,12 @@ export default function Login() {
             and mathematical optimization. Zero clashes guaranteed.
           </p>
 
-          <div className="feature-showcase">
+          <div className="feature-grid">
             {FEATURES.map((f, i) => (
-              <div
-                key={i}
-                className={`feature-item ${i === activeFeature ? "active" : ""}`}
-                onClick={() => setActiveFeature(i)}
-              >
-                <div className="feature-icon">{f.icon}</div>
-                <div>
-                  <div className="feature-title">{f.title}</div>
-                  <div className="feature-desc">{f.desc}</div>
-                </div>
+              <div key={i} className="feature-card">
+                <div className="feature-card-icon">{f.icon}</div>
+                <div className="feature-card-title">{f.title}</div>
+                <div className="feature-card-desc">{f.desc}</div>
               </div>
             ))}
           </div>
