@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import AntiGravityCanvas from "../components/AntiGravityCanvas";
@@ -411,6 +411,14 @@ export default function Login() {
                     </button>
                   </div>
                 </div>
+
+                {!isSignUp && (
+                  <div style={{ textAlign: "right", marginTop: -8 }}>
+                    <Link to="/forgot-password" style={{ color: "#00CEC8", fontSize: 12, textDecoration: "none", opacity: 0.8 }}>
+                      Forgot password?
+                    </Link>
+                  </div>
+                )}
 
                 {isSignUp && (
                   <div className="lf-field">

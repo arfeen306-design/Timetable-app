@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from backend.auth.jwt import create_access_token, verify_token
+from backend.auth.jwt import create_access_token, verify_token, create_reset_token
 from backend.auth.password import get_password_hash, verify_password
 from backend.config import get_settings
 from backend.models.base import get_db
@@ -52,6 +52,15 @@ class UserResponse(BaseModel):
 
 class UpdatePhoneRequest(BaseModel):
     phone: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
 
 
 # ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -266,3 +275,113 @@ def update_phone(data: UpdatePhoneRequest, current_user: dict = Depends(get_curr
 @router.post("/logout")
 def logout():
     return {"message": "Logged out"}
+
+
+# ─── FORGOT PASSWORD ─────────────────────────────────────────────────────────
+
+def _send_reset_email(to_email: str, token: str):
+    """Send password reset email via SMTP."""
+    settings = get_settings()
+    if not settings.smtp_host:
+        log.warning("SMTP not configured — cannot send reset email for %s", to_email)
+        return False
+
+    reset_url = f"{settings.app_url}/reset-password?token={token}"
+    subject = "Reset your Myzynca password"
+    html = f"""
+    <div style="font-family: -apple-system, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 2rem;">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="display: inline-block; width: 52px; height: 52px; border-radius: 14px;
+             background: linear-gradient(135deg, #0d9488, #00CEC8); font-size: 26px;
+             line-height: 52px; text-align: center; color: white;">🔐</div>
+        <h2 style="margin: 0.5rem 0 0; color: #0f172a; font-weight: 700;">Password Reset</h2>
+      </div>
+      <p style="color: #475569; font-size: 15px; line-height: 1.6;">
+        You requested a password reset for your Myzynca account. Click the button below
+        to set a new password:
+      </p>
+      <div style="text-align: center; margin: 1.5rem 0;">
+        <a href="{reset_url}" style="display: inline-block; padding: 14px 36px; border-radius: 10px;
+           background: linear-gradient(135deg, #0d9488, #00CEC8); color: #fff; text-decoration: none;
+           font-weight: 700; font-size: 15px; letter-spacing: 0.01em;">Reset My Password</a>
+      </div>
+      <p style="color: #94a3b8; font-size: 13px; line-height: 1.5;">
+        This link expires in <strong>1 hour</strong>. If you didn't request this, ignore this email.
+      </p>
+      <p style="color: #94a3b8; font-size: 12px; margin-top: 0.5rem;">
+        Or copy this link: <a href="{reset_url}" style="color: #0d9488;">{reset_url}</a>
+      </p>
+      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 1.5rem 0;" />
+      <p style="color: #94a3b8; font-size: 11px; text-align: center;">
+        Myzynca · Precision School Scheduling
+      </p>
+    </div>
+    """
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = settings.smtp_from or settings.smtp_user
+        msg["To"] = to_email
+        msg.attach(MIMEText(html, "html"))
+
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(settings.smtp_user, settings.smtp_pass)
+            server.send_message(msg)
+        log.info("Password reset email sent to %s", to_email)
+        return True
+    except Exception as e:
+        log.error("Failed to send reset email: %s", e)
+        return False
+
+
+@router.post("/forgot-password")
+def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Generate password reset token and send email."""
+    email = data.email.strip().lower()
+    if not email:
+        raise HTTPException(400, "Email is required")
+
+    user = db.query(User).filter(User.email == email).first()
+    # Always return success to prevent email enumeration
+    if not user:
+        return {"ok": True, "message": "If an account exists with this email, a reset link has been sent."}
+
+    token = create_reset_token(user.id, user.email)
+    sent = _send_reset_email(user.email, token)
+
+    if not sent:
+        raise HTTPException(500, "Unable to send email. Please contact support.")
+
+    return {"ok": True, "message": "If an account exists with this email, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Validate reset token and update password."""
+    if not data.token or not data.password:
+        raise HTTPException(400, "Token and password are required")
+    if len(data.password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+
+    decoded = verify_token(data.token)
+    if not decoded or decoded.get("purpose") != "reset_password":
+        raise HTTPException(400, "Invalid or expired reset link. Please request a new one.")
+
+    user_id = decoded.get("user_id")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    # Single-use: check if password was changed after token was issued
+    token_iat = decoded.get("iat", 0)
+    if user.updated_at and user.updated_at.timestamp() > token_iat:
+        raise HTTPException(400, "This reset link has already been used. Please request a new one.")
+
+    user.password_hash = get_password_hash(data.password)
+    user.updated_at = datetime.utcnow()
+    db.commit()
+
+    return {"ok": True, "message": "Password updated successfully. You can now sign in."}

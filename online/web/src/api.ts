@@ -52,14 +52,14 @@ export function downloadPDF(path: string, filename: string): Promise<void> {
 
 // Auth
 export function login(email: string, password: string) {
-  return api<{ access_token: string; user: { email: string; name: string; school_id: number } }>(
+  return api<{ access_token: string; user: { email: string; name: string; role: string; school_id: number } }>(
     "/api/auth/login",
     { method: "POST", body: JSON.stringify({ email, password }) }
   );
 }
 
 export function me() {
-  return api<{ id: number; email: string; name: string; school_id: number }>("/api/auth/me");
+  return api<{ id: number; email: string; name: string; role: string; phone?: string; school_id: number }>("/api/auth/me");
 }
 
 // Projects

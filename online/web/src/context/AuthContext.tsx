@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import * as api from "../api";
 
-type User = { id: number; email: string; name: string; school_id: number } | null;
+type User = { id: number; email: string; name: string; role: string; phone?: string; school_id: number } | null;
 
 type AuthContextType = {
   user: User;

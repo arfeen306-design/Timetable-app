@@ -1,276 +1,126 @@
-"""Admin API — protected data management endpoints.
-
-All endpoints require the logged-in user to have role='super_admin',
-OR the request must include the X-Admin-Key header matching the ADMIN_KEY env var.
-"""
+"""Admin API: user management (platform_admin only)."""
 from __future__ import annotations
-from fastapi import APIRouter, Depends, HTTPException, Header
-from sqlalchemy.orm import Session
-from sqlalchemy import text, func
-from typing import Optional
+import logging
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
+from backend.auth.deps import get_current_user
+from backend.auth.password import get_password_hash
 from backend.models.base import get_db
 from backend.models.user import User
-from backend.models.school import School, SchoolMembership
-from backend.models.project import Project
-from backend.auth.deps import get_current_user_optional
-from backend.config import get_settings
+from backend.models.school import SchoolMembership, School
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 
-# ── Auth guard ───────────────────────────────────────────────────────────────
+# ─── Guard ───────────────────────────────────────────────────────────────────
 
-def _require_admin(
-    current_user: Optional[dict] = Depends(get_current_user_optional),
-    x_admin_key: Optional[str] = Header(None),
-) -> None:
-    """Allow access if user is super_admin OR if X-Admin-Key matches env ADMIN_KEY."""
-    settings = get_settings()
-    admin_key = settings.admin_key
-
-    # Check header key first
-    if admin_key and x_admin_key and x_admin_key == admin_key:
-        return
-
-    # Check user role
-    if current_user and current_user.get("role") == "super_admin":
-        return
-
-    raise HTTPException(403, "Admin access required. Provide X-Admin-Key header or log in as super_admin.")
+def _require_platform_admin(current_user: dict):
+    if current_user.get("role") != "platform_admin":
+        raise HTTPException(403, "Access denied: platform admin required")
 
 
-# ── List all schools ─────────────────────────────────────────────────────────
+# ─── Models ──────────────────────────────────────────────────────────────────
 
-@router.get("/schools", dependencies=[Depends(_require_admin)])
-def list_all_schools(db: Session = Depends(get_db)):
-    """List all registered schools with user counts and project counts."""
-    schools = db.query(School).order_by(School.id).all()
+class AdminResetPassword(BaseModel):
+    new_password: str
+
+
+class AdminToggleStatus(BaseModel):
+    action: str  # "approve" | "deactivate"
+
+
+# ─── LIST USERS ──────────────────────────────────────────────────────────────
+
+@router.get("/users")
+def list_users(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """List all registered users with school info."""
+    _require_platform_admin(current_user)
+
+    users = db.query(User).order_by(User.created_at.desc()).all()
     result = []
-    for s in schools:
-        members = db.query(SchoolMembership).filter(SchoolMembership.school_id == s.id).count()
-        projects = db.query(Project).filter(Project.school_id == s.id).count()
-        emails = [
-            r[0] for r in
-            db.query(User.email)
-            .join(SchoolMembership, SchoolMembership.user_id == User.id)
-            .filter(SchoolMembership.school_id == s.id)
-            .all()
-        ]
-        result.append({
-            "id": s.id,
-            "name": s.name,
-            "slug": s.slug,
-            "created_at": s.created_at.isoformat() if hasattr(s, "created_at") and s.created_at else None,
-            "members": members,
-            "member_emails": emails,
-            "projects": projects,
-        })
-    return {"schools": result, "total": len(result)}
-
-
-# ── List all users ───────────────────────────────────────────────────────────
-
-@router.get("/users", dependencies=[Depends(_require_admin)])
-def list_all_users(db: Session = Depends(get_db)):
-    """List all registered users."""
-    users = db.query(User).order_by(User.id).all()
-    return {
-        "users": [
-            {
-                "id": u.id,
-                "email": u.email,
-                "name": u.name,
-                "role": u.role,
-                "is_active": u.is_active,
-                "is_approved": getattr(u, "is_approved", True),
-                "created_at": u.created_at.isoformat() if hasattr(u, "created_at") and u.created_at else None,
-            }
-            for u in users
-        ],
-        "total": len(users),
-    }
-
-
-# ── Pending users (awaiting approval) ───────────────────────────────────────
-
-@router.get("/pending", dependencies=[Depends(_require_admin)])
-def list_pending_users(db: Session = Depends(get_db)):
-    """List users who registered but haven't been approved yet."""
-    pending = db.query(User).filter(User.is_approved == False).order_by(User.created_at.desc()).all()
-    result = []
-    for u in pending:
-        # Find their school
+    for u in users:
+        # Get school name via membership
         membership = db.query(SchoolMembership).filter(SchoolMembership.user_id == u.id).first()
-        school = db.query(School).filter(School.id == membership.school_id).first() if membership else None
+        school_name = ""
+        if membership:
+            school = db.query(School).filter(School.id == membership.school_id).first()
+            school_name = school.name if school else ""
+
         result.append({
             "id": u.id,
-            "email": u.email,
             "name": u.name,
-            "school_name": school.name if school else "No school",
-            "school_id": school.id if school else None,
-            "registered_at": u.created_at.isoformat() if u.created_at else None,
+            "email": u.email,
+            "phone": u.phone,
+            "school_name": school_name,
+            "role": u.role,
+            "is_active": u.is_active,
+            "is_approved": u.is_approved,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
         })
-    return {"pending": result, "total": len(result)}
+
+    return {"users": result, "total": len(result)}
 
 
-# ── Approve a user ──────────────────────────────────────────────────────────
+# ─── RESET PASSWORD (admin) ─────────────────────────────────────────────────
 
-@router.post("/approve/{user_id}", dependencies=[Depends(_require_admin)])
-def approve_user(user_id: int, db: Session = Depends(get_db)):
-    """Approve a pending user registration. They can now log in."""
+@router.post("/users/{user_id}/reset-password")
+def admin_reset_password(
+    user_id: int,
+    data: AdminResetPassword,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Manually reset a user's password."""
+    _require_platform_admin(current_user)
+
+    if len(data.new_password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(404, f"User {user_id} not found")
-    if getattr(user, "is_approved", True):
-        return {"ok": True, "message": f"User '{user.email}' is already approved."}
+        raise HTTPException(404, "User not found")
 
-    user.is_approved = True
+    user.password_hash = get_password_hash(data.new_password)
+    user.updated_at = datetime.utcnow()
     db.commit()
-    return {"ok": True, "message": f"User '{user.email}' approved! They can now sign in."}
+
+    log.info("Admin %s reset password for user %s (%s)", current_user["email"], user_id, user.email)
+    return {"ok": True, "message": f"Password reset for {user.email}"}
 
 
-# ── Reject a user ───────────────────────────────────────────────────────────
+# ─── APPROVE / DEACTIVATE ───────────────────────────────────────────────────
 
-@router.post("/reject/{user_id}", dependencies=[Depends(_require_admin)])
-def reject_user(user_id: int, db: Session = Depends(get_db)):
-    """Reject and delete a pending user registration (and their school)."""
+@router.post("/users/{user_id}/toggle-status")
+def toggle_user_status(
+    user_id: int,
+    data: AdminToggleStatus,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Approve or deactivate a user account."""
+    _require_platform_admin(current_user)
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(404, f"User {user_id} not found")
+        raise HTTPException(404, "User not found")
 
-    email = user.email
-    # Delete their school and membership
-    memberships = db.query(SchoolMembership).filter(SchoolMembership.user_id == user_id).all()
-    for m in memberships:
-        db.query(Project).filter(Project.school_id == m.school_id).delete()
-        db.query(School).filter(School.id == m.school_id).delete()
-    db.query(SchoolMembership).filter(SchoolMembership.user_id == user_id).delete()
-    db.delete(user)
+    if data.action == "approve":
+        user.is_approved = True
+        user.is_active = True
+        msg = f"{user.email} approved"
+    elif data.action == "deactivate":
+        user.is_approved = False
+        user.is_active = False
+        msg = f"{user.email} deactivated"
+    else:
+        raise HTTPException(400, "Action must be 'approve' or 'deactivate'")
+
+    user.updated_at = datetime.utcnow()
     db.commit()
 
-    return {"ok": True, "message": f"User '{email}' rejected and deleted."}
-
-
-# ── Delete a specific school ────────────────────────────────────────────────
-
-@router.delete("/schools/{school_id}", dependencies=[Depends(_require_admin)])
-def delete_school(school_id: int, db: Session = Depends(get_db)):
-    """Delete a school and ALL its data (projects, teachers, classes, lessons, timetables, settings).
-    Also deletes the school's memberships and users who belong ONLY to this school."""
-    school = db.query(School).filter(School.id == school_id).first()
-    if not school:
-        raise HTTPException(404, f"School {school_id} not found")
-
-    name = school.name
-
-    # Find users who only belong to this school (will be orphaned)
-    orphan_user_ids = []
-    memberships = db.query(SchoolMembership).filter(SchoolMembership.school_id == school_id).all()
-    for m in memberships:
-        other_schools = db.query(SchoolMembership).filter(
-            SchoolMembership.user_id == m.user_id,
-            SchoolMembership.school_id != school_id,
-        ).count()
-        if other_schools == 0:
-            orphan_user_ids.append(m.user_id)
-
-    # Delete projects (CASCADE will handle children: lessons, entries, settings, etc.)
-    projects_deleted = db.query(Project).filter(Project.school_id == school_id).delete()
-
-    # Delete memberships
-    db.query(SchoolMembership).filter(SchoolMembership.school_id == school_id).delete()
-
-    # Delete the school
-    db.delete(school)
-
-    # Delete orphaned users
-    users_deleted = 0
-    if orphan_user_ids:
-        users_deleted = db.query(User).filter(User.id.in_(orphan_user_ids)).delete(synchronize_session=False)
-
-    db.commit()
-
-    return {
-        "ok": True,
-        "message": f"School '{name}' deleted.",
-        "projects_deleted": projects_deleted,
-        "users_deleted": users_deleted,
-    }
-
-
-# ── Delete a specific user ──────────────────────────────────────────────────
-
-@router.delete("/users/{user_id}", dependencies=[Depends(_require_admin)])
-def delete_user(user_id: int, db: Session = Depends(get_db)):
-    """Delete a user and their memberships. Does NOT delete their schools."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(404, f"User {user_id} not found")
-
-    email = user.email
-    db.query(SchoolMembership).filter(SchoolMembership.user_id == user_id).delete()
-    db.delete(user)
-    db.commit()
-
-    return {"ok": True, "message": f"User '{email}' deleted."}
-
-
-# ── Nuclear: clear ALL data ──────────────────────────────────────────────────
-
-class ClearAllRequest(BaseModel):
-    confirm: str  # Must be "DELETE_EVERYTHING" to proceed
-
-
-@router.post("/clear-all", dependencies=[Depends(_require_admin)])
-def clear_all_data(data: ClearAllRequest, db: Session = Depends(get_db)):
-    """⚠️ NUCLEAR: Delete ALL users, schools, projects, and data.
-    Requires confirm='DELETE_EVERYTHING' in the request body."""
-    if data.confirm != "DELETE_EVERYTHING":
-        raise HTTPException(400, "Set confirm to 'DELETE_EVERYTHING' to proceed.")
-
-    # Count before delete
-    counts = {
-        "users": db.query(User).count(),
-        "schools": db.query(School).count(),
-        "projects": db.query(Project).count(),
-    }
-
-    # Delete in dependency order
-    tables = [
-        "timetable_entries", "timetable_runs", "timetable_history",
-        "lessons", "lesson_allowed_rooms", "time_constraints",
-        "teachers", "teacher_subjects", "school_classes", "rooms", "subjects",
-        "school_settings", "projects",
-        "school_memberships", "users", "schools",
-    ]
-    for table in tables:
-        try:
-            db.execute(text(f"DELETE FROM {table}"))
-        except Exception:
-            pass  # Table might not exist
-
-    db.commit()
-
-    return {
-        "ok": True,
-        "message": "All data cleared.",
-        "deleted": counts,
-    }
-
-
-# ── Stats ────────────────────────────────────────────────────────────────────
-
-@router.get("/stats", dependencies=[Depends(_require_admin)])
-def admin_stats(db: Session = Depends(get_db)):
-    """Quick overview of database contents."""
-    pending_count = db.query(User).filter(User.is_approved == False).count()
-    return {
-        "users": db.query(User).count(),
-        "users_pending_approval": pending_count,
-        "schools": db.query(School).count(),
-        "projects": db.query(Project).count(),
-        "memberships": db.query(SchoolMembership).count(),
-    }
-
+    log.info("Admin %s %sd user %s", current_user["email"], data.action, user.email)
+    return {"ok": True, "message": msg}

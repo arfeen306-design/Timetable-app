@@ -6,6 +6,8 @@ import Login from "./pages/Login";
 import VerifyEmail from "./pages/VerifyEmail";
 import OAuthCallback from "./pages/OAuthCallback";
 import CompleteProfile from "./pages/CompleteProfile";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import ProjectDashboard from "./pages/ProjectDashboard";
 import ProjectEditor from "./pages/ProjectEditor";
@@ -24,6 +26,7 @@ const CommitteesPage   = lazy(() => import("./pages/Committees"));
 const ExamDutiesPage   = lazy(() => import("./pages/ExamDuties"));
 const ZyncaWelcome     = lazy(() => import("./pages/ZyncaWelcome"));
 const ContactUs        = lazy(() => import("./pages/ContactUs"));
+const AdminUsers       = lazy(() => import("./pages/AdminUsers"));
 
 function PageLoader() {
   return (
@@ -57,6 +60,8 @@ export default function App() {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/oauth-callback" element={<OAuthCallback />} />
       <Route path="/complete-profile" element={<CompleteProfile />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route
         path="/"
         element={
@@ -109,6 +114,9 @@ export default function App() {
         } />
         <Route path="project/:projectId/contact" element={
           <Suspense fallback={<PageLoader />}><ContactUs /></Suspense>
+        } />
+        <Route path="admin/users" element={
+          <Suspense fallback={<PageLoader />}><AdminUsers /></Suspense>
         } />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
