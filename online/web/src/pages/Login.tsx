@@ -224,17 +224,21 @@ export default function Login() {
                   </div>
                 </div>
               ))}
-              <div className="slide-dots">
-                {SLIDES.map((_, i) => (
-                  <button
-                    key={i}
-                    className={`slide-dot ${i === activeSlide ? "active" : ""}`}
-                    onClick={() => goToSlide(i)}
-                    aria-label={`Go to slide ${i + 1}`}
-                  >
-                    {i === activeSlide && <span className="slide-dot-progress" />}
-                  </button>
-                ))}
+              <div className="slide-nav">
+                <button className="slide-arrow" onClick={() => goToSlide((activeSlide - 1 + SLIDES.length) % SLIDES.length)} aria-label="Previous slide">‹</button>
+                <div className="slide-dots">
+                  {SLIDES.map((_, i) => (
+                    <button
+                      key={i}
+                      className={`slide-dot ${i === activeSlide ? "active" : ""}`}
+                      onClick={() => goToSlide(i)}
+                      aria-label={`Go to slide ${i + 1}`}
+                    >
+                      {i === activeSlide && <span className="slide-dot-progress" />}
+                    </button>
+                  ))}
+                </div>
+                <button className="slide-arrow" onClick={() => goToSlide((activeSlide + 1) % SLIDES.length)} aria-label="Next slide">›</button>
               </div>
             </div>
 
