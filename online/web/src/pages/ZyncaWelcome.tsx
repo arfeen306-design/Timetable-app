@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import "./ZyncaWelcome.css";
 
 // ── Animated ring chart data ───────────────────────────────────
@@ -44,9 +46,21 @@ function AnimatedRing({ pct, color, trackColor, delay }: { pct: number; color: s
 export default function ZyncaWelcome() {
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
+  const { user } = useAuth();
+  const toast = useToast();
   const [visible, setVisible] = useState(false);
 
-  useEffect(() => { setVisible(true); }, []);
+  useEffect(() => {
+    setVisible(true);
+
+    // Show welcome toast on first login
+    const key = "myzynca_welcomed";
+    if (!localStorage.getItem(key) && user) {
+      const name = user.name?.split(" ")[0] || "there";
+      toast("success", `🎉 Welcome to Myzynca, ${name}! Your account is ready.`);
+      localStorage.setItem(key, "1");
+    }
+  }, []);
 
   function handleCTA() {
     if (projectId) {

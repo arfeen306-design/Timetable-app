@@ -143,7 +143,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     settings = get_settings()
     smtp_configured = bool(settings.smtp_host)
 
-    # Create user — is_approved=False means admin must approve before login works
+    # Create user — auto-approved, immediately active
     user = User(
         email=email,
         password_hash=get_password_hash(data.password),
@@ -151,7 +151,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
         role="school_admin",
         phone=phone,
         is_active=True,
-        is_approved=False,  # Requires admin approval
+        is_approved=True,  # Auto-approved on signup
         email_verified_at=datetime.utcnow(),
     )
     db.add(user)
@@ -216,9 +216,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     # Check if user exists
     user_any = db.query(User).filter(User.email == email).first()
     if user_any and not user_any.is_active:
-        raise HTTPException(403, "Please verify your email before signing in. Check your inbox.")
-    if user_any and not getattr(user_any, 'is_approved', True):
-        raise HTTPException(403, "Your account is pending admin approval. Please wait for the admin to approve your registration.")
+        raise HTTPException(403, "Your account has been deactivated. Please contact support.")
 
     user = get_by_email(db, email)
     if not user or not verify_password(data.password, user.password_hash):

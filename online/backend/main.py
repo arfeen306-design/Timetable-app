@@ -33,8 +33,12 @@ async def lifespan(app: FastAPI):
         cols = [c["name"] for c in insp.get_columns("users")]
         if "is_approved" not in cols:
             with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE users ADD COLUMN is_approved BOOLEAN NOT NULL DEFAULT false"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_approved BOOLEAN NOT NULL DEFAULT true"))
             print("Migration: added is_approved column to users table.")
+        else:
+            # Auto-approve all existing pending users
+            with engine.begin() as conn:
+                conn.execute(text("UPDATE users SET is_approved = true WHERE is_approved = false"))
     except Exception as e:
         print(f"Warning: is_approved migration skipped: {e}")
 
