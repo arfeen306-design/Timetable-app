@@ -302,39 +302,41 @@ def export_excel(
                 ws.cell(row, 1).border = thin
 
                 if is_fri:
-                    # On Friday: iterate REGULAR cols for column positions,
-                    # but blank out regular-day break columns and map period data from fri_cols.
-                    fri_ci = 0
-                    for ci, reg_col in enumerate(cols):
+                    # Exceptional day: render using its OWN column sequence
+                    # (not mapped through regular cols, which causes misalignment
+                    # when breaks are at different positions)
+                    for ci, fc in enumerate(fri_cols):
                         cell = ws.cell(row, ci + 2)
                         cell.border = thin
                         cell.alignment = cell_align
-                        if reg_col["type"] == "break":
-                            # Regular-day break column — leave blank on Friday
-                            cell.value = ""
-                        else:
-                            # Advance past any Friday breaks
-                            while fri_ci < len(fri_cols) and fri_cols[fri_ci]["type"] == "break":
-                                fri_ci += 1
-                            if fri_ci < len(fri_cols):
-                                fc = fri_cols[fri_ci]
-                                if fc["type"] == "period":
-                                    e = lookup.get((d, fc["period_index"]))
-                                    if e:
-                                        code = e.get("subject_code") or e.get("subject_name", "")
-                                        lbl = e.get(label_key, "")
-                                        room = e.get("room_name", "")
-                                        text = code
-                                        if lbl: text += f"\n{lbl}"
-                                        if room: text += f"\n{room}"
-                                        cell.value = text
-                                        color = (e.get("subject_color") or "#4A90D9").lstrip("#")
-                                        try:
-                                            ri, gi, bi = int(color[:2],16), int(color[2:4],16), int(color[4:6],16)
-                                            lr, lg, lb = min(ri+60,255), min(gi+60,255), min(bi+60,255)
-                                            cell.fill = PatternFill("solid", fgColor=f"{lr:02X}{lg:02X}{lb:02X}")
-                                        except: pass
-                                fri_ci += 1
+                        if fc["type"] == "break":
+                            cell.fill = gray_fill
+                            cell.value = fc.get("label", "BREAK").lower()
+                            cell.font = Font(italic=True, size=8, color="64748B")
+                        elif fc["type"] == "zero":
+                            cell.fill = PatternFill("solid", fgColor="EBF8FF")
+                            cell.font = Font(italic=True, size=8, color="2B6CB0")
+                        elif fc["type"] == "period":
+                            e = lookup.get((d, fc["period_index"]))
+                            if e:
+                                code = e.get("subject_code") or e.get("subject_name", "")
+                                lbl = e.get(label_key, "")
+                                room = e.get("room_name", "")
+                                text = code
+                                if lbl: text += f"\n{lbl}"
+                                if room: text += f"\n{room}"
+                                cell.value = text
+                                color = (e.get("subject_color") or "#4A90D9").lstrip("#")
+                                try:
+                                    ri, gi, bi = int(color[:2],16), int(color[2:4],16), int(color[4:6],16)
+                                    lr, lg, lb = min(ri+60,255), min(gi+60,255), min(bi+60,255)
+                                    cell.fill = PatternFill("solid", fgColor=f"{lr:02X}{lg:02X}{lb:02X}")
+                                except: pass
+                    # Blank remaining regular-day columns that Saturday doesn't use
+                    for ci2 in range(len(fri_cols), len(cols)):
+                        cell = ws.cell(row, ci2 + 2)
+                        cell.border = thin
+                        cell.value = ""
                 else:
                     # Regular day — use cols directly
                     for ci, col in enumerate(cols):
@@ -503,38 +505,29 @@ def _build_pdf_table(entries_group, cols, working_days, fri_day_idx, fri_cols, l
                 fri_row.append("")
             data.append(fri_row)
 
-            # Now build the Friday data row, using fri_cols for content.
-            # Regular-day break columns should be BLANK on this row.
+            # Build the exceptional-day data row using fri_cols DIRECTLY
+            # (not mapped through regular cols — that causes misalignment
+            # when breaks are at different column positions)
             row = [DAY_SHORT[d]]
-            fri_ci = 0
-            for ci, reg_col in enumerate(cols):
-                if reg_col["type"] == "break":
-                    # This is a regular-day break column — blank it on Friday
+            for fc in fri_cols:
+                if fc["type"] == "break":
+                    row.append(fc.get("label", "BREAK").lower())
+                elif fc["type"] == "zero":
                     row.append("")
-                else:
-                    # Find matching content from fri_cols
-                    # Advance fri_ci past any friday breaks, writing them
-                    while fri_ci < len(fri_cols) and fri_cols[fri_ci]["type"] == "break":
-                        fri_ci += 1  # skip friday breaks (they don't match regular columns)
-                    if fri_ci < len(fri_cols):
-                        fc = fri_cols[fri_ci]
-                        if fc["type"] == "period" or fc["type"] == "zero":
-                            e = lookup.get((d, fc["period_index"])) if fc["type"] == "period" else None
-                            if e:
-                                code = e.get("subject_code") or e.get("subject_name", "")
-                                lbl = e.get(label_key, "")
-                                room = e.get("room_name", "")
-                                t = code
-                                if lbl: t += f"\n{lbl}"
-                                if room: t += f"\n{room}"
-                                row.append(t)
-                            else:
-                                row.append("")
-                        else:
-                            row.append("")
-                        fri_ci += 1
+                elif fc["type"] == "period":
+                    e = lookup.get((d, fc["period_index"]))
+                    if e:
+                        code = e.get("subject_code") or e.get("subject_name", "")
+                        lbl = e.get(label_key, "")
+                        room = e.get("room_name", "")
+                        t = code
+                        if lbl: t += f"\n{lbl}"
+                        if room: t += f"\n{room}"
+                        row.append(t)
                     else:
                         row.append("")
+                else:
+                    row.append("")
             while len(row) < header_len:
                 row.append("")
             data.append(row)
