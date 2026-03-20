@@ -800,7 +800,7 @@ export default function ProjectDashboard() {
           {/* Donut */}
           <div style={{ borderTop: "1px solid var(--slate-100)", display: "flex", alignItems: "center", gap: 16, padding: "12px 18px" }}>
             <svg width="80" height="80" viewBox="0 0 80 80" style={{ flexShrink: 0 }}>
-              <circle cx="40" cy="40" r="30" fill="none" stroke="#E4E8F2" strokeWidth="12" />
+              <circle cx="40" cy="40" r="30" fill="none" stroke={isDark ? "#334155" : "#E4E8F2"} strokeWidth="12" />
               <circle cx="40" cy="40" r="30" fill="none" stroke="#0EA875" strokeWidth="12"
                 strokeDasharray={`${d.is_off_day ? 0 : pDash} ${188.5 - (d.is_off_day ? 0 : pDash)}`}
                 strokeDashoffset="0" transform="rotate(-90 40 40)" />
@@ -1106,7 +1106,7 @@ export default function ProjectDashboard() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 18px 16px", gap: 14 }}>
             <svg width="140" height="140" viewBox="0 0 140 140">
-              <circle cx="70" cy="70" r="52" fill="none" stroke="#E4E8F2" strokeWidth="18" />
+              <circle cx="70" cy="70" r="52" fill="none" stroke={isDark ? "#334155" : "#E4E8F2"} strokeWidth="18" />
               <circle cx="70" cy="70" r="52" fill="none" stroke="#0EA875" strokeWidth="18"
                 strokeDasharray={`${(s.present_today / (s.total_teachers || 1)) * 326.7} ${326.7 - (s.present_today / (s.total_teachers || 1)) * 326.7}`}
                 strokeDashoffset="0" transform="rotate(-90 70 70)" strokeLinecap="round" />
