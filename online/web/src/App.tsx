@@ -28,6 +28,23 @@ const ZyncaWelcome     = lazy(() => import("./pages/ZyncaWelcome"));
 const ContactUs        = lazy(() => import("./pages/ContactUs"));
 const AdminUsers       = lazy(() => import("./pages/AdminUsers"));
 
+// Preload all lazy chunks after idle — tabs open INSTANTLY
+setTimeout(() => {
+  const chunks = [
+    () => import("./pages/Review"),
+    () => import("./pages/Export"),
+    () => import("./pages/Generate"),
+    () => import("./pages/ProjectDashboard"),
+    () => import("./pages/SubstitutionPage"),
+    () => import("./pages/DutyRoster"),
+    () => import("./pages/ExamDuties"),
+    () => import("./pages/WorkloadPage"),
+    () => import("./pages/Committees"),
+    () => import("./pages/SubstitutionRecords"),
+  ];
+  chunks.forEach((load, i) => setTimeout(() => load(), i * 200));
+}, 2000);
+
 function PageLoader() {
   return (
     <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999 }}>

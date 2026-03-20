@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import * as api from "../api";
 import { useToast } from "../context/ToastContext";
+import { cachedFetch } from "../hooks/prefetchCache";
 
 interface Entry {
   id: number; lesson_id: number; day_index: number; period_index: number;
@@ -134,13 +135,19 @@ export default function Review() {
   /* ── Load data ── */
   useEffect(() => {
     if (isNaN(pid)) return;
-    api.getRunSummary(pid).then(setRunSummary).catch(() => setRunSummary(null));
-    api.listClasses(pid).then(c => { setClasses(c); if (c.length > 0) setClassId(c[0].id); });
-    api.listTeachers(pid).then(t => { setTeachers(t); if (t.length > 0) setTeacherId(t[0].id); });
-    api.listRooms(pid).then(r => { setRooms(r); if (r.length > 0) setRoomId(r[0].id); });
-    fetch(`/api/projects/${pid}/school-settings`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("timetable_token")}` }
-    }).then(r => r.json()).then(s => setSettings(s)).catch(() => setSettings(null));
+    cachedFetch(`review-summary-${pid}`, () => api.getRunSummary(pid), 60_000)
+      .then(setRunSummary).catch(() => setRunSummary(null));
+    cachedFetch(`review-classes-${pid}`, () => api.listClasses(pid), 60_000)
+      .then(c => { setClasses(c); if (c.length > 0) setClassId(c[0].id); });
+    cachedFetch(`review-teachers-${pid}`, () => api.listTeachers(pid), 60_000)
+      .then(t => { setTeachers(t); if (t.length > 0) setTeacherId(t[0].id); });
+    cachedFetch(`review-rooms-${pid}`, () => api.listRooms(pid), 60_000)
+      .then(r => { setRooms(r); if (r.length > 0) setRoomId(r[0].id); });
+    cachedFetch(`review-settings-${pid}`, () =>
+      fetch(`/api/projects/${pid}/school-settings`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("timetable_token")}` }
+      }).then(r => r.json()), 60_000
+    ).then(s => setSettings(s)).catch(() => setSettings(null));
   }, [pid]);
 
   /* ── Load timetable ── */
@@ -148,10 +155,13 @@ export default function Review() {
     const id = view === "class" ? classId : view === "teacher" ? teacherId : roomId;
     if (!id) { setEntries([]); return; }
     setLoading(true); setError("");
-    const fn = view === "class" ? api.getClassTimetable(pid, classId)
-      : view === "teacher" ? api.getTeacherTimetable(pid, teacherId)
-      : api.getRoomTimetable(pid, roomId);
-    fn.then(data => { setEntries((data.entries || []) as Entry[]); setGridDays(data.days); setGridPeriods(data.periods); })
+    const cacheKey = `review-tt-${pid}-${view}-${id}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fetcher: () => Promise<any> = view === "class" ? () => api.getClassTimetable(pid, classId)
+      : view === "teacher" ? () => api.getTeacherTimetable(pid, teacherId)
+      : () => api.getRoomTimetable(pid, roomId);
+    cachedFetch(cacheKey, fetcher, 30_000)
+      .then(data => { setEntries((data.entries || []) as Entry[]); setGridDays(data.days); setGridPeriods(data.periods); })
       .catch(e => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   }, [view, classId, teacherId, roomId, pid]);
