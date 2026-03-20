@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import * as api from "../api";
 import { useToast } from "../context/ToastContext";
+import { cachedFetch, invalidateCachePrefix } from "../hooks/prefetchCache";
 
 /* ── Modular tab components ── */
 import SubjectsTab from "./tabs/SubjectsTab";
@@ -37,14 +38,20 @@ export default function ProjectEditor() {
     if (!pid) return;
     setLoading(true);
     Promise.all([
-      api.getSchoolSettings(pid).then(setSettings).catch(() => setSettings(null)),
-      api.listSubjects(pid).then(setSubjects),
-      api.listClasses(pid).then(setClasses),
-      api.listRooms(pid).then(setRooms),
-      api.listTeachers(pid).then(setTeachers),
-      api.listLessons(pid).then(setLessons),
-      api.listConstraints(pid).then(setConstraints),
+      cachedFetch(`editor-settings-${pid}`, () => api.getSchoolSettings(pid), 60_000).then(setSettings).catch(() => setSettings(null)),
+      cachedFetch(`editor-subjects-${pid}`, () => api.listSubjects(pid), 30_000).then(setSubjects),
+      cachedFetch(`editor-classes-${pid}`, () => api.listClasses(pid), 30_000).then(setClasses),
+      cachedFetch(`editor-rooms-${pid}`, () => api.listRooms(pid), 30_000).then(setRooms),
+      cachedFetch(`editor-teachers-${pid}`, () => api.listTeachers(pid), 30_000).then(setTeachers),
+      cachedFetch(`editor-lessons-${pid}`, () => api.listLessons(pid), 30_000).then(setLessons),
+      cachedFetch(`editor-constraints-${pid}`, () => api.listConstraints(pid), 30_000).then(setConstraints),
     ]).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoading(false));
+  }
+
+  /** Invalidate editor cache so next load fetches fresh data */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  function invalidateEditorCache() {
+    invalidateCachePrefix(`editor-`);
   }
 
   useEffect(() => { load(); }, [pid]);
