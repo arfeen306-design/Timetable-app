@@ -508,6 +508,11 @@ def _build_pdf_table(entries_group, cols, working_days, fri_day_idx, fri_cols, l
             # Build the exceptional-day data row using fri_cols DIRECTLY
             # (not mapped through regular cols — that causes misalignment
             # when breaks are at different column positions)
+            import logging
+            _log = logging.getLogger("exports.pdf")
+            _log.info("PDF exceptional day=%d: fri_cols=%d items, types=%s",
+                       d, len(fri_cols),
+                       [(fc["type"], fc.get("period_index")) for fc in fri_cols])
             row = [DAY_SHORT[d]]
             for fc in fri_cols:
                 if fc["type"] == "break":
@@ -528,6 +533,8 @@ def _build_pdf_table(entries_group, cols, working_days, fri_day_idx, fri_cols, l
                         row.append("")
                 else:
                     row.append("")
+            _log.info("PDF exceptional day=%d: data_row has %d cells: %s",
+                       d, len(row), row[:8])
             while len(row) < header_len:
                 row.append("")
             data.append(row)
