@@ -49,8 +49,8 @@ export default function ProjectEditor() {
   }
 
   /** Invalidate editor cache so next load fetches fresh data */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function invalidateEditorCache() {
+  // @ts-ignore kept for future use
+  function _invalidateEditorCache() {
     invalidateCachePrefix(`editor-`);
   }
 
