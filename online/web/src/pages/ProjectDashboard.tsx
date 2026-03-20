@@ -1098,11 +1098,11 @@ export default function ProjectDashboard() {
           </div>
         </div>
 
-        {/* ── Performance Pie Chart ── */}
+        {/* ── Teacher Attendance Pie Chart ── */}
         <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
-            <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Performance</div>
-            <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Teacher presence overview</div>
+            <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Teacher Attendance</div>
+            <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Daily presence overview</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 18px 16px", gap: 14 }}>
             <svg width="140" height="140" viewBox="0 0 140 140">
