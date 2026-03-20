@@ -807,8 +807,8 @@ export default function ProjectDashboard() {
               <circle cx="40" cy="40" r="30" fill="none" stroke="#D97706" strokeWidth="12"
                 strokeDasharray={`${d.is_off_day ? 0 : aDash} ${188.5 - (d.is_off_day ? 0 : aDash)}`}
                 strokeDashoffset={`${-(d.is_off_day ? 0 : pDash)}`} transform="rotate(-90 40 40)" />
-              <text x="40" y="37" textAnchor="middle" fontSize="13" fontWeight="800" fill="#0D1117" fontFamily="var(--font-mono)">{s.total_teachers}</text>
-              <text x="40" y="50" textAnchor="middle" fontSize="9" fill="#6B7594">teachers</text>
+              <text x="40" y="37" textAnchor="middle" fontSize="13" fontWeight="800" fill={isDark ? "#E2E8F0" : "#0D1117"} fontFamily="var(--font-mono)">{s.total_teachers}</text>
+              <text x="40" y="50" textAnchor="middle" fontSize="9" fill={isDark ? "#94A3B8" : "#6B7594"}>teachers</text>
             </svg>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {[
@@ -1114,8 +1114,8 @@ export default function ProjectDashboard() {
                 strokeDasharray={`${(s.absent_today / (s.total_teachers || 1)) * 326.7} ${326.7 - (s.absent_today / (s.total_teachers || 1)) * 326.7}`}
                 strokeDashoffset={`${-((s.present_today / (s.total_teachers || 1)) * 326.7)}`}
                 transform="rotate(-90 70 70)" strokeLinecap="round" />
-              <text x="70" y="65" textAnchor="middle" fontSize="22" fontWeight="800" fill="#0D1117" fontFamily="var(--font-mono)">{s.total_teachers}</text>
-              <text x="70" y="82" textAnchor="middle" fontSize="10" fill="#6B7594">teachers</text>
+              <text x="70" y="65" textAnchor="middle" fontSize="22" fontWeight="800" fill={isDark ? "#E2E8F0" : "#0D1117"} fontFamily="var(--font-mono)">{s.total_teachers}</text>
+              <text x="70" y="82" textAnchor="middle" fontSize="10" fill={isDark ? "#94A3B8" : "#6B7594"}>teachers</text>
             </svg>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
