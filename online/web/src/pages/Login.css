@@ -659,6 +659,23 @@
 [data-theme="light"] .lf-demo-hint { border-top-color: #E2E8F0; color: #A0AEC0; }
 [data-theme="light"] .lf-demo-hint strong { color: #718096; }
 
+/* Country select */
+[data-theme="light"] .lf-country-select {
+  color: #2D3748;
+  background-color: #F7FAFC;
+  border-color: #E2E8F0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23718096' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+[data-theme="light"] .lf-country-select:focus {
+  border-color: #38B2AC;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(56,178,172,0.1);
+}
+[data-theme="light"] .lf-country-select option {
+  background: #fff;
+  color: #2D3748;
+}
+
 /* Developer Console */
 [data-theme="light"] .dev-console {
   background: rgba(247, 250, 252, 0.75);
