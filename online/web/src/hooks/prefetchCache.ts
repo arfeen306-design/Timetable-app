@@ -103,17 +103,37 @@ export function prefetchRoute(route: string, projectId: number): void {
     } else if (route === "committees") {
       cachedFetch(`comm-teachers-${pid}`, () => api.listTeachers(pid), 60_000).catch(() => {});
       cachedFetch(`comm-list-${pid}`, () => api.listCommittees(pid), 15_000).catch(() => {});
+    } else if (route === "review") {
+      cachedFetch(`rev-classes-${pid}`, () => api.listClasses(pid), 60_000).catch(() => {});
+      cachedFetch(`rev-teachers-${pid}`, () => api.listTeachers(pid), 60_000).catch(() => {});
+      cachedFetch(`rev-rooms-${pid}`, () => api.listRooms(pid), 60_000).catch(() => {});
+      cachedFetch(`rev-settings-${pid}`, () =>
+        fetch(`/api/projects/${pid}/school-settings`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("timetable_token")}` }
+        }).then(r => r.json()), 60_000
+      ).catch(() => {});
     }
   }).catch(() => {});
 }
 
 /**
- * Pre-warm ALL module tabs at once. Called once when timetable is generated
- * so all 4 tabs open instantly.
+ * Preload heavy lazy-loaded page chunks so they are cached in the browser.
+ * This prevents the delay of fetching JS from Railway on first click.
  */
-export function prefetchAllModules(projectId: number): void {
-  for (const route of ["dashboard", "substitution", "duty-roster", "exam-duties", "committees"]) {
-    prefetchRoute(route, projectId);
-  }
+export function preloadLazyChunks(): void {
+  import("../pages/Review").catch(() => {});
+  import("../pages/Export").catch(() => {});
+  import("../pages/Generate").catch(() => {});
 }
 
+/**
+ * Pre-warm ALL module tabs at once. Called once when timetable is generated
+ * so all tabs open instantly.
+ */
+export function prefetchAllModules(projectId: number): void {
+  for (const route of ["dashboard", "substitution", "duty-roster", "exam-duties", "committees", "review"]) {
+    prefetchRoute(route, projectId);
+  }
+  // Also preload the lazy JS chunks
+  preloadLazyChunks();
+}
