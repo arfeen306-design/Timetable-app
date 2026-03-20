@@ -763,7 +763,7 @@ export default function ProjectDashboard() {
         <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-default)", borderRadius: 14, overflow: "hidden", maxHeight: 420, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 10px", borderBottom: "1px solid var(--slate-50)" }}>
             <div>
-              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Today's workload — lessons per teacher</div>
+              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--slate-900)" }}>Weekly workload — lessons per teacher</div>
               <div style={{ fontSize: "0.68rem", color: "var(--slate-400)", marginTop: 1 }}>Sorted highest to lowest · orange = substitution · red = over limit</div>
             </div>
             <div style={{ display: "flex", gap: 12 }}>
