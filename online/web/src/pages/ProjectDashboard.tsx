@@ -589,34 +589,36 @@ export default function ProjectDashboard() {
                           🟢 Free Teachers ({free.length})
                           <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: "normal", color: "var(--text-muted)", fontSize: "0.6rem" }}>— sorted by lowest workload today</span>
                         </div>
-                        <div className="pd-live-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-                          {free.map((t, i) => (
-                            <div key={t.teacher_id || i} style={{
-                              borderRadius: 10, padding: "10px 12px",
-                              background: "var(--card-bg)",
-                              border: "1px solid var(--border-default)",
-                              animation: cardFilter ? `fadeUp 0.2s ease ${i * 0.03}s both` : undefined,
-                            }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
-                                <div style={{
-                                  width: 26, height: 26, borderRadius: "50%", background: t.color,
-                                  fontSize: "0.55rem", fontWeight: 700, color: "#fff",
-                                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                                }}>{t.initials}</div>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text-primary)" }}>{t.name}</div>
-                                  <div style={{ fontSize: "0.62rem", marginTop: 1, color: "#16A34A" }}>Free this lesson</div>
+                        <div style={{ maxHeight: 320, overflowY: "auto", borderRadius: 10, padding: "2px 2px 2px 0" }}>
+                          <div className="pd-live-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                            {free.map((t, i) => (
+                              <div key={t.teacher_id || i} style={{
+                                borderRadius: 10, padding: "10px 12px",
+                                background: "var(--card-bg)",
+                                border: "1px solid var(--border-default)",
+                                animation: cardFilter ? `fadeUp 0.2s ease ${i * 0.03}s both` : undefined,
+                              }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                                  <div style={{
+                                    width: 26, height: 26, borderRadius: "50%", background: t.color,
+                                    fontSize: "0.55rem", fontWeight: 700, color: "#fff",
+                                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                                  }}>{t.initials}</div>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text-primary)" }}>{t.name}</div>
+                                    <div style={{ fontSize: "0.62rem", marginTop: 1, color: "#16A34A" }}>Free this lesson</div>
+                                  </div>
+                                  <div style={{
+                                    fontSize: "0.58rem", fontWeight: 700, padding: "2px 7px",
+                                    borderRadius: 10, fontFamily: "var(--font-mono)",
+                                    background: (t.today_lessons ?? 0) === 0 ? "rgba(14,168,117,0.1)" : "rgba(245,158,11,0.1)",
+                                    color: (t.today_lessons ?? 0) === 0 ? "#0EA875" : "#D97706",
+                                  }}>{t.today_lessons ?? 0} today</div>
                                 </div>
-                                <div style={{
-                                  fontSize: "0.58rem", fontWeight: 700, padding: "2px 7px",
-                                  borderRadius: 10, fontFamily: "var(--font-mono)",
-                                  background: (t.today_lessons ?? 0) === 0 ? "rgba(14,168,117,0.1)" : "rgba(245,158,11,0.1)",
-                                  color: (t.today_lessons ?? 0) === 0 ? "#0EA875" : "#D97706",
-                                }}>{t.today_lessons ?? 0} today</div>
+                                <div style={{ fontSize: "0.6rem", color: "#16A34A", fontWeight: 600 }}>Available for substitution</div>
                               </div>
-                              <div style={{ fontSize: "0.6rem", color: "#16A34A", fontWeight: 600 }}>Available for substitution</div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       </>
                     )}
