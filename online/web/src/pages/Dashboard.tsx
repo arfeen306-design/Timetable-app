@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import * as api from "../api";
+import OnboardingOverlay from "../components/OnboardingOverlay";
 
 type Project = { id: number; name: string; academic_year: string };
 
@@ -17,6 +18,8 @@ export default function Dashboard() {
   const [deleting, setDeleting] = useState<number | null>(null);
   const [exporting, setExporting] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [ctaPulse, setCtaPulse] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -33,6 +36,13 @@ export default function Dashboard() {
       navigate(`/project/${projects[0].id}/dashboard`, { replace: true });
     }
   }, [loading, projects, navigate]);
+
+  // Show onboarding for first-time users with no projects
+  useEffect(() => {
+    if (!loading && projects.length === 0 && !localStorage.getItem("agora_onboarded")) {
+      setShowOnboarding(true);
+    }
+  }, [loading, projects]);
 
   async function handleLoadDemo() {
     setError(""); setDemoLoading(true);
@@ -105,8 +115,18 @@ export default function Dashboard() {
      EMPTY STATE — full-page hero when no projects exist
      ═══════════════════════════════════════════════════════════ */
   if (projects.length === 0 && !showCreateForm) {
+    const dismissOnboarding = () => {
+      localStorage.setItem("agora_onboarded", "1");
+      setShowOnboarding(false);
+      setCtaPulse(true);
+    };
+    const startOnboarding = () => {
+      dismissOnboarding();
+      setShowCreateForm(true);
+    };
     return (
       <div style={{ maxWidth: 780, margin: "0 auto", padding: "2rem 1rem" }}>
+        {showOnboarding && <OnboardingOverlay onDismiss={dismissOnboarding} onStart={startOnboarding} />}
         {error && <div className="alert alert-error" style={{ marginBottom: 24 }}>{error}</div>}
 
         {/* ── Keyframe animations ── */}
@@ -120,6 +140,7 @@ export default function Dashboard() {
           @keyframes cardHover  { 0%{transform:translateY(0)} 50%{transform:translateY(-3px)} 100%{transform:translateY(0)} }
           @keyframes shimmer    { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
           @keyframes countUp    { from{opacity:0;transform:scale(0.5)} to{opacity:1;transform:scale(1)} }
+          @keyframes ctaPulse   { 0%,100%{box-shadow:0 6px 24px rgba(28,46,74,0.4), 0 0 0 0 rgba(0,206,200,0.5);transform:scale(1)} 50%{box-shadow:0 6px 24px rgba(28,46,74,0.4), 0 0 0 16px rgba(0,206,200,0);transform:scale(1.03)} }
         `}</style>
 
         {/* ═══ HERO CARD ═══ */}
@@ -206,10 +227,11 @@ export default function Dashboard() {
               style={{
                 fontSize: "0.95rem", padding: "0.75rem 1.8rem", fontWeight: 700,
                 borderRadius: 12, border: "none", cursor: "pointer",
-                background: "linear-gradient(135deg, #1C2E4A 0%, #0F1A2B 100%)",
-                color: "#fff", fontFamily: "var(--font-sans)",
+                background: ctaPulse ? "linear-gradient(135deg, #00CEC8 0%, #00B4AE 100%)" : "linear-gradient(135deg, #1C2E4A 0%, #0F1A2B 100%)",
+                color: ctaPulse ? "#0F1A2B" : "#fff", fontFamily: "var(--font-sans)",
                 boxShadow: "0 6px 24px rgba(28,46,74,0.4)",
                 transition: "all 0.2s",
+                animation: ctaPulse ? "ctaPulse 1.5s ease-in-out infinite" : undefined,
               }}>
               ✨ Create Your First Timetable
             </button>
