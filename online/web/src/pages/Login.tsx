@@ -167,6 +167,13 @@ export default function Login() {
     }, 5000);
   };
 
+  // Roadmap step auto-cycle
+  const [roadmapStep, setRoadmapStep] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setRoadmapStep(s => (s + 1) % 8), 2000);
+    return () => clearInterval(t);
+  }, []);
+
   // Count-up stats
   const years = useCountUp(12, 2200, 400);
   const weeks = useCountUp(40, 2000, 600);
@@ -311,13 +318,16 @@ export default function Login() {
                   { n: 6, emoji: "📋", label: "Lessons", key: true },
                   { n: 7, emoji: "⚙️", label: "Constraints" },
                   { n: 8, emoji: "⚡", label: "Generate" },
-                ].map(s => (
-                  <div key={s.n} className={`roadmap-step ${s.key ? "roadmap-step-key" : ""}`}>
-                    <div className="roadmap-num">{s.n}</div>
-                    <span className="roadmap-label">{s.emoji} {s.label}</span>
-                    {s.key && <span className="roadmap-badge">★ KEY</span>}
-                  </div>
-                ))}
+                ].map((s, idx) => {
+                  const isActive = idx === roadmapStep;
+                  return (
+                    <div key={s.n} className={`roadmap-step ${isActive ? "roadmap-step-active" : ""} ${s.key ? "roadmap-step-key" : ""}`}>
+                      <div className={`roadmap-num ${isActive ? "roadmap-num-active" : ""}`}>{s.n}</div>
+                      <span className={`roadmap-label ${isActive ? "roadmap-label-active" : ""}`}>{s.emoji} {s.label}</span>
+                      {s.key && <span className="roadmap-badge">★ KEY</span>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
