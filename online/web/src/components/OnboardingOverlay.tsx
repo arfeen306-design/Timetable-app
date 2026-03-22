@@ -165,32 +165,37 @@ const STEPS = [
   {
     icon: SchoolIcon,
     title: "School Identity",
-    desc: "Name your school and set the academic year — this becomes your project workspace.",
+    desc: "Establish your institution's profile — school name, academic year, and campus structure become the foundation of your scheduling workspace.",
     color: "#6366F1",
+    highlight: false,
   },
   {
     icon: CalendarIcon,
     title: "Define Off Days",
-    desc: "Mark weekends & holidays. Set Friday or Saturday as different-schedule days from the top bar.",
-    color: "#0EA875",
+    desc: "Configure your weekly structure from the top bar. Set Friday, Saturday, or any combination as weekends. Apply different schedules for specific days — the solver adapts automatically.",
+    color: "#64ffda",
+    highlight: true,
   },
   {
     icon: FacultyIcon,
     title: "Faculty & Subjects",
-    desc: "Import teachers from Excel or add one-by-one. Assign their subjects and weekly limits.",
+    desc: "Import your entire faculty roster from Excel or add individually. Map each teacher to their subjects, set weekly period limits, and define teaching preferences.",
     color: "#E8A020",
+    highlight: false,
   },
   {
     icon: BellIcon,
     title: "Bell Schedule",
-    desc: "Define lessons per day, break positions, and period timings for the timetable grid.",
+    desc: "Architect your school day — define the number of periods, their exact timings, break positions, and assembly slots. This becomes the grid structure for your timetable.",
     color: "#EC4899",
+    highlight: false,
   },
   {
     icon: SolverIcon,
     title: "Generate & Review",
-    desc: "Click Generate — the AI solver builds a clash-free timetable in under 10 seconds.",
+    desc: "One click. The AI constraint-solver processes all your rules and generates a mathematically optimal, clash-free timetable in under 10 seconds. Review, adjust, and export.",
     color: "#64ffda",
+    highlight: false,
   },
 ];
 
@@ -284,7 +289,7 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                   <circle cx="50" cy="50" r="46" stroke="#64ffda" strokeWidth="3" fill="rgba(100,255,218,0.06)" />
                   <path d="M50 22L30 33v13c0 11.5 7.5 18 16.5 21 1.2.4 2.3.5 3.5.7 1.2-.2 2.3-.3 3.5-.7C63.5 64 70 57.5 70 46V33L50 22z"
                     fill="rgba(100,255,218,0.1)" stroke="#64ffda" strokeWidth="1.5" />
-                  <text x="50" y="52" textAnchor="middle" fontSize="18" fontWeight="800" fill="#fff" fontFamily="Sora, sans-serif">A</text>
+                  <text x="50" y="52" textAnchor="middle" fontSize="18" fontWeight="800" fill="#fff" fontFamily="Sora, sans-serif">Z</text>
                 </svg>
               </div>
 
@@ -294,14 +299,14 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                 letterSpacing: "-0.03em", lineHeight: 1.2,
                 animation: "obSlideUp 0.5s ease 0.15s both",
               }}>
-                Welcome to <span style={{ color: "#64ffda" }}>Agora</span>
+                Welcome to <span style={{ color: "#64ffda" }}>Myzynca</span>
               </h1>
               <p style={{
                 margin: "12px auto 0", fontSize: "0.92rem", color: "#8892B0",
-                maxWidth: 380, lineHeight: 1.6,
+                maxWidth: 400, lineHeight: 1.6,
                 animation: "obSlideUp 0.5s ease 0.25s both",
               }}>
-                Your First Timetable Setup — 5 simple steps to generate a clash-free schedule.
+                Your First Timetable Setup — 5 steps to a mathematically perfect, clash-free schedule.
               </p>
 
               {/* CTA */}
@@ -369,6 +374,7 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {STEPS.map((step, i) => {
                     const isActive = i === activeStep;
+                    const isHighlight = step.highlight;
                     return (
                       <button
                         key={i}
@@ -377,11 +383,16 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                         style={{
                           display: "flex", alignItems: "center", gap: 10,
                           padding: "10px 12px", borderRadius: 12, cursor: "pointer",
-                          background: isActive ? "rgba(100,255,218,0.08)" : "transparent",
-                          border: isActive ? "1px solid rgba(100,255,218,0.2)" : "1px solid transparent",
+                          background: isActive
+                            ? (isHighlight ? "rgba(100,255,218,0.14)" : "rgba(100,255,218,0.08)")
+                            : "transparent",
+                          border: isActive
+                            ? `1px solid ${isHighlight ? "rgba(100,255,218,0.4)" : "rgba(100,255,218,0.2)"}`
+                            : "1px solid transparent",
                           transition: "all 0.25s ease",
                           animation: `obStepIn 0.4s ease ${0.15 + i * 0.08}s both`,
                           textAlign: "left",
+                          boxShadow: isActive && isHighlight ? "0 0 20px rgba(100,255,218,0.1)" : "none",
                         }}
                       >
                         {/* Step number */}
@@ -395,13 +406,22 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                         }}>
                           {i + 1}
                         </div>
-                        <div>
+                        <div style={{ flex: 1 }}>
                           <div style={{
                             fontSize: "0.78rem", fontWeight: 700,
                             color: isActive ? "#CCD6F6" : "#8892B0",
                             transition: "color 0.2s",
+                            display: "flex", alignItems: "center", gap: 6,
                           }}>
                             {step.title}
+                            {isHighlight && (
+                              <span style={{
+                                fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.06em",
+                                padding: "1px 5px", borderRadius: 4,
+                                background: "rgba(100,255,218,0.15)", color: "#64ffda",
+                                fontFamily: "var(--font-mono)",
+                              }}>★ KEY STEP</span>
+                            )}
                           </div>
                           {isActive && (
                             <div style={{
@@ -491,7 +511,7 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                       textDecoration: "underline", textUnderlineOffset: 3,
                     }}
                   >
-                    I&apos;ll explore on my own
+                    Skip to Dashboard
                   </button>
                 </div>
               </div>
