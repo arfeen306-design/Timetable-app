@@ -298,18 +298,10 @@ export default function Login() {
             </div>
 
             {/* ── 8-Step Setup Roadmap ── */}
-            <div style={{
-              marginTop: 24, padding: "20px 24px", borderRadius: 16,
-              background: "rgba(100,255,218,0.03)",
-              border: "1px solid rgba(100,255,218,0.08)",
-            }}>
-              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#CCD6F6", marginBottom: 4, letterSpacing: "-0.02em" }}>
-                Your First Timetable Setup
-              </div>
-              <div style={{ fontSize: "0.65rem", color: "#4A5568", marginBottom: 14 }}>
-                8 steps · Follow the sidebar · Zero clashes
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
+            <div className="roadmap-box">
+              <div className="roadmap-title">Your First Timetable Setup</div>
+              <div className="roadmap-sub">8 steps · Follow the sidebar · Zero clashes</div>
+              <div className="roadmap-grid">
                 {[
                   { n: 1, emoji: "🏫", label: "School" },
                   { n: 2, emoji: "🚪", label: "Classrooms" },
@@ -320,29 +312,10 @@ export default function Login() {
                   { n: 7, emoji: "⚙️", label: "Constraints" },
                   { n: 8, emoji: "⚡", label: "Generate" },
                 ].map(s => (
-                  <div key={s.n} style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "5px 8px", borderRadius: 8,
-                    background: s.key ? "rgba(100,255,218,0.06)" : "transparent",
-                    border: s.key ? "1px solid rgba(100,255,218,0.15)" : "1px solid transparent",
-                  }}>
-                    <div style={{
-                      width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-                      background: "rgba(100,255,218,0.1)", color: "#64ffda",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "0.55rem", fontWeight: 800, fontFamily: "var(--font-mono, monospace)",
-                    }}>{s.n}</div>
-                    <span style={{ fontSize: "0.72rem", color: "#8892B0", fontWeight: 600 }}>
-                      {s.emoji} {s.label}
-                    </span>
-                    {s.key && (
-                      <span style={{
-                        fontSize: "0.48rem", fontWeight: 800, letterSpacing: "0.05em",
-                        padding: "1px 4px", borderRadius: 3,
-                        background: "rgba(100,255,218,0.12)", color: "#64ffda",
-                        fontFamily: "var(--font-mono, monospace)", marginLeft: "auto",
-                      }}>★ KEY</span>
-                    )}
+                  <div key={s.n} className={`roadmap-step ${s.key ? "roadmap-step-key" : ""}`}>
+                    <div className="roadmap-num">{s.n}</div>
+                    <span className="roadmap-label">{s.emoji} {s.label}</span>
+                    {s.key && <span className="roadmap-badge">★ KEY</span>}
                   </div>
                 ))}
               </div>
