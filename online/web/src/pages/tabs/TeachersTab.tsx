@@ -48,6 +48,8 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
   const importRef = React.createRef<HTMLInputElement>();
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success_count: number; errors: { row: number; message: string }[] } | null>(null);
+  const [addingNewSubject, setAddingNewSubject] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState("");
 
   // Inline single-delete confirm
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
@@ -469,13 +471,65 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                 </div>
               </div>
 
-              {/* ── Subject (single select, searchable dropdown) ── */}
-              {subjects.length > 0 && (
-                <div className="modal-field">
-                  <label className="modal-label required">Subject:</label>
+              {/* ── Subject (deduplicated, with inline add) ── */}
+              <div className="modal-field">
+                <label className="modal-label required">Subject:</label>
+                {addingNewSubject ? (
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      value={newSubjectName}
+                      onChange={e => setNewSubjectName(e.target.value)}
+                      placeholder="New subject name"
+                      autoFocus
+                      onKeyDown={async e => {
+                        if (e.key === "Enter" && newSubjectName.trim()) {
+                          try {
+                            const created = await api.createSubject(pid, { name: newSubjectName.trim() });
+                            subjects.push(created);
+                            setFSubjectId(created.id);
+                            setFSubjects([created.id]);
+                            setAddingNewSubject(false);
+                            setNewSubjectName("");
+                            toast("success", `Subject "${created.name}" created.`);
+                          } catch (err) { toast("error", err instanceof Error ? err.message : "Failed to create subject"); }
+                        } else if (e.key === "Escape") {
+                          setAddingNewSubject(false);
+                          setNewSubjectName("");
+                        }
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button" className="btn btn-primary"
+                      style={{ fontSize: "0.78rem", padding: "4px 12px" }}
+                      disabled={!newSubjectName.trim()}
+                      onClick={async () => {
+                        if (!newSubjectName.trim()) return;
+                        try {
+                          const created = await api.createSubject(pid, { name: newSubjectName.trim() });
+                          subjects.push(created);
+                          setFSubjectId(created.id);
+                          setFSubjects([created.id]);
+                          setAddingNewSubject(false);
+                          setNewSubjectName("");
+                          toast("success", `Subject "${created.name}" created.`);
+                        } catch (err) { toast("error", err instanceof Error ? err.message : "Failed to create subject"); }
+                      }}
+                    >Add</button>
+                    <button
+                      type="button" className="btn"
+                      style={{ fontSize: "0.78rem", padding: "4px 10px" }}
+                      onClick={() => { setAddingNewSubject(false); setNewSubjectName(""); }}
+                    >Cancel</button>
+                  </div>
+                ) : (
                   <select
                     value={fSubjectId ?? ""}
                     onChange={e => {
+                      if (e.target.value === "__add_new__") {
+                        setAddingNewSubject(true);
+                        return;
+                      }
                       const val = e.target.value ? Number(e.target.value) : null;
                       setFSubjectId(val);
                       if (val != null) setFSubjects([val]);
@@ -483,12 +537,21 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                     }}
                   >
                     <option value="">— Select subject —</option>
-                    {subjects.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
+                    {(() => {
+                      const seen = new Set<string>();
+                      return subjects.filter(s => {
+                        const key = s.name.trim().toLowerCase();
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                      }).map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ));
+                    })()}
+                    <option value="__add_new__" style={{ fontWeight: 700 }}>＋ Add New Subject…</option>
                   </select>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* ── Max Lessons / Day + Week ── */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
