@@ -90,7 +90,7 @@ const TABS: Tab[] = [
 
 const DROPDOWN_GROUPS = [
   {
-    label: "SETUP",
+    label: "YOUR FIRST TIMETABLE SETUP",
     items: [
       { name: "School",      icon: "🏫", segment: "settings" },
       { name: "Classrooms",  icon: "🚪", segment: "rooms" },

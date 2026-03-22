@@ -12,7 +12,7 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: "SETUP",
+    label: "YOUR FIRST TIMETABLE SETUP",
     items: [
       { num: 2, label: "New Timetable",icon: "🗓️", path: "/project/:projectId/academic-year", segment: "academic-year" },
       { num: 3, label: "School",      icon: "🏫", path: "/project/:projectId/settings",      segment: "settings" },
