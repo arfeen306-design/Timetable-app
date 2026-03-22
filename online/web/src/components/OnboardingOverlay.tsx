@@ -100,36 +100,6 @@ function FacultyIcon() {
   );
 }
 
-function BellIcon() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ overflow: "visible" }}>
-      {/* Clock face */}
-      <circle cx="24" cy="24" r="18" fill="#0a192f" stroke="#64ffda" strokeWidth="1.5"
-        style={{ animation: "obCheckScale 0.5s ease both" }} />
-      {/* Hour marks */}
-      {[0,1,2,3,4,5,6,7,8,9,10,11].map(i => {
-        const angle = (i * 30 - 90) * Math.PI / 180;
-        const x1 = 24 + 15 * Math.cos(angle);
-        const y1 = 24 + 15 * Math.sin(angle);
-        const x2 = 24 + 17 * Math.cos(angle);
-        const y2 = 24 + 17 * Math.sin(angle);
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#64ffda" strokeWidth={i % 3 === 0 ? "1.5" : "0.8"} opacity="0.4"
-          style={{ animation: `obFadeIn 0.2s ease ${0.3 + i * 0.03}s both` }} />;
-      })}
-      {/* Hour hand */}
-      <line x1="24" y1="24" x2="24" y2="14" stroke="#64ffda" strokeWidth="2" strokeLinecap="round"
-        style={{ animation: "obClockHour 2s ease 0.5s both", transformOrigin: "24px 24px" }} />
-      {/* Minute hand */}
-      <line x1="24" y1="24" x2="34" y2="24" stroke="#64ffda" strokeWidth="1.2" strokeLinecap="round"
-        style={{ animation: "obClockMinute 2s ease 0.5s both", transformOrigin: "24px 24px" }} />
-      {/* Center dot */}
-      <circle cx="24" cy="24" r="2" fill="#64ffda"
-        style={{ animation: "obCheckScale 0.3s ease 0.4s both" }} />
-      {/* Period labels */}
-      <text x="24" y="36" textAnchor="middle" fontSize="4" fill="#64ffda" opacity="0.5" fontFamily="var(--font-mono)">P1 P2 P3</text>
-    </svg>
-  );
-}
 
 function SolverIcon() {
   return (
@@ -159,41 +129,159 @@ function SolverIcon() {
   );
 }
 
-/* ─── Steps Data ─────────────────────────────────────────────────── */
+/* ─── Extra SVG Icons for new steps ──────────────────────────────── */
+
+function ClassroomIcon() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ overflow: "visible" }}>
+      {/* Door frame */}
+      <rect x="12" y="8" width="24" height="34" rx="2" fill="#0a192f" stroke="#64ffda" strokeWidth="1.5"
+        style={{ animation: "obDrawUp 0.5s ease both" }} />
+      {/* Door panels */}
+      <rect x="15" y="12" width="8" height="14" rx="1" fill="#64ffda" opacity="0.1" stroke="#64ffda" strokeWidth="0.6"
+        style={{ animation: "obCheckScale 0.3s ease 0.2s both" }} />
+      <rect x="25" y="12" width="8" height="14" rx="1" fill="#64ffda" opacity="0.1" stroke="#64ffda" strokeWidth="0.6"
+        style={{ animation: "obCheckScale 0.3s ease 0.3s both" }} />
+      {/* Handle */}
+      <circle cx="32" cy="28" r="1.5" fill="#64ffda" opacity="0.5"
+        style={{ animation: "obCheckScale 0.2s ease 0.4s both" }} />
+      {/* Room label */}
+      <text x="24" y="38" textAnchor="middle" fontSize="5" fill="#64ffda" opacity="0.4" fontFamily="var(--font-mono)" fontWeight="600">Room A</text>
+    </svg>
+  );
+}
+
+function SubjectIcon() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ overflow: "visible" }}>
+      {/* Book stack */}
+      <rect x="10" y="28" width="28" height="6" rx="1" fill="#64ffda" opacity="0.1" stroke="#64ffda" strokeWidth="1"
+        style={{ animation: "obDrawUp 0.4s ease both" }} />
+      <rect x="12" y="21" width="24" height="6" rx="1" fill="#64ffda" opacity="0.15" stroke="#64ffda" strokeWidth="1"
+        style={{ animation: "obDrawUp 0.4s ease 0.1s both" }} />
+      <rect x="14" y="14" width="20" height="6" rx="1" fill="#64ffda" opacity="0.2" stroke="#64ffda" strokeWidth="1"
+        style={{ animation: "obDrawUp 0.4s ease 0.2s both" }} />
+      {/* Subject labels */}
+      <text x="24" y="18" textAnchor="middle" fontSize="3.5" fill="#64ffda" fontFamily="var(--font-sans)" fontWeight="600"
+        style={{ animation: "obFadeIn 0.3s ease 0.4s both" }}>Mathematics</text>
+      <text x="24" y="25" textAnchor="middle" fontSize="3.5" fill="#64ffda" fontFamily="var(--font-sans)" fontWeight="600"
+        style={{ animation: "obFadeIn 0.3s ease 0.5s both" }}>English</text>
+      <text x="24" y="32" textAnchor="middle" fontSize="3.5" fill="#64ffda" fontFamily="var(--font-sans)" fontWeight="600"
+        style={{ animation: "obFadeIn 0.3s ease 0.6s both" }}>Science</text>
+    </svg>
+  );
+}
+
+function ClassIcon() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ overflow: "visible" }}>
+      {/* Graduation cap */}
+      <path d="M24 10L4 22L24 34L44 22L24 10Z" fill="#64ffda" opacity="0.1" stroke="#64ffda" strokeWidth="1.2"
+        style={{ animation: "obDrawUp 0.5s ease both" }} />
+      <line x1="24" y1="22" x2="24" y2="40" stroke="#64ffda" strokeWidth="1" opacity="0.4"
+        style={{ animation: "obDrawUp 0.3s ease 0.3s both" }} />
+      {/* Tassel */}
+      <path d="M24 34L20 38" stroke="#64ffda" strokeWidth="1.2" strokeLinecap="round"
+        style={{ animation: "obDrawUp 0.3s ease 0.4s both" }} />
+      {/* Class labels */}
+      <rect x="8" y="38" width="14" height="5" rx="2.5" fill="#64ffda" opacity="0.12" stroke="#64ffda" strokeWidth="0.6"
+        style={{ animation: "obStepIn 0.3s ease 0.5s both" }} />
+      <text x="15" y="42" textAnchor="middle" fontSize="3.5" fill="#64ffda" fontWeight="600">10-A</text>
+      <rect x="26" y="38" width="14" height="5" rx="2.5" fill="#64ffda" opacity="0.12" stroke="#64ffda" strokeWidth="0.6"
+        style={{ animation: "obStepIn 0.3s ease 0.6s both" }} />
+      <text x="33" y="42" textAnchor="middle" fontSize="3.5" fill="#64ffda" fontWeight="600">10-B</text>
+    </svg>
+  );
+}
+
+function ConstraintIcon() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ overflow: "visible" }}>
+      {/* Gear outer */}
+      <circle cx="24" cy="24" r="14" fill="#0a192f" stroke="#64ffda" strokeWidth="1.5"
+        style={{ animation: "obCheckScale 0.5s ease both" }} />
+      {/* Gear teeth */}
+      {[0,45,90,135,180,225,270,315].map(deg => {
+        const rad = deg * Math.PI / 180;
+        const x = 24 + 16 * Math.cos(rad);
+        const y = 24 + 16 * Math.sin(rad);
+        return <circle key={deg} cx={x} cy={y} r="2.5" fill="#0a192f" stroke="#64ffda" strokeWidth="1" opacity="0.6"
+          style={{ animation: `obCheckScale 0.2s ease ${0.3 + deg * 0.001}s both` }} />;
+      })}
+      {/* Inner circle */}
+      <circle cx="24" cy="24" r="6" fill="#64ffda" opacity="0.1" stroke="#64ffda" strokeWidth="1"
+        style={{ animation: "obCheckScale 0.3s ease 0.4s both" }} />
+      {/* Check mark inside */}
+      <path d="M20 24L23 27L28 21" stroke="#64ffda" strokeWidth="1.5" strokeLinecap="round" fill="none"
+        style={{ animation: "obDrawCheck 0.4s ease 0.6s both" }} />
+    </svg>
+  );
+}
+
+/* ─── Steps Data — matches sidebar menu exactly ──────────────────── */
 
 const STEPS = [
   {
     icon: SchoolIcon,
-    title: "School Identity",
-    desc: "Establish your institution's profile — school name, academic year, and campus structure become the foundation of your scheduling workspace.",
+    emoji: "🏫",
+    title: "School",
+    desc: "Set your school name, academic year, and off-day structure. This is the foundation of your timetable.",
     color: "#6366F1",
     highlight: false,
   },
   {
-    icon: CalendarIcon,
-    title: "Define Off Days",
-    desc: "Configure your weekly structure from the top bar. Set Friday, Saturday, or any combination as weekends. Apply different schedules for specific days — the solver adapts automatically.",
-    color: "#64ffda",
-    highlight: true,
+    icon: ClassroomIcon,
+    emoji: "🚪",
+    title: "Classrooms",
+    desc: "Add your rooms and labs. The solver uses these to prevent room conflicts — two classes can't be in the same room at once.",
+    color: "#0891B2",
+    highlight: false,
   },
   {
     icon: FacultyIcon,
-    title: "Faculty & Subjects",
-    desc: "Import your entire faculty roster from Excel or add individually. Map each teacher to their subjects, set weekly period limits, and define teaching preferences.",
+    emoji: "👩‍🏫",
+    title: "Teachers",
+    desc: "Add your faculty — import from Excel or one by one. Assign subjects and set max periods per day.",
     color: "#E8A020",
     highlight: false,
   },
   {
-    icon: BellIcon,
-    title: "Bell Schedule",
-    desc: "Architect your school day — define the number of periods, their exact timings, break positions, and assembly slots. This becomes the grid structure for your timetable.",
+    icon: SubjectIcon,
+    emoji: "📚",
+    title: "Subjects",
+    desc: "Create your subject list — Mathematics, English, Science, etc. These link teachers to class lessons.",
+    color: "#7C3AED",
+    highlight: false,
+  },
+  {
+    icon: ClassIcon,
+    emoji: "🎓",
+    title: "Classes",
+    desc: "Define your class sections — 10-A, 10-B, etc. Each class gets its own column in the final timetable.",
+    color: "#0EA875",
+    highlight: false,
+  },
+  {
+    icon: CalendarIcon,
+    emoji: "📋",
+    title: "Lessons",
+    desc: "Map which teacher teaches which subject to which class, and how many periods per week. This is the core scheduling data.",
+    color: "#64ffda",
+    highlight: true,
+  },
+  {
+    icon: ConstraintIcon,
+    emoji: "⚙️",
+    title: "Constraints",
+    desc: "Set rules — max consecutive periods, preferred time slots, room restrictions. The solver respects all of these.",
     color: "#EC4899",
     highlight: false,
   },
   {
     icon: SolverIcon,
-    title: "Generate & Review",
-    desc: "One click. The AI constraint-solver processes all your rules and generates a mathematically optimal, clash-free timetable in under 10 seconds. Review, adjust, and export.",
+    emoji: "⚡",
+    title: "Generate",
+    desc: "One click — the AI solver processes all your data and rules, then builds a clash-free timetable in under 10 seconds.",
     color: "#64ffda",
     highlight: false,
   },
@@ -259,7 +347,7 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
         <div
           onClick={e => e.stopPropagation()}
           style={{
-            width: "100%", maxWidth: screen === "welcome" ? 520 : 640,
+            width: "100%", maxWidth: screen === "welcome" ? 520 : 700,
             borderRadius: 24, position: "relative", overflow: "hidden",
             background: "linear-gradient(155deg, #0a192f 0%, #112240 50%, #0d1f3c 100%)",
             border: "1px solid rgba(100,255,218,0.12)",
@@ -365,13 +453,13 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                 margin: "4px 0 20px", fontSize: "0.75rem", color: "#4A5568",
                 textAlign: "center", animation: "obSlideUp 0.4s ease 0.1s both",
               }}>
-                5 steps · Under 15 minutes · Zero clashes
+                8 steps · Follow the sidebar · Zero clashes
               </p>
 
               {/* ── Two-column layout: steps list + animated preview ── */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, minHeight: 260 }}>
                 {/* Left: Step list */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {STEPS.map((step, i) => {
                     const isActive = i === activeStep;
                     const isHighlight = step.highlight;
@@ -381,8 +469,8 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                         type="button"
                         onClick={() => goStep(i)}
                         style={{
-                          display: "flex", alignItems: "center", gap: 10,
-                          padding: "10px 12px", borderRadius: 12, cursor: "pointer",
+                          display: "flex", alignItems: "center", gap: 8,
+                          padding: "7px 10px", borderRadius: 10, cursor: "pointer",
                           background: isActive
                             ? (isHighlight ? "rgba(100,255,218,0.14)" : "rgba(100,255,218,0.08)")
                             : "transparent",
@@ -397,11 +485,11 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                       >
                         {/* Step number */}
                         <div style={{
-                          width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                          width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
                           background: isActive ? "#64ffda" : "rgba(100,255,218,0.08)",
                           color: isActive ? "#0a192f" : "#64ffda",
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: "0.68rem", fontWeight: 800, fontFamily: "var(--font-mono)",
+                          fontSize: "0.62rem", fontWeight: 800, fontFamily: "var(--font-mono)",
                           transition: "all 0.25s ease",
                         }}>
                           {i + 1}
@@ -413,7 +501,7 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                             transition: "color 0.2s",
                             display: "flex", alignItems: "center", gap: 6,
                           }}>
-                            {step.title}
+                            {step.emoji} {step.title}
                             {isHighlight && (
                               <span style={{
                                 fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.06em",
@@ -454,7 +542,7 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                     marginTop: 16, fontSize: "0.82rem", fontWeight: 700, color: "#CCD6F6",
                     animation: "obFadeIn 0.3s ease 0.2s both",
                   }}>
-                    Step {activeStep + 1} of 5
+                    Step {activeStep + 1} of {STEPS.length}
                   </div>
                   {/* Progress dots */}
                   <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
@@ -463,7 +551,7 @@ export default function OnboardingOverlay({ onDismiss, onStart }: Props) {
                         key={i}
                         onClick={() => goStep(i)}
                         style={{
-                          width: i === activeStep ? 20 : 6, height: 6, borderRadius: 3,
+                          width: i === activeStep ? 16 : 5, height: 5, borderRadius: 3,
                           background: i === activeStep ? "#64ffda" : "rgba(100,255,218,0.15)",
                           cursor: "pointer",
                           transition: "all 0.3s ease",
