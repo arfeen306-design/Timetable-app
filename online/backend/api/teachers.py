@@ -152,6 +152,7 @@ def bulk_delete_teachers(
 class ImportExcelResult(BaseModel):
     success_count: int
     total_rows: int
+    subjects_linked: int = 0
     errors: List[dict]  # [{ "row": int, "message": str }]
 
 
@@ -168,6 +169,7 @@ async def import_teachers_excel(
     return ImportExcelResult(
         success_count=result.success_count,
         total_rows=result.total_rows,
+        subjects_linked=result.subjects_linked,
         errors=[{"row": e.row, "message": e.message} for e in result.errors],
     )
 

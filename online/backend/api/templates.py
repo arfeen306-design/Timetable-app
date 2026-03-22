@@ -14,7 +14,7 @@ def _teachers_workbook() -> BytesIO:
     wb = Workbook()
     ws = wb.active
     ws.title = "Teachers"
-    headers = ["First Name", "Last Name", "Abbreviation", "Title", "Max Periods Per Day", "Max Periods Per Week"]
+    headers = ["First Name", "Last Name", "Abbreviation", "Title", "Max Periods Per Day", "Max Periods Per Week", "Subject"]
     for col, h in enumerate(headers, 1):
         ws.cell(1, col, h).font = Font(bold=True)
     ws.cell(2, 1, "Zain")
@@ -23,6 +23,7 @@ def _teachers_workbook() -> BytesIO:
     ws.cell(2, 4, "Mr.")
     ws.cell(2, 5, 6)
     ws.cell(2, 6, 28)
+    ws.cell(2, 7, "Mathematics")
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)

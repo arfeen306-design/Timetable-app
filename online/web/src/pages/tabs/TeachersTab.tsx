@@ -47,7 +47,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
   const [editTeacher, setEditTeacher] = useState<Teacher | null>(null);
   const importRef = React.createRef<HTMLInputElement>();
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ success_count: number; errors: { row: number; message: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ success_count: number; total_rows: number; subjects_linked: number; errors: { row: number; message: string }[] } | null>(null);
   const [addingNewSubject, setAddingNewSubject] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState("");
 
@@ -245,7 +245,9 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
       <div className="toolbar" style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
         <button type="button" className="btn btn-primary" onClick={openAdd}>+ Add Teacher</button>
         <input type="file" ref={importRef} accept=".xlsx,.xls" style={{ display: "none" }} onChange={onImportFile} />
-        <button type="button" className="btn" onClick={() => importRef.current?.click()} disabled={importing}>{importing ? "Importing…" : "Import from Excel"}</button>
+        <button type="button" className="btn" onClick={() => importRef.current?.click()} disabled={importing}>
+          {importing ? "⏳ Processing…" : "Import from Excel"}
+        </button>
         <button type="button" className="btn" onClick={() => api.downloadTemplate("teachers")}>Download Template</button>
         <button type="button" className="btn" onClick={() => openEdit()} disabled={selectedId == null}>Edit</button>
         <button
@@ -255,10 +257,52 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
         >{checkedIds.size > 0 ? `Delete (${checkedIds.size})` : "Delete"}</button>
       </div>
 
-      {/* ── Import result ── */}
+      {/* ── Import progress bar ── */}
+      {importing && (
+        <div style={{ marginBottom: "1rem", borderRadius: 6, overflow: "hidden", height: 4, background: "var(--slate-200)" }}>
+          <div style={{
+            width: "100%", height: "100%", background: "var(--primary-500)",
+            animation: "loadProgress 1.5s ease-in-out infinite",
+          }} />
+        </div>
+      )}
+
+      {/* ── Import result panel ── */}
       {importResult && (
-        <div className="alert alert-success" style={{ marginBottom: "1rem" }}>
-          Imported {importResult.success_count} teacher(s).{importResult.errors.length > 0 && ` Errors: ${importResult.errors.map(e => `Row ${e.row}: ${e.message}`).join("; ")}`}
+        <div style={{
+          marginBottom: "1rem", borderRadius: 8, padding: "12px 16px",
+          background: importResult.errors.length > 0 ? "var(--warning-50, #FFFBEB)" : "var(--success-50, #F0FDF4)",
+          border: `1px solid ${importResult.errors.length > 0 ? "var(--warning-200, #FDE68A)" : "var(--success-200, #BBF7D0)"}`,
+        }}>
+          <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--slate-800)", marginBottom: 4 }}>
+            ✅ Imported {importResult.success_count} of {importResult.total_rows} teacher(s)
+            {(importResult).subjects_linked > 0 && (
+              <span style={{ fontWeight: 500, marginLeft: 8, color: "var(--primary-600)" }}>
+                📎 {(importResult).subjects_linked} subject link(s) created
+              </span>
+            )}
+          </div>
+          {importResult.errors.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--danger-600)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {importResult.errors.length} error(s):
+              </div>
+              <div style={{ maxHeight: 120, overflowY: "auto", fontSize: "0.78rem" }}>
+                {importResult.errors.map((e, i) => (
+                  <div key={i} style={{ padding: "2px 0", color: "var(--slate-700)" }}>
+                    <span style={{ fontWeight: 600, color: "var(--danger-600)", fontFamily: "var(--font-mono)", fontSize: "0.72rem" }}>
+                      Row {e.row}:
+                    </span>{" "}
+                    {e.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <button
+            type="button" onClick={() => setImportResult(null)}
+            style={{ marginTop: 8, fontSize: "0.72rem", background: "none", border: "none", color: "var(--slate-400)", cursor: "pointer", textDecoration: "underline" }}
+          >Dismiss</button>
         </div>
       )}
 

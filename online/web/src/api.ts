@@ -280,7 +280,7 @@ export async function importTeachersExcel(projectId: number, file: File) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail));
   }
-  return res.json() as Promise<{ success_count: number; total_rows: number; errors: { row: number; message: string }[] }>;
+  return res.json() as Promise<{ success_count: number; total_rows: number; subjects_linked: number; errors: { row: number; message: string }[] }>;
 }
 
 // Lessons
