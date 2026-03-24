@@ -49,10 +49,12 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
   const [fLessons, setFLessons] = useState(1);
   const [saving, setSaving] = useState(false);
 
-  /* Bulk assign */
+  /* Bulk assign — cascading grade → section */
   const [bulkTeacher, setBulkTeacher] = useState(0);
   const [bulkSubject, setBulkSubject] = useState(0);
-  const [bulkLessons, setBulkLessons] = useState<Record<number, number>>({});
+  const [bulkSelectedGrades, setBulkSelectedGrades] = useState<string[]>([]);
+  const [bulkSelectedClasses, setBulkSelectedClasses] = useState<number[]>([]);
+  const [bulkLpw, setBulkLpw] = useState(1);
   const [bulkSaving, setBulkSaving] = useState(false);
 
   /* Copy from class */
@@ -169,11 +171,10 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
 
   async function doBulkAssign() {
     if (!bulkTeacher || !bulkSubject) return;
-    const selected = classes.map(c => c.id).filter(id => (bulkLessons[id] ?? 0) > 0);
-    if (selected.length === 0) { toast("info", "Select at least one class and set lessons."); return; }
+    if (bulkSelectedClasses.length === 0) { toast("info", "Select at least one class."); return; }
 
     // Overload warning
-    const adding = selected.reduce((s, id) => s + (bulkLessons[id] ?? 0), 0);
+    const adding = bulkSelectedClasses.length * bulkLpw;
     const current = teacherCurrentLoad(bulkTeacher);
     const max = teacherMaxWeek(bulkTeacher);
     if (current + adding > max) {
@@ -185,7 +186,7 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
     try {
       const res = await api.bulkCreateLessons(pid, {
         teacher_id: bulkTeacher, subject_id: bulkSubject,
-        classes: selected.map(class_id => ({ class_id, periods_per_week: bulkLessons[class_id] ?? 1 })),
+        classes: bulkSelectedClasses.map(class_id => ({ class_id, periods_per_week: bulkLpw })),
       });
       if (res.created > 0) { const list = await api.listLessons(pid); onChange(list); setBulkOpen(false); toast("success", `Created ${res.created} lesson(s).`); }
       if (res.errors.length > 0) toast("error", "Some rows failed: " + res.errors.map(e => e.message).join("; "));
@@ -292,7 +293,7 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
 
       <div className="toolbar" style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
         <button type="button" className="btn" onClick={openAddModal}>+ Add Lesson</button>
-        <button type="button" className="btn btn-primary" onClick={() => { setBulkTeacher(0); setBulkSubject(0); setBulkLessons({}); setBulkOpen(true); }}>+ Bulk Assign (1 Teacher → Many Classes)</button>
+        <button type="button" className="btn btn-primary" onClick={() => { setBulkTeacher(0); setBulkSubject(0); setBulkSelectedGrades([]); setBulkSelectedClasses([]); setBulkLpw(1); setBulkOpen(true); }}>+ Bulk Assign (1 Teacher → Many Classes)</button>
         <button type="button" className="btn" onClick={() => { setCopySource(0); setCopyTargets([]); setCopyOpen(true); }}>Copy from Class</button>
         <button type="button" className="btn btn-danger" onClick={deleteSelected} disabled={selectedId == null}>Delete</button>
         <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontStyle: "italic", fontSize: "0.85rem" }}>{lessons.length} lessons, {totalLessons} total lessons/week</span>
@@ -424,73 +425,202 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
         </div>
       )}
 
-      {/* ═══ Bulk Assign Modal ═══ */}
-      {bulkOpen && (
-        <div className="modal-overlay" onClick={() => setBulkOpen(false)}>
-          <div className="modal-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
-            <h3 style={{ marginTop: 0 }}>Bulk Assign</h3>
-            <p className="subheading">Select a teacher — their linked subjects will auto-fill. Then set lessons per class.</p>
-            <div className="modal-form">
-              <div className="modal-field"><label className="modal-label">Teacher:</label>
-                <SearchableSelect
-                  value={bulkTeacher || ""}
-                  onChange={v => setBulkTeacher(v ? Number(v) : 0)}
-                  options={teachers.map(t => {
-                    const cnt = (teacherSubjectMap.get(t.id) || []).length;
-                    return { value: t.id, label: `${t.first_name} ${t.last_name}${cnt ? ` (${cnt} subj)` : ''}` };
-                  })}
-                  placeholder="Select teacher"
-                  style={{ maxWidth: "100%" }}
-                />
-              </div>
-              <div className="modal-field"><label className="modal-label">Subject:</label>
-                {bulkTeacher ? (
-                  <SubjectSelector
-                    value={bulkSubject}
-                    onChange={setBulkSubject}
-                    linkedIds={bulkLinkedSubjectIds}
-                    linkedSubjects={bulkLinkedSubjects}
-                    allSubjects={subjects}
-                    isOverride={!!bulkIsOverride}
+      {/* ═══ Bulk Assign Modal (Cascading Grade → Section) ═══ */}
+      {bulkOpen && (() => {
+        // Compute unique grades from classes
+        const uniqueGrades = Array.from(new Set(classes.map(c => c.grade).filter(Boolean)));
+        // Classes filtered by selected grades
+        const filteredClasses = bulkSelectedGrades.length > 0
+          ? classes.filter(c => bulkSelectedGrades.includes(c.grade))
+          : [];
+        const bulkTotal = bulkSelectedClasses.length * bulkLpw;
+
+        return (
+          <div className="modal-overlay" onClick={() => setBulkOpen(false)}>
+            <div className="modal-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 580 }}>
+              <h3 style={{ marginTop: 0 }}>Bulk Assign</h3>
+              <p className="subheading" style={{ margin: "0 0 0.75rem" }}>Select teacher → grades → sections → lessons/week.</p>
+
+              {/* Step 1: Teacher + Subject */}
+              <div className="modal-form">
+                <div className="modal-field"><label className="modal-label required">Teacher:</label>
+                  <SearchableSelect
+                    value={bulkTeacher || ""}
+                    onChange={v => setBulkTeacher(v ? Number(v) : 0)}
+                    options={teachers.map(t => {
+                      const cnt = (teacherSubjectMap.get(t.id) || []).length;
+                      return { value: t.id, label: `${t.first_name} ${t.last_name}${cnt ? ` (${cnt} subj)` : ''}` };
+                    })}
+                    placeholder="Select teacher"
+                    style={{ maxWidth: "100%" }}
                   />
-                ) : (
-                  <select disabled style={{ maxWidth: "100%" }}><option>Select a teacher first</option></select>
-                )}
+                </div>
+                <div className="modal-field"><label className="modal-label required">Subject:</label>
+                  {bulkTeacher ? (
+                    <SubjectSelector
+                      value={bulkSubject}
+                      onChange={setBulkSubject}
+                      linkedIds={bulkLinkedSubjectIds}
+                      linkedSubjects={bulkLinkedSubjects}
+                      allSubjects={subjects}
+                      isOverride={!!bulkIsOverride}
+                    />
+                  ) : (
+                    <select disabled style={{ maxWidth: "100%" }}><option>Select a teacher first</option></select>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Auto-fill summary */}
-            {bulkTeacher > 0 && bulkSubject > 0 && (
-              <div style={{
-                marginTop: 8, padding: "8px 12px", borderRadius: 8,
-                background: "var(--surface-input, #f8fafc)",
-                border: "1px solid var(--border-subtle, #e2e8f0)",
-                fontSize: "0.78rem",
-              }}>
-                <strong>{nameTeacher(bulkTeacher)}</strong> teaching <strong>{nameSubject(bulkSubject)}</strong>
-                {bulkLinkedSubjectIds.length === 1 && (
-                  <span style={{ color: "var(--success-600)", marginLeft: 8 }}>✓ Auto-filled</span>
-                )}
+              {/* Auto-fill summary */}
+              {bulkTeacher > 0 && bulkSubject > 0 && (
+                <div style={{
+                  marginTop: 8, padding: "8px 12px", borderRadius: 8,
+                  background: "var(--surface-input, #f8fafc)",
+                  border: "1px solid var(--border-subtle)",
+                  fontSize: "0.78rem",
+                }}>
+                  <strong>{nameTeacher(bulkTeacher)}</strong> teaching <strong>{nameSubject(bulkSubject)}</strong>
+                  {bulkLinkedSubjectIds.length === 1 && (
+                    <span style={{ color: "var(--success-600)", marginLeft: 8 }}>✓ Auto-filled</span>
+                  )}
+                </div>
+              )}
+
+              {/* Step 2: Grade Selection (chips) */}
+              {bulkTeacher > 0 && bulkSubject > 0 && (
+                <div style={{ marginTop: "1rem" }}>
+                  <label style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>
+                    Step 2 — Select Grade(s)
+                  </label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {uniqueGrades.map(g => {
+                      const active = bulkSelectedGrades.includes(g);
+                      return (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() => {
+                            const next = active
+                              ? bulkSelectedGrades.filter(x => x !== g)
+                              : [...bulkSelectedGrades, g];
+                            setBulkSelectedGrades(next);
+                            // Also deselect classes that no longer belong to selected grades
+                            const validClassIds = classes.filter(c => next.includes(c.grade)).map(c => c.id);
+                            setBulkSelectedClasses(prev => prev.filter(id => validClassIds.includes(id)));
+                          }}
+                          style={{
+                            padding: "5px 14px", borderRadius: 20, fontSize: "0.78rem", fontWeight: 600,
+                            cursor: "pointer", transition: "all 0.15s",
+                            border: active ? "2px solid var(--primary-500)" : "1.5px solid var(--border-default)",
+                            background: active ? "var(--primary-500)" : "var(--surface-card)",
+                            color: active ? "#fff" : "var(--text-primary)",
+                          }}
+                        >{g}</button>
+                      );
+                    })}
+                    {uniqueGrades.length === 0 && (
+                      <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", fontStyle: "italic" }}>No classes created yet.</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Section Selection (checkboxes) — only shown when grades are selected */}
+              {bulkSelectedGrades.length > 0 && (
+                <div style={{ marginTop: "0.75rem" }}>
+                  <label style={{
+                    fontWeight: 600, fontSize: "0.82rem", color: "var(--text-secondary)",
+                    marginBottom: 6, display: "flex", alignItems: "center", gap: 8,
+                  }}>
+                    Step 3 — Select Sections
+                    <span style={{ fontSize: "0.68rem", fontWeight: 400, color: "var(--text-muted)" }}>({bulkSelectedClasses.length} selected)</span>
+                    <button type="button" onClick={() => setBulkSelectedClasses(filteredClasses.map(c => c.id))} style={{
+                      fontSize: "0.65rem", background: "none", border: "1px solid var(--border-default)",
+                      borderRadius: 4, padding: "1px 6px", cursor: "pointer", color: "var(--primary-600)", fontWeight: 600,
+                    }}>All</button>
+                    <button type="button" onClick={() => setBulkSelectedClasses([])} style={{
+                      fontSize: "0.65rem", background: "none", border: "1px solid var(--border-default)",
+                      borderRadius: 4, padding: "1px 6px", cursor: "pointer", color: "var(--text-muted)",
+                    }}>Clear</button>
+                  </label>
+                  <div style={{
+                    maxHeight: 200, overflowY: "auto",
+                    border: "1px solid var(--border-default)", borderRadius: 8,
+                    padding: "6px 10px", background: "var(--surface-card)",
+                  }}>
+                    {/* Group by grade */}
+                    {bulkSelectedGrades.map(grade => {
+                      const gradeClasses = filteredClasses.filter(c => c.grade === grade);
+                      if (gradeClasses.length === 0) return null;
+                      return (
+                        <div key={grade} style={{ marginBottom: 6 }}>
+                          <div style={{
+                            fontSize: "0.7rem", fontWeight: 700, color: "var(--primary-500)",
+                            textTransform: "uppercase", letterSpacing: "0.05em",
+                            padding: "2px 0", borderBottom: "1px solid var(--border-subtle)", marginBottom: 4,
+                          }}>{grade}</div>
+                          {gradeClasses.map(c => (
+                            <label key={c.id} style={{
+                              display: "flex", alignItems: "center", gap: 8, padding: "2px 0",
+                              cursor: "pointer", fontSize: "0.82rem",
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={bulkSelectedClasses.includes(c.id)}
+                                onChange={() => setBulkSelectedClasses(prev =>
+                                  prev.includes(c.id) ? prev.filter(x => x !== c.id) : [...prev, c.id]
+                                )}
+                                style={{ width: "auto", accentColor: "var(--primary-500)" }}
+                              />
+                              <span style={{ fontWeight: bulkSelectedClasses.includes(c.id) ? 600 : 400 }}>
+                                {c.section ? `${c.section} (${c.name})` : c.name}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Lessons/Week */}
+              {bulkSelectedClasses.length > 0 && (
+                <div style={{ marginTop: "0.75rem" }}>
+                  <div className="modal-field">
+                    <label className="modal-label" style={{ fontWeight: 600 }}>Lessons/Week:</label>
+                    <input type="number" min={1} value={bulkLpw} onChange={e => setBulkLpw(Math.max(1, Number(e.target.value) || 1))} style={{ width: 80 }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Summary */}
+              {bulkTeacher > 0 && bulkSubject > 0 && bulkSelectedClasses.length > 0 && (
+                <div style={{
+                  marginTop: 10, padding: "8px 12px", borderRadius: 8,
+                  background: "var(--surface-input)",
+                  border: "1px solid var(--border-subtle)",
+                  fontSize: "0.78rem",
+                }}>
+                  Will create <strong>{bulkSelectedClasses.length}</strong> lesson{bulkSelectedClasses.length !== 1 ? "s" : ""} ×
+                  <strong> {bulkLpw}</strong>/week = <strong>{bulkTotal}</strong> total lessons/week
+                  for <strong>{nameTeacher(bulkTeacher)}</strong>
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button type="button" className="btn" onClick={() => setBulkOpen(false)}>Cancel</button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={doBulkAssign}
+                  disabled={bulkSaving || !bulkTeacher || !bulkSubject || bulkSelectedClasses.length === 0}
+                >{bulkSaving ? "Creating…" : `Create ${bulkSelectedClasses.length} Lesson${bulkSelectedClasses.length !== 1 ? "s" : ""}`}</button>
               </div>
-            )}
-
-            <table className="data-table" style={{ marginTop: "0.75rem" }}>
-              <thead><tr><th>Class</th><th>Lessons / Week</th></tr></thead>
-              <tbody>
-                {classes.map(c => (
-                  <tr key={c.id}><td>{c.name}</td>
-                    <td><input type="number" min={0} value={bulkLessons[c.id] ?? 0} onChange={e => setBulkLessons(prev => ({ ...prev, [c.id]: Number(e.target.value) || 0 }))} style={{ width: 80 }} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={() => setBulkOpen(false)}>Cancel</button>
-              <button type="button" className="btn btn-primary" onClick={doBulkAssign} disabled={bulkSaving}>{bulkSaving ? "Creating…" : "Create Lessons"}</button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ═══ Copy from Class Modal ═══ */}
       {copyOpen && (
