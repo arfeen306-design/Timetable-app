@@ -258,4 +258,12 @@ def set_teacher_subjects_endpoint(
     t = teacher_repo.get_by_id_and_project(db, teacher_id, project.id)
     if not t:
         raise HTTPException(status_code=404, detail="Teacher not found")
-    teacher_repo.set_teacher_subjects(db, teacher_id, data.subject_ids)
+    try:
+        teacher_repo.set_teacher_subjects(db, teacher_id, data.subject_ids)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to update teacher subjects: {e}",
+        )
+
