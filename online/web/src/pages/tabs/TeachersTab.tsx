@@ -63,7 +63,6 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
   const [fCodeEditable, setFCodeEditable] = useState(false);
   const [fTitle, setFTitle] = useState("Mr.");
   const [fColor, setFColor] = useState("#E8725A");
-  const [fSubjectId, setFSubjectId] = useState<number | null>(null);
   const [fSubjects, setFSubjects] = useState<number[]>([]);
   const [fMaxDay, setFMaxDay] = useState(6);
   const [fMaxWeek, setFMaxWeek] = useState(30);
@@ -129,7 +128,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     setFName(""); setFCode(""); setFCodeEditable(false); setFTitle("Mr.");
     const usedColors = list.map(t => t.color).filter(Boolean) as string[];
     setFColor(nextAvailableColor(usedColors));
-    setFSubjectId(null); setFSubjects([]); setFMaxDay(6); setFMaxWeek(30);
+    setFSubjects([]); setFMaxDay(6); setFMaxWeek(30);
     setModalOpen(true);
   }
 
@@ -140,9 +139,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     setFName(`${teacher.first_name} ${teacher.last_name}`.trim());
     setFCode(teacher.code); setFCodeEditable(false);
     setFTitle(teacher.title); setFColor(teacher.color || "#E8725A");
-    const assignedSubjectIds = teacherSubjectIds.get(teacher.id) || [];
-    setFSubjects(assignedSubjectIds);
-    setFSubjectId(assignedSubjectIds.length > 0 ? assignedSubjectIds[0] : null);
+    setFSubjects(teacherSubjectIds.get(teacher.id) || []);
     setFMaxDay(teacher.max_periods_day ?? 6);
     setFMaxWeek(teacher.max_periods_week ?? 30);
     setModalOpen(true);
@@ -165,7 +162,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(" ");
     // Sync fSubjects from fSubjectId for the subject assignment API
-    const subjectsToSave = fSubjectId != null ? [fSubjectId] : fSubjects;
+    const subjectsToSave = fSubjects;
     const data = {
       first_name: firstName, last_name: lastName, code: fCode.trim(),
       title: fTitle, color: fColor, max_periods_day: fMaxDay, max_periods_week: fMaxWeek,
@@ -326,7 +323,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
               </th>
               <th style={{ width: 36 }}>#</th>
               <th>Name</th>
-              <th>Code</th>
+              <th>Abbreviation</th>
               <th>Title</th>
               <th style={{ width: 50 }}>Color</th>
               <th>Max/Day</th>
@@ -358,27 +355,34 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 3, minWidth: 80 }}>
                         {assignedIds.length === 0
                           ? <span style={{ fontSize: "0.7rem", color: "var(--slate-400)", fontStyle: "italic" }}>—</span>
-                          : assignedIds.map(sid => {
-                              const subj = subjectMap.get(sid);
-                              if (!subj) return null;
-                              return (
-                                <span
-                                  key={sid}
-                                  title={subj.name}
-                                  style={{
-                                    display: "inline-block",
-                                    background: subj.color,
-                                    color: "#fff",
-                                    fontSize: "0.6rem",
-                                    fontWeight: 700,
-                                    padding: "1px 5px",
-                                    borderRadius: "var(--radius-sm)",
-                                  }}
-                                >
-                                  {subj.code || subj.name.slice(0, 4)}
+                          : <>
+                              {assignedIds.slice(0, 2).map(sid => {
+                                const subj = subjectMap.get(sid);
+                                if (!subj) return null;
+                                return (
+                                  <span
+                                    key={sid}
+                                    title={subj.name}
+                                    style={{
+                                      display: "inline-block",
+                                      background: subj.color,
+                                      color: "#fff",
+                                      fontSize: "0.6rem",
+                                      fontWeight: 700,
+                                      padding: "1px 5px",
+                                      borderRadius: "var(--radius-sm)",
+                                    }}
+                                  >
+                                    {subj.code || subj.name.slice(0, 4)}
+                                  </span>
+                                );
+                              })}
+                              {assignedIds.length > 2 && (
+                                <span style={{ fontSize: "0.6rem", color: "var(--slate-500)", fontWeight: 600 }}>
+                                  +{assignedIds.length - 2} more
                                 </span>
-                              );
-                            })
+                              )}
+                            </>
                         }
                       </div>
                     </td>
@@ -460,7 +464,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
       </div>
 
       <div className="nav-footer">
-        <button type="button" className="btn" onClick={onNext}>Next: Lessons →</button>
+        <button type="button" className="btn" onClick={onNext}>Next: Subjects →</button>
       </div>
 
       {/* ── Add / Edit modal ── */}
@@ -515,9 +519,8 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                 </div>
               </div>
 
-              {/* ── Subject (deduplicated, with inline add) ── */}
               <div className="modal-field">
-                <label className="modal-label required">Subject:</label>
+                <label className="modal-label">Subjects:</label>
                 {addingNewSubject ? (
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <input
@@ -530,8 +533,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                           try {
                             const created = await api.createSubject(pid, { name: newSubjectName.trim() });
                             subjects.push(created);
-                            setFSubjectId(created.id);
-                            setFSubjects([created.id]);
+                            setFSubjects(prev => [...prev, created.id]);
                             setAddingNewSubject(false);
                             setNewSubjectName("");
                             toast("success", `Subject "${created.name}" created.`);
@@ -552,8 +554,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                         try {
                           const created = await api.createSubject(pid, { name: newSubjectName.trim() });
                           subjects.push(created);
-                          setFSubjectId(created.id);
-                          setFSubjects([created.id]);
+                          setFSubjects(prev => [...prev, created.id]);
                           setAddingNewSubject(false);
                           setNewSubjectName("");
                           toast("success", `Subject "${created.name}" created.`);
@@ -567,33 +568,66 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                     >Cancel</button>
                   </div>
                 ) : (
-                  <select
-                    value={fSubjectId ?? ""}
-                    onChange={e => {
-                      if (e.target.value === "__add_new__") {
-                        setAddingNewSubject(true);
-                        return;
-                      }
-                      const val = e.target.value ? Number(e.target.value) : null;
-                      setFSubjectId(val);
-                      if (val != null) setFSubjects([val]);
-                      else setFSubjects([]);
-                    }}
-                  >
-                    <option value="">— Select subject —</option>
-                    {(() => {
-                      const seen = new Set<string>();
-                      return subjects.filter(s => {
-                        const key = s.name.trim().toLowerCase();
-                        if (seen.has(key)) return false;
-                        seen.add(key);
-                        return true;
-                      }).map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ));
-                    })()}
-                    <option value="__add_new__" style={{ fontWeight: 700 }}>＋ Add New Subject…</option>
-                  </select>
+                  <div>
+                    {/* Selected subject chips */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: fSubjects.length > 0 ? 8 : 0 }}>
+                      {fSubjects.map(sid => {
+                        const subj = subjectMap.get(sid);
+                        if (!subj) return null;
+                        return (
+                          <span
+                            key={sid}
+                            style={{
+                              display: "inline-flex", alignItems: "center", gap: 4,
+                              background: subj.color || "var(--primary-100)",
+                              color: "#fff",
+                              fontSize: "0.75rem", fontWeight: 600,
+                              padding: "2px 8px", borderRadius: "var(--radius-sm)",
+                            }}
+                          >
+                            {subj.name}
+                            <button
+                              type="button"
+                              onClick={() => setFSubjects(prev => prev.filter(id => id !== sid))}
+                              style={{
+                                background: "none", border: "none", color: "rgba(255,255,255,0.7)",
+                                cursor: "pointer", fontSize: "0.85rem", padding: 0, lineHeight: 1,
+                              }}
+                              title={`Remove ${subj.name}`}
+                            >×</button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                    {/* Searchable multi-select dropdown */}
+                    <select
+                      value=""
+                      onChange={e => {
+                        if (e.target.value === "__add_new__") {
+                          setAddingNewSubject(true);
+                          return;
+                        }
+                        const val = Number(e.target.value);
+                        if (val && !fSubjects.includes(val)) {
+                          setFSubjects(prev => [...prev, val]);
+                        }
+                      }}
+                    >
+                      <option value="">{fSubjects.length === 0 ? "— Select subjects —" : "＋ Add another subject…"}</option>
+                      {(() => {
+                        const seen = new Set<string>();
+                        return subjects.filter(s => {
+                          const key = s.name.trim().toLowerCase();
+                          if (seen.has(key)) return false;
+                          seen.add(key);
+                          return !fSubjects.includes(s.id);
+                        }).map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ));
+                      })()}
+                      <option value="__add_new__" style={{ fontWeight: 700 }}>＋ Add New Subject…</option>
+                    </select>
+                  </div>
                 )}
               </div>
 

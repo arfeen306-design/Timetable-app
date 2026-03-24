@@ -12,8 +12,8 @@ import TeachersTab from "./tabs/TeachersTab";
 import LessonsTab from "./tabs/LessonsTab";
 import ConstraintsTab from "./tabs/ConstraintsTab";
 
-type Tab = "settings" | "subjects" | "classes" | "rooms" | "teachers" | "lessons" | "constraints";
-const TAB_SEGMENTS: Tab[] = ["settings", "subjects", "classes", "rooms", "teachers", "lessons", "constraints"];
+type Tab = "settings" | "teachers" | "subjects" | "classes" | "rooms" | "lessons" | "constraints";
+const TAB_SEGMENTS: Tab[] = ["settings", "teachers", "subjects", "classes", "rooms", "lessons", "constraints"];
 
 export default function ProjectEditor() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -77,10 +77,10 @@ export default function ProjectEditor() {
         <ClassesTab pid={pid} classes={classes} teachers={teachers} rooms={rooms} onChange={setClasses} onNext={() => navigateTab("rooms")} />
       )}
       {tab === "rooms" && (
-        <ClassroomsTab pid={pid} rooms={rooms} onChange={setRooms} onNext={() => navigateTab("teachers")} />
+        <ClassroomsTab pid={pid} rooms={rooms} onChange={setRooms} onNext={() => navigateTab("lessons")} />
       )}
       {tab === "teachers" && (
-        <TeachersTab pid={pid} teachers={teachers} subjects={subjects} onChange={setTeachers} onNext={() => navigateTab("lessons")} />
+        <TeachersTab pid={pid} teachers={teachers} subjects={subjects} onChange={setTeachers} onNext={() => navigateTab("subjects")} />
       )}
       {tab === "lessons" && (
         <LessonsTab pid={pid} lessons={lessons} subjects={subjects} classes={classes} teachers={teachers} onChange={setLessons} onNext={() => navigateTab("constraints")} />
@@ -352,7 +352,7 @@ function SettingsTab({
       });
       onSave();
       toast("success", "School settings saved.");
-      if (andNext) navigate(`/project/${pid}/subjects`);
+      if (andNext) navigate(`/project/${pid}/teachers`);
     } catch (err) { toast("error", err instanceof Error ? err.message : "Save failed"); }
     finally { setSaving(false); }
   }
@@ -488,7 +488,7 @@ function SettingsTab({
       {/* ═══ SAVE FOOTER ═══ */}
       <div className="settings-footer">
         <button type="button" className="btn btn-primary" onClick={() => save()} disabled={saving}>{saving ? "Saving…" : "💾 Save Settings"}</button>
-        <button type="button" className="btn" onClick={() => save(true)} disabled={saving}>Next: Subjects →</button>
+        <button type="button" className="btn" onClick={() => save(true)} disabled={saving}>Next: Teachers →</button>
       </div>
     </div>
   );
