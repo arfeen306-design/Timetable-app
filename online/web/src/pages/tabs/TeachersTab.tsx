@@ -398,9 +398,23 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
         <td>
           <input
             type="number"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={maxDay}
-            onChange={e => { setMaxDay(Math.max(1, Math.min(10, Number(e.target.value) || 1))); markDirty(); }}
-            onBlur={handleBlur}
+            onChange={e => {
+              const raw = e.target.value.replace(/[^0-9]/g, '');
+              if (raw === '') { setMaxDay(0); markDirty(); return; }
+              setMaxDay(Math.max(1, Math.min(10, Number(raw)))); markDirty();
+            }}
+            onKeyDown={e => {
+              if (['Backspace','Delete','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key)) return;
+              if (e.ctrlKey || e.metaKey) return;
+              if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+            }}
+            onBlur={e => {
+              if (!e.target.value || Number(e.target.value) < 1) { setMaxDay(6); markDirty(); }
+              handleBlur();
+            }}
             min={1} max={10}
             style={{
               width: 44, border: "none", background: "transparent",
@@ -414,9 +428,23 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
         <td>
           <input
             type="number"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={maxWeek}
-            onChange={e => { setMaxWeek(Math.max(1, Math.min(50, Number(e.target.value) || 1))); markDirty(); }}
-            onBlur={handleBlur}
+            onChange={e => {
+              const raw = e.target.value.replace(/[^0-9]/g, '');
+              if (raw === '') { setMaxWeek(0); markDirty(); return; }
+              setMaxWeek(Math.max(1, Math.min(50, Number(raw)))); markDirty();
+            }}
+            onKeyDown={e => {
+              if (['Backspace','Delete','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key)) return;
+              if (e.ctrlKey || e.metaKey) return;
+              if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+            }}
+            onBlur={e => {
+              if (!e.target.value || Number(e.target.value) < 1) { setMaxWeek(30); markDirty(); }
+              handleBlur();
+            }}
             min={1} max={50}
             style={{
               width: 44, border: "none", background: "transparent",
