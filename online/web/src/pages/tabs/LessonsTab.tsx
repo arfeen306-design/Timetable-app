@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import * as api from "../../api";
 import { useToast } from "../../context/ToastContext";
 import SearchableSelect from "../../components/SearchableSelect";
@@ -25,6 +25,23 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
   const [bulkOpen, setBulkOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
 
+  /* ── Teacher → Subject mapping (fetched once) ── */
+  const [teacherSubjectMap, setTeacherSubjectMap] = useState<Map<number, number[]>>(new Map());
+  useEffect(() => {
+    if (teachers.length === 0) return;
+    Promise.all(
+      teachers.map(t =>
+        api.getTeacherSubjects(pid, t.id)
+          .then(ids => ({ id: t.id, ids }))
+          .catch(() => ({ id: t.id, ids: [] as number[] }))
+      )
+    ).then(results => {
+      const map = new Map<number, number[]>();
+      results.forEach(r => map.set(r.id, r.ids));
+      setTeacherSubjectMap(map);
+    });
+  }, [pid, teachers.length]);
+
   /* Single lesson form */
   const [fTeacher, setFTeacher] = useState(0);
   const [fSubject, setFSubject] = useState(0);
@@ -42,6 +59,45 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
   const [copySource, setCopySource] = useState(0);
   const [copyTargets, setCopyTargets] = useState<number[]>([]);
   const [copySaving, setCopySaving] = useState(false);
+
+  /* ── Auto-populate subject when teacher changes (single modal) ── */
+  useEffect(() => {
+    if (!fTeacher) { setFSubject(0); return; }
+    const linked = teacherSubjectMap.get(fTeacher) || [];
+    if (linked.length === 1) {
+      setFSubject(linked[0]); // Auto-select sole subject
+    } else if (linked.length > 1 && !linked.includes(fSubject)) {
+      setFSubject(linked[0]); // Default to first if current not in list
+    } else if (linked.length === 0) {
+      setFSubject(0);
+    }
+  }, [fTeacher, teacherSubjectMap]);
+
+  /* ── Auto-populate subject when teacher changes (bulk modal) ── */
+  useEffect(() => {
+    if (!bulkTeacher) { setBulkSubject(0); return; }
+    const linked = teacherSubjectMap.get(bulkTeacher) || [];
+    if (linked.length === 1) {
+      setBulkSubject(linked[0]);
+    } else if (linked.length > 1 && !linked.includes(bulkSubject)) {
+      setBulkSubject(linked[0]);
+    } else if (linked.length === 0) {
+      setBulkSubject(0);
+    }
+  }, [bulkTeacher, teacherSubjectMap]);
+
+  /* ── Compute filtered subjects for selected teacher ── */
+  const fLinkedSubjectIds = fTeacher ? (teacherSubjectMap.get(fTeacher) || []) : [];
+  const fLinkedSubjects = fLinkedSubjectIds.length > 0
+    ? subjects.filter(s => fLinkedSubjectIds.includes(s.id))
+    : subjects;
+  const fIsOverride = fSubject && fLinkedSubjectIds.length > 0 && !fLinkedSubjectIds.includes(fSubject);
+
+  const bulkLinkedSubjectIds = bulkTeacher ? (teacherSubjectMap.get(bulkTeacher) || []) : [];
+  const bulkLinkedSubjects = bulkLinkedSubjectIds.length > 0
+    ? subjects.filter(s => bulkLinkedSubjectIds.includes(s.id))
+    : subjects;
+  const bulkIsOverride = bulkSubject && bulkLinkedSubjectIds.length > 0 && !bulkLinkedSubjectIds.includes(bulkSubject);
 
   function nameTeacher(id: number) { const t = teachers.find(x => x.id === id); return t ? `${t.first_name} ${t.last_name}` : `#${id}`; }
   function nameSubject(id: number) { return subjects.find(x => x.id === id)?.name ?? `#${id}`; }
@@ -109,6 +165,83 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
     finally { setCopySaving(false); }
   }
 
+  /* ── Helper: Subject selector with auto-fill indicator ── */
+  function SubjectSelector({ value, onChange: onChangeSub, linkedIds, linkedSubjects, allSubjects, isOverride }: {
+    value: number; onChange: (v: number) => void;
+    linkedIds: number[]; linkedSubjects: Subject[]; allSubjects: Subject[];
+    isOverride: boolean;
+  }) {
+    const [showAll, setShowAll] = useState(false);
+    const displayList = showAll ? allSubjects : (linkedSubjects.length > 0 ? linkedSubjects : allSubjects);
+
+    return (
+      <div>
+        <select
+          value={value}
+          onChange={e => onChangeSub(Number(e.target.value))}
+          style={{
+            maxWidth: "100%",
+            borderColor: isOverride ? "var(--warning-500, #f59e0b)" : undefined,
+          }}
+        >
+          <option value={0}>
+            {linkedIds.length === 0 ? "No subjects linked — select manually" : "Select subject"}
+          </option>
+          {displayList.map(s => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+              {linkedIds.includes(s.id) ? " ✓" : ""}
+            </option>
+          ))}
+        </select>
+        {/* Status line */}
+        <div style={{ marginTop: 4, fontSize: "0.72rem" }}>
+          {linkedIds.length === 1 && value === linkedIds[0] && (
+            <span style={{ color: "var(--success-600, #16a34a)", fontWeight: 600 }}>
+              ✓ Auto-filled from teacher profile
+            </span>
+          )}
+          {linkedIds.length > 1 && linkedIds.includes(value) && (
+            <span style={{ color: "var(--primary-600)", fontWeight: 500 }}>
+              {linkedIds.length} subjects linked — showing teacher's subjects
+            </span>
+          )}
+          {linkedIds.length === 0 && (
+            <span style={{ color: "var(--warning-500, #f59e0b)", fontStyle: "italic" }}>
+              ⚠ No subjects found for this teacher. Add one in the Teachers tab.
+            </span>
+          )}
+          {isOverride && (
+            <span style={{ color: "var(--warning-600, #d97706)", fontWeight: 500 }}>
+              ⚠ This subject isn't linked to the teacher's profile
+            </span>
+          )}
+        </div>
+        {/* Toggle to show all subjects */}
+        {linkedSubjects.length > 0 && !showAll && (
+          <button
+            type="button"
+            onClick={() => setShowAll(true)}
+            style={{
+              marginTop: 4, fontSize: "0.68rem", background: "none", border: "none",
+              color: "var(--primary-500)", cursor: "pointer", textDecoration: "underline", padding: 0,
+            }}
+          >Show all subjects</button>
+        )}
+        {showAll && (
+          <button
+            type="button"
+            onClick={() => setShowAll(false)}
+            style={{
+              marginTop: 4, fontSize: "0.68rem", background: "none", border: "none",
+              color: "var(--slate-400)", cursor: "pointer", textDecoration: "underline", padding: 0,
+            }}
+          >Show only linked</button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Lesson Assignments</h2>
@@ -119,7 +252,7 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
         <button type="button" className="btn btn-primary" onClick={() => { setBulkTeacher(0); setBulkSubject(0); setBulkPeriods({}); setBulkOpen(true); }}>+ Bulk Assign (1 Teacher → Many Classes)</button>
         <button type="button" className="btn" onClick={() => { setCopySource(0); setCopyTargets([]); setCopyOpen(true); }}>Copy from Class</button>
         <button type="button" className="btn btn-danger" onClick={deleteSelected} disabled={selectedId == null}>Delete</button>
-        <span style={{ marginLeft: "auto", color: "#64748b", fontStyle: "italic", fontSize: "0.85rem" }}>{lessons.length} lessons, {totalPeriods} total periods/week</span>
+        <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontStyle: "italic", fontSize: "0.85rem" }}>{lessons.length} lessons, {totalPeriods} total periods/week</span>
       </div>
 
       {missing.length > 0 && (
@@ -142,7 +275,7 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
         <button type="button" className="btn" onClick={onNext}>Next: Constraints →</button>
       </div>
 
-      {/* Add Single Lesson Modal */}
+      {/* ═══ Add Single Lesson Modal ═══ */}
       {modalOpen && (
         <div className="modal-overlay" onClick={() => setModalOpen(false)}>
           <div className="modal-dialog" onClick={e => e.stopPropagation()}>
@@ -153,16 +286,27 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
                 <SearchableSelect
                   value={fTeacher || ""}
                   onChange={v => setFTeacher(v ? Number(v) : 0)}
-                  options={teachers.map(t => ({ value: t.id, label: `${t.first_name} ${t.last_name}` }))}
+                  options={teachers.map(t => {
+                    const cnt = (teacherSubjectMap.get(t.id) || []).length;
+                    return { value: t.id, label: `${t.first_name} ${t.last_name}${cnt ? ` (${cnt} subj)` : ''}` };
+                  })}
                   placeholder="Select teacher"
                 />
               </div>
               <div className="modal-field">
                 <label className="modal-label required">Subject:</label>
-                <select value={fSubject} onChange={e => setFSubject(Number(e.target.value))}>
-                  <option value={0}>Select subject</option>
-                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                {fTeacher ? (
+                  <SubjectSelector
+                    value={fSubject}
+                    onChange={setFSubject}
+                    linkedIds={fLinkedSubjectIds}
+                    linkedSubjects={fLinkedSubjects}
+                    allSubjects={subjects}
+                    isOverride={!!fIsOverride}
+                  />
+                ) : (
+                  <select disabled><option>Select a teacher first</option></select>
+                )}
               </div>
               <div className="modal-field">
                 <label className="modal-label required">Class:</label>
@@ -181,29 +325,56 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
         </div>
       )}
 
-      {/* Bulk Assign Modal */}
+      {/* ═══ Bulk Assign Modal ═══ */}
       {bulkOpen && (
         <div className="modal-overlay" onClick={() => setBulkOpen(false)}>
           <div className="modal-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
             <h3 style={{ marginTop: 0 }}>Bulk Assign</h3>
-            <p className="subheading">Assign one teacher and one subject to multiple classes. Set periods per week for each class.</p>
+            <p className="subheading">Select a teacher — their linked subjects will auto-fill. Then set periods per class.</p>
             <div className="modal-form">
               <div className="modal-field"><label className="modal-label">Teacher:</label>
                 <SearchableSelect
                   value={bulkTeacher || ""}
                   onChange={v => setBulkTeacher(v ? Number(v) : 0)}
-                  options={teachers.map(t => ({ value: t.id, label: `${t.first_name} ${t.last_name}` }))}
+                  options={teachers.map(t => {
+                    const cnt = (teacherSubjectMap.get(t.id) || []).length;
+                    return { value: t.id, label: `${t.first_name} ${t.last_name}${cnt ? ` (${cnt} subj)` : ''}` };
+                  })}
                   placeholder="Select teacher"
                   style={{ maxWidth: "100%" }}
                 />
               </div>
               <div className="modal-field"><label className="modal-label">Subject:</label>
-                <select value={bulkSubject} onChange={e => setBulkSubject(Number(e.target.value))} style={{ maxWidth: "100%" }}>
-                  <option value={0}>Select subject</option>
-                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                {bulkTeacher ? (
+                  <SubjectSelector
+                    value={bulkSubject}
+                    onChange={setBulkSubject}
+                    linkedIds={bulkLinkedSubjectIds}
+                    linkedSubjects={bulkLinkedSubjects}
+                    allSubjects={subjects}
+                    isOverride={!!bulkIsOverride}
+                  />
+                ) : (
+                  <select disabled style={{ maxWidth: "100%" }}><option>Select a teacher first</option></select>
+                )}
               </div>
             </div>
+
+            {/* Auto-fill summary */}
+            {bulkTeacher > 0 && bulkSubject > 0 && (
+              <div style={{
+                marginTop: 8, padding: "8px 12px", borderRadius: 8,
+                background: "var(--surface-input, #f8fafc)",
+                border: "1px solid var(--border-subtle, #e2e8f0)",
+                fontSize: "0.78rem",
+              }}>
+                <strong>{nameTeacher(bulkTeacher)}</strong> teaching <strong>{nameSubject(bulkSubject)}</strong>
+                {bulkLinkedSubjectIds.length === 1 && (
+                  <span style={{ color: "var(--success-600)", marginLeft: 8 }}>✓ Auto-filled</span>
+                )}
+              </div>
+            )}
+
             <table className="data-table" style={{ marginTop: "0.75rem" }}>
               <thead><tr><th>Class</th><th>Periods / Week</th></tr></thead>
               <tbody>
@@ -222,7 +393,7 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
         </div>
       )}
 
-      {/* Copy from Class Modal */}
+      {/* ═══ Copy from Class Modal ═══ */}
       {copyOpen && (
         <div className="modal-overlay" onClick={() => setCopyOpen(false)}>
           <div className="modal-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
@@ -238,7 +409,7 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
             </div>
             <div style={{ marginTop: "0.75rem" }}>
               <label className="modal-label" style={{ display: "block", marginBottom: 4 }}>To classes (select one or more):</label>
-              <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: 8, padding: "0.5rem 0.75rem" }}>
+              <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid var(--border-default, #e2e8f0)", borderRadius: 8, padding: "0.5rem 0.75rem" }}>
                 {classes.filter(c => c.id !== copySource).map(c => (
                   <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", cursor: "pointer" }}>
                     <input type="checkbox" checked={copyTargets.includes(c.id)} onChange={() => setCopyTargets(prev => prev.includes(c.id) ? prev.filter(x => x !== c.id) : [...prev, c.id])} style={{ width: "auto" }} />
