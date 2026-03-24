@@ -14,7 +14,16 @@ interface Props {
   onNext: () => void;
 }
 
-const GRADE_OPTIONS = Array.from({ length: 14 }, (_, i) => i); // 0-13
+// Pre-defined grade chips: Pre, 1–11, AS, A2, 12, 13
+const BUILTIN_GRADES: { key: string; label: string }[] = [
+  { key: "0", label: "Pre" },
+  ...Array.from({ length: 11 }, (_, i) => ({ key: String(i + 1), label: String(i + 1) })),
+  { key: "AS", label: "AS" },
+  { key: "A2", label: "A2" },
+  { key: "12", label: "12" },
+  { key: "13", label: "13" },
+];
+
 const CLASS_COLORS = ['#50C878','#4F46E5','#0891B2','#D97706','#7C3AED','#0F766E','#9333EA','#0369A1','#15803D','#C2410C','#B45309','#16A34A','#DC2626','#6366F1'];
 const DEFAULT_ALPHA_SECTIONS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
 
@@ -22,15 +31,32 @@ function parseSections(input: string): string[] {
   return input.split(",").map(s => s.trim()).filter(s => s.length > 0);
 }
 
+function gradeName(g: string, section?: string): string {
+  const base = g === "0" ? "Pre-School" : /^\d+$/.test(g) ? `Grade ${g}` : g;
+  return section ? `${base}-${section}` : base;
+}
+
+function gradeCode(g: string, section?: string): string {
+  const base = g === "0" ? "PRE" : g.toUpperCase();
+  return section ? `${base}-${section}`.toUpperCase() : base;
+}
+
+function gradeLabel(g: string): string {
+  return g === "0" ? "Pre-School" : /^\d+$/.test(g) ? `Grade ${g}` : g;
+}
+
 function ClassesTab({ pid, classes, onChange, onNext }: Props) {
   const toast = useToast();
 
   // ── Bulk creation state ──
-  const [selectedGrades, setSelectedGrades] = useState<number[]>([]);
+  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  const [customGrades, setCustomGrades] = useState<string[]>([]); // user-defined grade labels
+  const [customInput, setCustomInput] = useState("");
+  const [showCustomInput, setShowCustomInput] = useState(false);
   const [sameForAll, setSameForAll] = useState(true);
   const [sectionCount, setSectionCount] = useState(3);
   const [sharedSections, setSharedSections] = useState("");
-  const [perGradeSections, setPerGradeSections] = useState<Record<number, string>>({});
+  const [perGradeSections, setPerGradeSections] = useState<Record<string, string>>({});
   const [editMode, setEditMode] = useState(classes.length === 0);
   const [saving, setSaving] = useState(false);
   const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
@@ -43,19 +69,51 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
   // Delete state
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
 
+  // ── All grade chips (built-in + custom) ──
+  const allGrades = useMemo(() => {
+    const list = [...BUILTIN_GRADES];
+    for (const cg of customGrades) {
+      if (!list.some(g => g.key === cg)) {
+        list.push({ key: cg, label: cg });
+      }
+    }
+    return list;
+  }, [customGrades]);
+
   // ── Grade selection ──
-  function toggleGrade(g: number) {
-    setSelectedGrades(prev =>
-      prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g].sort((a, b) => a - b)
-    );
+  function toggleGrade(key: string) {
+    setSelectedGrades(prev => {
+      if (prev.includes(key)) return prev.filter(x => x !== key);
+      // Maintain order: follow allGrades order
+      const order = allGrades.map(g => g.key);
+      const next = [...prev, key];
+      return next.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    });
   }
 
   function selectAllGrades() {
-    setSelectedGrades([...GRADE_OPTIONS]);
+    setSelectedGrades(allGrades.map(g => g.key));
   }
 
   function clearGrades() {
     setSelectedGrades([]);
+  }
+
+  function addCustomGrade() {
+    const label = customInput.trim();
+    if (!label) return;
+    if (label.length > 10) { toast("error", "Grade label must be 10 characters or fewer."); return; }
+    if (allGrades.some(g => g.key.toLowerCase() === label.toLowerCase())) { toast("info", `"${label}" already exists.`); return; }
+    setCustomGrades(prev => [...prev, label]);
+    setSelectedGrades(prev => [...prev, label]);
+    setCustomInput("");
+    setShowCustomInput(false);
+    toast("success", `Grade "${label}" added.`);
+  }
+
+  function removeCustomGrade(key: string) {
+    setCustomGrades(prev => prev.filter(g => g !== key));
+    setSelectedGrades(prev => prev.filter(g => g !== key));
   }
 
   // ── Auto-fill section names from count ──
@@ -74,19 +132,19 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
       const sects = parseSections(sectionsStr);
       if (sects.length === 0) {
         result.push({
-          grade: String(g),
+          grade: g,
           section: "",
-          name: g === 0 ? "Pre-School" : `Grade ${g}`,
-          code: g === 0 ? "PRE" : `${g}`,
+          name: gradeName(g),
+          code: gradeCode(g),
           color: CLASS_COLORS[colorIdx++ % CLASS_COLORS.length],
         });
       } else {
         for (const sec of sects) {
           result.push({
-            grade: String(g),
+            grade: g,
             section: sec,
-            name: g === 0 ? `Pre-${sec}` : `Grade ${g}-${sec}`,
-            code: g === 0 ? `PRE-${sec}`.toUpperCase() : `${g}-${sec}`.toUpperCase(),
+            name: gradeName(g, sec),
+            code: gradeCode(g, sec),
             color: CLASS_COLORS[colorIdx++ % CLASS_COLORS.length],
           });
         }
@@ -105,7 +163,6 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
       toast("error", "Select at least one grade.");
       return;
     }
-    // If there are existing classes and we're generating new ones, show overwrite warning
     if (classes.length > 0 && newItems.length > 0 && !showOverwriteWarning) {
       setShowOverwriteWarning(true);
       return;
@@ -200,25 +257,25 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
           <button type="button" className="btn btn-danger" onClick={handleDelete}>🗑 Delete ({checkedIds.size})</button>
         )}
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: "0.72rem", color: "var(--slate-400)" }}>{classes.length} class{classes.length !== 1 ? "es" : ""}</span>
+        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{classes.length} class{classes.length !== 1 ? "es" : ""}</span>
       </div>
 
       {/* ── Import result ── */}
       {importResult && (
         <div style={{
           marginBottom: "1rem", borderRadius: 8, padding: "12px 16px",
-          background: importResult.errors.length > 0 ? "#FFFBEB" : "#F0FDF4",
-          border: `1px solid ${importResult.errors.length > 0 ? "#FDE68A" : "#BBF7D0"}`,
+          background: importResult.errors.length > 0 ? "var(--warning-50)" : "var(--success-50)",
+          border: `1px solid ${importResult.errors.length > 0 ? "var(--warning-200)" : "var(--success-200)"}`,
         }}>
           <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>✅ Imported {importResult.success_count} class(es)</div>
-          <button type="button" onClick={() => setImportResult(null)} style={{ marginTop: 4, fontSize: "0.72rem", background: "none", border: "none", color: "var(--slate-400)", cursor: "pointer", textDecoration: "underline" }}>Dismiss</button>
+          <button type="button" onClick={() => setImportResult(null)} style={{ marginTop: 4, fontSize: "0.72rem", background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", textDecoration: "underline" }}>Dismiss</button>
         </div>
       )}
 
       {/* ═══ BULK GENERATOR ═══ */}
       {editMode && (
         <div style={{
-          background: "var(--surface-card, #f8fafc)",
+          background: "var(--surface-input, var(--surface-raised))",
           border: "2px solid var(--primary-200, #c7d2fe)",
           borderRadius: 12, padding: "1.5rem", marginBottom: "1.5rem",
         }}>
@@ -235,26 +292,97 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
                 color: "#fff", fontSize: "0.72rem", fontWeight: 700,
               }}>1</span>
               <span style={{ fontWeight: 600, fontSize: "0.88rem" }}>Select Grades</span>
-              <button type="button" onClick={selectAllGrades} style={{ fontSize: "0.68rem", background: "none", border: "1px solid var(--slate-200)", borderRadius: 4, padding: "2px 8px", cursor: "pointer", color: "var(--primary-600)", fontWeight: 600 }}>Select All</button>
-              <button type="button" onClick={clearGrades} style={{ fontSize: "0.68rem", background: "none", border: "1px solid var(--slate-200)", borderRadius: 4, padding: "2px 8px", cursor: "pointer", color: "var(--slate-500)" }}>Clear</button>
+              <button type="button" onClick={selectAllGrades} style={{ fontSize: "0.68rem", background: "none", border: "1px solid var(--border-default)", borderRadius: 4, padding: "2px 8px", cursor: "pointer", color: "var(--primary-600)", fontWeight: 600 }}>Select All</button>
+              <button type="button" onClick={clearGrades} style={{ fontSize: "0.68rem", background: "none", border: "1px solid var(--border-default)", borderRadius: 4, padding: "2px 8px", cursor: "pointer", color: "var(--text-muted)" }}>Clear</button>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-              {GRADE_OPTIONS.map(g => (
+              {allGrades.map(g => {
+                const isCustom = customGrades.includes(g.key);
+                const isSelected = selectedGrades.includes(g.key);
+                return (
+                  <div key={g.key} style={{ position: "relative", display: "inline-flex" }}>
+                    <button
+                      type="button"
+                      onClick={() => toggleGrade(g.key)}
+                      style={{
+                        padding: "6px 16px", borderRadius: 8,
+                        border: isSelected ? "2px solid var(--primary-500)" : "2px solid var(--border-default)",
+                        background: isSelected ? "var(--primary-500)" : "var(--surface-card)",
+                        color: isSelected ? "#fff" : "var(--text-secondary)",
+                        fontWeight: 700, fontSize: "0.82rem", cursor: "pointer",
+                        transition: "all 0.12s", minWidth: 44,
+                      }}
+                    >
+                      {g.label}
+                    </button>
+                    {isCustom && !isSelected && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); removeCustomGrade(g.key); }}
+                        style={{
+                          position: "absolute", top: -5, right: -5,
+                          width: 16, height: 16, borderRadius: "50%",
+                          background: "var(--danger-500, #dc2626)", color: "#fff",
+                          border: "none", fontSize: "0.55rem", cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          lineHeight: 1,
+                        }}
+                        title={`Remove "${g.key}"`}
+                      >×</button>
+                    )}
+                  </div>
+                );
+              })}
+              {/* ── Custom Grade Button ── */}
+              {!showCustomInput ? (
                 <button
-                  key={g} type="button"
-                  onClick={() => toggleGrade(g)}
+                  type="button"
+                  onClick={() => setShowCustomInput(true)}
                   style={{
-                    padding: "6px 16px", borderRadius: 8,
-                    border: selectedGrades.includes(g) ? "2px solid var(--primary-500)" : "2px solid var(--slate-200)",
-                    background: selectedGrades.includes(g) ? "var(--primary-500)" : "#fff",
-                    color: selectedGrades.includes(g) ? "#fff" : "var(--slate-600)",
-                    fontWeight: 700, fontSize: "0.82rem", cursor: "pointer",
-                    transition: "all 0.12s", minWidth: 44,
+                    padding: "6px 14px", borderRadius: 8,
+                    border: "2px dashed var(--primary-300)",
+                    background: "transparent",
+                    color: "var(--primary-500)", fontWeight: 600, fontSize: "0.82rem",
+                    cursor: "pointer", transition: "all 0.12s", minWidth: 44,
                   }}
                 >
-                  {g === 0 ? "Pre" : g}
+                  ➕ Custom
                 </button>
-              ))}
+              ) : (
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <input
+                    value={customInput}
+                    onChange={e => setCustomInput(e.target.value.slice(0, 10))}
+                    placeholder="e.g. Nursery"
+                    autoFocus
+                    onKeyDown={e => { if (e.key === "Enter") addCustomGrade(); if (e.key === "Escape") { setShowCustomInput(false); setCustomInput(""); } }}
+                    style={{
+                      width: 100, padding: "5px 8px", borderRadius: 6,
+                      border: "2px solid var(--primary-400)", fontSize: "0.82rem",
+                      outline: "none", background: "var(--surface-card)", color: "var(--text-primary)",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={addCustomGrade}
+                    disabled={!customInput.trim()}
+                    style={{
+                      padding: "5px 10px", borderRadius: 6,
+                      border: "none", background: "var(--primary-500)", color: "#fff",
+                      fontWeight: 700, fontSize: "0.78rem", cursor: "pointer",
+                    }}
+                  >Add</button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowCustomInput(false); setCustomInput(""); }}
+                    style={{
+                      padding: "5px 8px", borderRadius: 6,
+                      border: "1px solid var(--border-default)", background: "var(--surface-card)",
+                      color: "var(--text-muted)", fontSize: "0.78rem", cursor: "pointer",
+                    }}
+                  >✕</button>
+                </div>
+              )}
             </div>
             {selectedGrades.length > 0 && (
               <p style={{ margin: "6px 0 0", fontSize: "0.72rem", color: "var(--primary-600)", fontWeight: 500 }}>
@@ -282,7 +410,6 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
 
               {sameForAll ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {/* Section count + auto-fill */}
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <label style={{ fontSize: "0.82rem", fontWeight: 500 }}>Sections per grade:</label>
                     <input
@@ -298,13 +425,12 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
                         if (['Backspace','Delete','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
                         if (!/^[0-9]$/.test(e.key)) e.preventDefault();
                       }}
-                      style={{ width: 56, textAlign: "center", fontWeight: 700, fontSize: "0.88rem", borderRadius: 6, border: "1px solid var(--slate-200)", padding: "6px 8px" }}
+                      style={{ width: 56, textAlign: "center", fontWeight: 700, fontSize: "0.88rem", borderRadius: 6, border: "1px solid var(--border-default)", padding: "6px 8px", background: "var(--surface-card)", color: "var(--text-primary)" }}
                     />
-                    <span style={{ fontSize: "0.72rem", color: "var(--slate-400)" }}>= {selectedGrades.length * Math.max(parseSections(sharedSections).length, 1)} total classes</span>
+                    <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>= {selectedGrades.length * Math.max(parseSections(sharedSections).length, 1)} total classes</span>
                   </div>
-                  {/* Section names */}
                   <div>
-                    <label style={{ fontSize: "0.78rem", fontWeight: 500, color: "var(--slate-600)", display: "block", marginBottom: 4 }}>
+                    <label style={{ fontSize: "0.78rem", fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
                       Section names (comma separated):
                     </label>
                     <input
@@ -317,7 +443,8 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
                       placeholder='e.g. A, B, C, D  or  Red, Blue, Green'
                       style={{
                         width: "100%", maxWidth: 420, padding: "8px 12px",
-                        borderRadius: 8, border: "1px solid var(--slate-200)", fontSize: "0.82rem",
+                        borderRadius: 8, border: "1px solid var(--border-default)", fontSize: "0.82rem",
+                        background: "var(--surface-card)", color: "var(--text-primary)",
                       }}
                     />
                     {sharedSections && (
@@ -334,22 +461,22 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <p style={{ fontSize: "0.72rem", color: "var(--slate-400)", margin: "0 0 4px" }}>
+                  <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", margin: "0 0 4px" }}>
                     Customize sections per grade (comma separated):
                   </p>
                   {selectedGrades.map(g => (
                     <div key={g} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontWeight: 700, fontSize: "0.82rem", minWidth: 80, color: "var(--slate-700)" }}>
-                        {g === 0 ? "Pre-School" : `Grade ${g}`}:
+                      <span style={{ fontWeight: 700, fontSize: "0.82rem", minWidth: 80, color: "var(--text-primary)" }}>
+                        {gradeLabel(g)}:
                       </span>
                       <input
                         value={perGradeSections[g] || ""}
                         onChange={e => setPerGradeSections(prev => ({ ...prev, [g]: e.target.value }))}
                         placeholder="e.g. A, B, C"
-                        style={{ flex: 1, maxWidth: 300, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--slate-200)", fontSize: "0.82rem" }}
+                        style={{ flex: 1, maxWidth: 300, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border-default)", fontSize: "0.82rem", background: "var(--surface-card)", color: "var(--text-primary)" }}
                       />
                       {(perGradeSections[g] || "") && (
-                        <span style={{ fontSize: "0.68rem", color: "var(--slate-400)", fontWeight: 500 }}>
+                        <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 500 }}>
                           {parseSections(perGradeSections[g] || "").length} section{parseSections(perGradeSections[g] || "").length !== 1 ? "s" : ""}
                         </span>
                       )}
@@ -371,7 +498,7 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
                 }}>3</span>
                 <span style={{ fontWeight: 600, fontSize: "0.88rem" }}>
                   Preview — {preview.length} class{preview.length !== 1 ? "es" : ""}
-                  {existingItems.length > 0 && <span style={{ color: "var(--slate-400)", fontWeight: 400 }}> ({existingItems.length} already exist, {newItems.length} new)</span>}
+                  {existingItems.length > 0 && <span style={{ color: "var(--text-muted)", fontWeight: 400 }}> ({existingItems.length} already exist, {newItems.length} new)</span>}
                 </span>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 5, maxHeight: 140, overflowY: "auto", padding: 4 }}>
@@ -381,8 +508,8 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
                     <span key={i} style={{
                       display: "inline-block", padding: "4px 12px",
                       borderRadius: 6, fontSize: "0.72rem", fontWeight: 600,
-                      background: exists ? "var(--slate-100)" : p.color,
-                      color: exists ? "var(--slate-400)" : "#fff",
+                      background: exists ? "var(--surface-raised)" : p.color,
+                      color: exists ? "var(--text-muted)" : "#fff",
                       textDecoration: exists ? "line-through" : "none",
                       transition: "all 0.1s",
                     }} title={exists ? "Already exists — will be skipped" : `Will create: ${p.name} (${p.code})`}>
@@ -398,9 +525,9 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
           {showOverwriteWarning && (
             <div style={{
               marginBottom: "1rem", borderRadius: 8, padding: "12px 16px",
-              background: "#FEF3C7", border: "1px solid #FDE68A",
+              background: "var(--warning-50)", border: "1px solid var(--warning-200)",
             }}>
-              <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 600, color: "#92400E" }}>
+              <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 600, color: "var(--warning-700, #92400E)" }}>
                 ⚠️ You already have {classes.length} class{classes.length !== 1 ? "es" : ""}. 
                 {newItems.length > 0 && ` ${newItems.length} new class${newItems.length !== 1 ? "es" : ""} will be added.`}
                 {existingItems.length > 0 && ` ${existingItems.length} existing will be skipped.`}
@@ -430,7 +557,7 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
                 <button type="button" className="btn" onClick={() => { setEditMode(false); setShowOverwriteWarning(false); }}>Cancel</button>
               )}
               {newItems.length === 0 && preview.length > 0 && (
-                <span style={{ fontSize: "0.72rem", color: "var(--slate-400)" }}>All selected classes already exist.</span>
+                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>All selected classes already exist.</span>
               )}
             </div>
           )}
