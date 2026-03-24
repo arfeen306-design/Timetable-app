@@ -256,6 +256,24 @@ function ClassesTab({ pid, classes, onChange, onNext }: Props) {
         {checkedIds.size > 0 && (
           <button type="button" className="btn btn-danger" onClick={handleDelete}>🗑 Delete ({checkedIds.size})</button>
         )}
+        {classes.length > 0 && checkedIds.size === 0 && (
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={async () => {
+              if (!confirm(`⚠️ Delete ALL ${classes.length} class${classes.length !== 1 ? "es" : ""}? This cannot be undone.`)) return;
+              try {
+                const ids = classes.map(c => c.id);
+                const result = await api.bulkDeleteClasses(pid, ids);
+                onChange([]);
+                setCheckedIds(new Set());
+                toast("success", `🗑 ${result.deleted} class${result.deleted !== 1 ? "es" : ""} deleted — starting fresh.`);
+              } catch (err) {
+                toast("error", err instanceof Error ? err.message : "Delete all failed");
+              }
+            }}
+          >🗑 Reset All ({classes.length})</button>
+        )}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{classes.length} class{classes.length !== 1 ? "es" : ""}</span>
       </div>

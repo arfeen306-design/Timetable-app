@@ -21,6 +21,7 @@ export default function SubjectsTab({ pid, subjects, rooms, onChange, onNext }: 
   const [importFileRef] = useState(() => React.createRef<HTMLInputElement>());
   const [importing, setImporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   function toggleSelect(id: number) {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -199,6 +200,30 @@ export default function SubjectsTab({ pid, subjects, rooms, onChange, onNext }: 
       <div className="toolbar" style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
         <button type="button" className="btn" onClick={openAdd}>+ Add Subject</button>
         <button type="button" className="btn btn-primary" onClick={openLibrary}>Import from Library</button>
+        <button
+          type="button"
+          className="btn"
+          onClick={async () => {
+            setSeeding(true);
+            const nameSet = new Set(subjects.map(s => s.name.trim().toLowerCase()));
+            const toAdd = DEFAULT_SUBJECTS.filter(s => !nameSet.has(s.name.trim().toLowerCase()));
+            if (toAdd.length === 0) { toast("info", "All O/A Level subjects already exist."); setSeeding(false); return; }
+            let added = 0;
+            for (const s of toAdd) {
+              try {
+                await api.createSubject(pid, { name: s.name, code: s.code, category: s.category, color: s.color, max_per_day: 2 });
+                added++;
+              } catch { /* skip duplicates */ }
+            }
+            const list = await api.listSubjects(pid); onChange(list);
+            toast("success", `⚡ Added ${added} O/A Level subject${added !== 1 ? "s" : ""} instantly.`);
+            setSeeding(false);
+          }}
+          disabled={seeding}
+          style={{ background: seeding ? undefined : "var(--success-500, #16a34a)", color: "#fff", border: "none" }}
+        >
+          {seeding ? "⏳ Seeding…" : "⚡ Load O/A Level Subjects"}
+        </button>
         <input type="file" ref={importFileRef} accept=".xlsx,.xls" style={{ display: "none" }} onChange={onImportFile} />
         <button type="button" className="btn" onClick={() => importFileRef.current?.click()} disabled={importing}>{importing ? "Importing…" : "Import from Excel"}</button>
         <button type="button" className="btn" onClick={downloadTemplate}>Download Template</button>

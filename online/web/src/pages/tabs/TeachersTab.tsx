@@ -231,7 +231,7 @@ interface RowData {
   subjectIds: number[];
 }
 
-function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelete, isNew, toast }: {
+function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelete, isNew, toast, checked, onCheck }: {
   row: RowData;
   index: number;
   existingCodes: string[];
@@ -241,6 +241,8 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
   onDelete: (id: number) => Promise<void>;
   isNew: boolean;
   toast: ReturnType<typeof useToast>;
+  checked?: boolean;
+  onCheck?: (id: number) => void;
 }) {
   const [name, setName] = useState(row.name);
   const [code, setCode] = useState(row.code);
@@ -337,6 +339,12 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
   return (
     <>
       <tr style={{ background: rowBg, transition: "background 0.2s" }}>
+        {/* Checkbox */}
+        <td style={{ textAlign: "center", width: 36 }} onClick={e => e.stopPropagation()}>
+          {!isNew && row.id && onCheck ? (
+            <input type="checkbox" checked={!!checked} onChange={() => onCheck(row.id!)} style={{ width: "auto" }} />
+          ) : null}
+        </td>
         {/* # */}
         <td style={{ textAlign: "center", color: "var(--slate-400)", fontSize: "0.78rem", fontWeight: 500, width: 36 }}>
           {isNew ? "+" : index + 1}
@@ -527,6 +535,11 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success_count: number; total_rows: number; subjects_linked: number; errors: { row: number; message: string }[] } | null>(null);
 
+  // Bulk selection state
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   // Teacher → assigned subject IDs map
   const [teacherSubjectIds, setTeacherSubjectIds] = useState<Map<number, number[]>>(new Map());
 
@@ -579,11 +592,36 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     try {
       await api.deleteTeacher(pid, id);
       onChange(list.filter(t => t.id !== id));
+      setCheckedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
       toast("success", "Teacher deleted.");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Delete failed");
     }
   }
+
+  async function handleBulkDelete() {
+    if (checkedIds.size === 0) return;
+    if (!confirmDeleteAll) { setConfirmDeleteAll(true); return; }
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(checkedIds);
+      const result = await api.bulkDeleteTeachers(pid, ids);
+      onChange(list.filter(t => !ids.includes(t.id)));
+      setCheckedIds(new Set());
+      setConfirmDeleteAll(false);
+      toast("success", `${result.deleted} teacher${result.deleted !== 1 ? "s" : ""} deleted.`);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Bulk delete failed");
+    }
+    setBulkDeleting(false);
+  }
+
+  function toggleCheckAll(checked: boolean) {
+    setCheckedIds(checked ? new Set(list.map(t => t.id)) : new Set());
+  }
+
+  const allChecked = list.length > 0 && checkedIds.size === list.length;
+  const someChecked = checkedIds.size > 0 && !allChecked;
 
   async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
@@ -630,6 +668,26 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
           {importing ? "⏳ Processing…" : "📥 Import from Excel"}
         </button>
         <button type="button" className="btn" onClick={() => api.downloadTemplate("teachers")}>📋 Download Template</button>
+        {checkedIds.size > 0 && !confirmDeleteAll && (
+          <button type="button" className="btn btn-danger" onClick={handleBulkDelete} disabled={bulkDeleting}>
+            🗑 Delete ({checkedIds.size})
+          </button>
+        )}
+        {confirmDeleteAll && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "6px 12px", borderRadius: 8,
+            background: "var(--danger-50, #fef2f2)", border: "1px solid var(--danger-200, #fecaca)",
+          }}>
+            <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--danger-700, #b91c1c)" }}>
+              Delete {checkedIds.size} teacher{checkedIds.size !== 1 ? "s" : ""}? This cannot be undone.
+            </span>
+            <button type="button" className="btn btn-danger" onClick={handleBulkDelete} disabled={bulkDeleting} style={{ fontSize: "0.72rem", padding: "4px 12px" }}>
+              {bulkDeleting ? "Deleting…" : "Yes, Delete"}
+            </button>
+            <button type="button" className="btn" onClick={() => setConfirmDeleteAll(false)} style={{ fontSize: "0.72rem", padding: "4px 10px" }}>Cancel</button>
+          </div>
+        )}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: "0.72rem", color: "var(--slate-400)" }}>
           {list.length} teacher{list.length !== 1 ? "s" : ""}
@@ -674,6 +732,16 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
         <table className="data-table">
           <thead>
             <tr>
+              <th style={{ width: 36, textAlign: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={allChecked}
+                  ref={el => { if (el) el.indeterminate = someChecked; }}
+                  onChange={e => toggleCheckAll(e.target.checked)}
+                  title="Select all"
+                  style={{ width: "auto" }}
+                />
+              </th>
               <th style={{ width: 36 }}>#</th>
               <th style={{ minWidth: 160 }}>Name</th>
               <th style={{ width: 80 }}>Abbreviation</th>
@@ -698,6 +766,8 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                 onDelete={handleDelete}
                 isNew={false}
                 toast={toast}
+                checked={checkedIds.has(row.id!)}
+                onCheck={(id) => setCheckedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
               />
             ))}
             {/* Empty "new entry" row */}
