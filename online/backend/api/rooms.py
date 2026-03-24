@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import List, Optional
 
 from backend.auth.project_scope import get_project_or_404
 from backend.models.base import get_db
@@ -112,3 +112,25 @@ def delete_room_endpoint(
 ):
     if not delete_room(db, room_id, project.id):
         raise HTTPException(status_code=404, detail="Room not found")
+
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+
+
+@router.delete("/bulk", status_code=200)
+def bulk_delete_rooms(
+    data: BulkDeleteRequest,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    deleted = 0
+    failed: List[int] = []
+    for room_id in data.ids:
+        r = get_by_id_and_project(db, room_id, project.id)
+        if not r:
+            failed.append(room_id)
+            continue
+        delete_room(db, room_id, project.id)
+        deleted += 1
+    return {"deleted": deleted, "failed": failed}

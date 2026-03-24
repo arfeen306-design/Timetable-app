@@ -226,6 +226,13 @@ export function deleteRoom(projectId: number, id: number) {
   return api(`/api/projects/${projectId}/rooms/${id}`, { method: "DELETE" });
 }
 
+export function bulkDeleteRooms(projectId: number, ids: number[]) {
+  return api<{ deleted: number; failed: number[] }>(`/api/projects/${projectId}/rooms/bulk`, {
+    method: "DELETE",
+    body: JSON.stringify({ ids }),
+  });
+}
+
 // Teachers
 export function listTeachers(projectId: number) {
   return api<{ id: number; first_name: string; last_name: string; code: string; title: string; color: string; max_periods_day: number; max_periods_week: number }[]>(`/api/projects/${projectId}/teachers`);
@@ -388,8 +395,8 @@ export function moveEntry(projectId: number, entryId: number, newDayIndex: numbe
 }
 
 // Templates — download Excel templates for bulk import (same as desktop)
-export function downloadTemplate(type: "teachers" | "classes") {
-  const filename = type === "teachers" ? "teachers_template.xlsx" : "classes_template.xlsx";
+export function downloadTemplate(type: "teachers" | "classes" | "rooms") {
+  const filename = type === "teachers" ? "teachers_template.xlsx" : type === "classes" ? "classes_template.xlsx" : "rooms_template.xlsx";
   return apiBlob(`/api/templates/${type}.xlsx`).then((blob) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

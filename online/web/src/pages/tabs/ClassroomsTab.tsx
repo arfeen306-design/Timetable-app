@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import * as api from "../../api";
 import type { Room } from "../../api";
 import { useToast } from "../../context/ToastContext";
@@ -82,9 +82,11 @@ interface RowProps {
   onSave: (data: { id: number; name: string; code: string; room_type: string; capacity: number; color: string }) => Promise<void>;
   onDelete: (id: number) => void;
   pid: number;
+  checked?: boolean;
+  onCheck?: (id: number) => void;
 }
 
-function EditableRow({ row, index, isNew, existingCodes, onSave, onDelete }: RowProps) {
+function EditableRow({ row, index, isNew, existingCodes, onSave, onDelete, checked, onCheck }: RowProps) {
   const [name, setName] = useState(row.name);
   const [code, setCode] = useState(row.code);
   const [codeManual, setCodeManual] = useState(false);
@@ -139,6 +141,17 @@ function EditableRow({ row, index, isNew, existingCodes, onSave, onDelete }: Row
 
   return (
     <tr style={{ background: rowBg, transition: "background 0.2s" }}>
+      {/* Checkbox */}
+      <td style={{ textAlign: "center", width: 36 }} onClick={e => e.stopPropagation()}>
+        {!isNew && row.id && onCheck ? (
+          <input
+            type="checkbox"
+            checked={!!checked}
+            onChange={() => onCheck(row.id)}
+            style={{ width: "auto" }}
+          />
+        ) : null}
+      </td>
       {/* # */}
       <td style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "0.78rem", fontWeight: 500, width: 36 }}>
         {isNew ? "+" : index + 1}
@@ -267,21 +280,26 @@ function EditableRow({ row, index, isNew, existingCodes, onSave, onDelete }: Row
    ═══════════════════════════════════════════════════════ */
 export default function ClassroomsTab({ pid, rooms, onChange, onNext }: Props) {
   const toast = useToast();
-  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
-  const [deletingAll, setDeletingAll] = useState(false);
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const existingCodes = rooms.map(r => r.code);
+  const allChecked = rooms.length > 0 && checkedIds.size === rooms.length;
+  const someChecked = checkedIds.size > 0 && !allChecked;
+
+  function toggleCheckAll(checked: boolean) {
+    setCheckedIds(checked ? new Set(rooms.map(r => r.id)) : new Set());
+  }
 
   async function handleSave(data: { id: number; name: string; code: string; room_type: string; capacity: number; color: string }) {
     if (data.id) {
-      // Update existing
       await api.updateRoom(pid, data.id, {
         name: data.name, code: data.code, room_type: data.room_type, capacity: data.capacity,
       });
       onChange(rooms.map(r => r.id === data.id ? { ...r, ...data } : r));
       toast("success", "Room saved.");
     } else {
-      // Create new
       const created = await api.createRoom(pid, {
         name: data.name, code: data.code, room_type: data.room_type, capacity: data.capacity,
       });
@@ -294,27 +312,29 @@ export default function ClassroomsTab({ pid, rooms, onChange, onNext }: Props) {
     try {
       await api.deleteRoom(pid, id);
       onChange(rooms.filter(r => r.id !== id));
+      setCheckedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
       toast("success", "Room deleted.");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Delete failed");
     }
   }
 
-  async function handleDeleteAll() {
-    if (!confirmDeleteAll) { setConfirmDeleteAll(true); return; }
-    setDeletingAll(true);
+  async function handleBulkDelete() {
+    if (checkedIds.size === 0) return;
+    if (!confirmBulkDelete) { setConfirmBulkDelete(true); return; }
+    setBulkDeleting(true);
+    // Optimistic UI: remove from list immediately
+    const ids = Array.from(checkedIds);
+    onChange(rooms.filter(r => !ids.includes(r.id)));
+    setCheckedIds(new Set());
+    setConfirmBulkDelete(false);
     try {
-      let deleted = 0;
-      for (const r of rooms) {
-        try { await api.deleteRoom(pid, r.id); deleted++; } catch { /* skip */ }
-      }
-      onChange([]);
-      toast("success", `${deleted} classroom${deleted !== 1 ? "s" : ""} deleted.`);
+      const result = await api.bulkDeleteRooms(pid, ids);
+      toast("success", `${result.deleted} classroom${result.deleted !== 1 ? "s" : ""} deleted.`);
     } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Delete all failed");
+      toast("error", err instanceof Error ? err.message : "Bulk delete failed");
     }
-    setDeletingAll(false);
-    setConfirmDeleteAll(false);
+    setBulkDeleting(false);
   }
 
   const emptyRow = { id: 0, name: "", code: "", room_type: "Classroom", capacity: 40, color: COLOR_PALETTE[rooms.length % COLOR_PALETTE.length] };
@@ -343,42 +363,48 @@ export default function ClassroomsTab({ pid, rooms, onChange, onNext }: Props) {
 
       {/* Toolbar */}
       <div className="toolbar" style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-        {rooms.length > 0 && !confirmDeleteAll && (
+        <button type="button" className="btn" onClick={() => api.downloadTemplate("rooms")}>
+          📋 Download Template
+        </button>
+
+        {checkedIds.size > 0 && !confirmBulkDelete && (
           <button
             type="button"
             className="btn btn-danger"
-            onClick={handleDeleteAll}
-            disabled={deletingAll}
+            onClick={handleBulkDelete}
+            disabled={bulkDeleting}
           >
-            🗑 Delete All ({rooms.length})
+            🗑 Delete ({checkedIds.size})
           </button>
         )}
-        {confirmDeleteAll && (
+
+        {confirmBulkDelete && (
           <div style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "6px 12px", borderRadius: 8,
             background: "var(--danger-50, #fef2f2)", border: "1px solid var(--danger-200, #fecaca)",
           }}>
             <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--danger-700, #b91c1c)" }}>
-              Delete all {rooms.length} classroom{rooms.length !== 1 ? "s" : ""}? This cannot be undone.
+              Delete {checkedIds.size} classroom{checkedIds.size !== 1 ? "s" : ""}? This cannot be undone.
             </span>
             <button
               type="button"
               className="btn btn-danger"
-              onClick={handleDeleteAll}
-              disabled={deletingAll}
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
               style={{ fontSize: "0.72rem", padding: "4px 12px" }}
-            >{deletingAll ? "Deleting…" : "Yes, Delete All"}</button>
+            >{bulkDeleting ? "Deleting…" : "Yes, Delete"}</button>
             <button
               type="button"
               className="btn"
-              onClick={() => setConfirmDeleteAll(false)}
+              onClick={() => setConfirmBulkDelete(false)}
               style={{ fontSize: "0.72rem", padding: "4px 10px" }}
             >Cancel</button>
           </div>
         )}
+
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+        <span style={{ fontSize: "0.72rem", color: "var(--slate-400)" }}>
           {rooms.length} room{rooms.length !== 1 ? "s" : ""}
         </span>
       </div>
@@ -388,6 +414,16 @@ export default function ClassroomsTab({ pid, rooms, onChange, onNext }: Props) {
         <table className="data-table">
           <thead>
             <tr>
+              <th style={{ width: 36, textAlign: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={allChecked}
+                  ref={el => { if (el) el.indeterminate = someChecked; }}
+                  onChange={e => toggleCheckAll(e.target.checked)}
+                  title="Select all"
+                  style={{ width: "auto" }}
+                />
+              </th>
               <th style={{ width: 36 }}>#</th>
               <th style={{ minWidth: 160 }}>Name</th>
               <th style={{ width: 80 }}>Code</th>
@@ -408,6 +444,12 @@ export default function ClassroomsTab({ pid, rooms, onChange, onNext }: Props) {
                 onSave={handleSave}
                 onDelete={handleDelete}
                 pid={pid}
+                checked={checkedIds.has(r.id)}
+                onCheck={id => setCheckedIds(prev => {
+                  const n = new Set(prev);
+                  n.has(id) ? n.delete(id) : n.add(id);
+                  return n;
+                })}
               />
             ))}
             {/* New entry row */}
