@@ -17,9 +17,9 @@ const NAV_GROUPS = [
       { num: 2, label: "New Timetable",icon: "🗓️", path: "/project/:projectId/academic-year", segment: "academic-year" },
       { num: 3, label: "School",      icon: "🏫", path: "/project/:projectId/settings",      segment: "settings" },
       { num: 4, label: "Teachers",     icon: "👩‍🏫", path: "/project/:projectId/teachers",      segment: "teachers" },
-      { num: 5, label: "Subjects",     icon: "📚", path: "/project/:projectId/subjects",      segment: "subjects" },
-      { num: 6, label: "Classes",      icon: "🎓", path: "/project/:projectId/classes",       segment: "classes" },
-      { num: 7, label: "Classrooms",   icon: "🚪", path: "/project/:projectId/rooms",         segment: "rooms" },
+      { num: 5, label: "Classrooms",   icon: "🚪", path: "/project/:projectId/rooms",         segment: "rooms" },
+      { num: 6, label: "Subjects",     icon: "📚", path: "/project/:projectId/subjects",      segment: "subjects" },
+      { num: 7, label: "Classes",      icon: "🎓", path: "/project/:projectId/classes",       segment: "classes" },
       { num: 8, label: "Lessons",      icon: "📋", path: "/project/:projectId/lessons",       segment: "lessons" },
       { num: 9, label: "Constraints",  icon: "⚙️", path: "/project/:projectId/constraints",   segment: "constraints" },
     ],
@@ -55,8 +55,8 @@ function getActiveNum(pathname: string): number {
     ["/dashboard", 1], ["/academic-year", 2], ["/substitutions", 13], ["/workload", 12],
     ["/duty-roster", 14], ["/committees", 15], ["/exam-duties", 16], ["/contact", 17],
     ["/export", 11], ["/review", 11], ["/generate", 10],
-    ["/constraints", 9], ["/lessons", 8], ["/rooms", 7],
-    ["/classes", 6], ["/subjects", 5], ["/teachers", 4], ["/settings", 3],
+    ["/constraints", 9], ["/lessons", 8], ["/classes", 7],
+    ["/subjects", 6], ["/rooms", 5], ["/teachers", 4], ["/settings", 3],
   ];
   for (const [seg, num] of map) {
     if (pathname.includes(seg)) return num;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import * as api from "../../api";
 import { useToast } from "../../context/ToastContext";
 import { TITLE_OPTIONS } from "../../constants";
@@ -18,7 +18,6 @@ function generateCode(name: string, existingCodes: string[]): string {
   const initials = parts.map(p => p[0]?.toUpperCase() || "").join("");
   if (!initials) return "";
   if (!existingCodes.includes(initials)) return initials;
-  // Try adding more letters
   if (parts.length > 1) {
     const longer = parts[0][0].toUpperCase() + parts[parts.length - 1].slice(0, 2).toUpperCase();
     if (!existingCodes.includes(longer)) return longer;
@@ -38,45 +37,474 @@ interface Props {
   onNext: () => void;
 }
 
+/* ── Inline Subject Picker ── */
+function SubjectPicker({ subjectIds, subjects, onAdd, onRemove, onCreateNew, pid }: {
+  subjectIds: number[];
+  subjects: Subject[];
+  onAdd: (id: number) => void;
+  onRemove: (id: number) => void;
+  onCreateNew: (name: string) => void;
+  pid: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const subjectMap = new Map(subjects.map(s => [s.id, s]));
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const filtered = subjects.filter(s =>
+    !subjectIds.includes(s.id) &&
+    s.name.toLowerCase().includes(search.toLowerCase())
+  );
+  // Deduplicate by name
+  const seen = new Set<string>();
+  const deduped = filtered.filter(s => {
+    const k = s.name.trim().toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
+  const exactMatch = subjects.some(s => s.name.trim().toLowerCase() === search.trim().toLowerCase());
+
+  return (
+    <div ref={ref} style={{ position: "relative", minWidth: 120 }}>
+      {/* Chips */}
+      <div
+        style={{ display: "flex", flexWrap: "wrap", gap: 3, cursor: "text", minHeight: 26 }}
+        onClick={() => setOpen(true)}
+      >
+        {subjectIds.map(sid => {
+          const subj = subjectMap.get(sid);
+          if (!subj) return null;
+          return (
+            <span key={sid} style={{
+              display: "inline-flex", alignItems: "center", gap: 2,
+              background: subj.color || "#6366f1", color: "#fff",
+              fontSize: "0.62rem", fontWeight: 700, padding: "1px 5px",
+              borderRadius: 4, whiteSpace: "nowrap",
+            }}>
+              {subj.code || subj.name.slice(0, 5)}
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); onRemove(sid); }}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.6)", cursor: "pointer", fontSize: "0.7rem", padding: 0, lineHeight: 1 }}
+              >×</button>
+            </span>
+          );
+        })}
+        {subjectIds.length === 0 && (
+          <span style={{ fontSize: "0.7rem", color: "var(--slate-400)", fontStyle: "italic" }}>+ Add</span>
+        )}
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, zIndex: 100,
+          background: "#fff", border: "1px solid var(--slate-200)",
+          borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+          minWidth: 200, maxHeight: 220, overflow: "hidden",
+          animation: "slideUp 0.15s ease-out",
+        }}>
+          <div style={{ padding: "6px 8px", borderBottom: "1px solid var(--slate-100)" }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search or add new…"
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === "Enter" && search.trim() && !exactMatch) {
+                  onCreateNew(search.trim());
+                  setSearch("");
+                } else if (e.key === "Escape") {
+                  setOpen(false);
+                }
+              }}
+              style={{ width: "100%", fontSize: "0.78rem", border: "1px solid var(--slate-200)", borderRadius: 4, padding: "4px 8px" }}
+            />
+          </div>
+          <div style={{ maxHeight: 160, overflowY: "auto" }}>
+            {deduped.map(s => (
+              <div
+                key={s.id}
+                onClick={() => { onAdd(s.id); setSearch(""); }}
+                style={{
+                  padding: "5px 10px", fontSize: "0.78rem", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 6,
+                  transition: "background 0.1s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "var(--primary-50)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color || "#94a3b8", flexShrink: 0 }} />
+                {s.name}
+              </div>
+            ))}
+            {search.trim() && !exactMatch && (
+              <div
+                onClick={() => { onCreateNew(search.trim()); setSearch(""); }}
+                style={{
+                  padding: "5px 10px", fontSize: "0.78rem", cursor: "pointer",
+                  fontWeight: 600, color: "var(--primary-600)",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "var(--primary-50)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+              >
+                ＋ Create "{search.trim()}"
+              </div>
+            )}
+            {deduped.length === 0 && !search.trim() && (
+              <div style={{ padding: "8px 10px", fontSize: "0.72rem", color: "var(--slate-400)" }}>No subjects available</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ── Inline Color Picker ── */
+function InlineColorPicker({ color, onChange }: { color: string; onChange: (c: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <div
+        onClick={() => setOpen(!open)}
+        style={{
+          width: 22, height: 22, borderRadius: 6, backgroundColor: color || "#E8725A",
+          cursor: "pointer", border: "2px solid var(--slate-200)", transition: "transform 0.1s",
+        }}
+        title="Click to change color"
+      />
+      {open && (
+        <div style={{
+          position: "absolute", top: 28, left: -20, zIndex: 100,
+          background: "#fff", border: "1px solid var(--slate-200)",
+          borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+          padding: 6, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4,
+        }}>
+          {COLOR_PALETTE.map(c => (
+            <div
+              key={c}
+              onClick={() => { onChange(c); setOpen(false); }}
+              style={{
+                width: 22, height: 22, borderRadius: 6, backgroundColor: c,
+                cursor: "pointer", border: c === color ? "2px solid #1e293b" : "2px solid transparent",
+                transition: "transform 0.1s",
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ── Editable Row ── */
+interface RowData {
+  id: number | null; // null = new row
+  name: string;
+  code: string;
+  title: string;
+  color: string;
+  maxDay: number;
+  maxWeek: number;
+  subjectIds: number[];
+}
+
+function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelete, isNew, subjectMap, toast }: {
+  row: RowData;
+  index: number;
+  existingCodes: string[];
+  subjects: Subject[];
+  pid: number;
+  onSave: (data: RowData) => Promise<void>;
+  onDelete: (id: number) => Promise<void>;
+  isNew: boolean;
+  subjectMap: Map<number, Subject>;
+  toast: ReturnType<typeof useToast>;
+}) {
+  const [name, setName] = useState(row.name);
+  const [code, setCode] = useState(row.code);
+  const [codeManual, setCodeManual] = useState(false);
+  const [title, setTitle] = useState(row.title);
+  const [color, setColor] = useState(row.color);
+  const [maxDay, setMaxDay] = useState(row.maxDay);
+  const [maxWeek, setMaxWeek] = useState(row.maxWeek);
+  const [subjectIds, setSubjectIds] = useState<number[]>(row.subjectIds);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  // Sync external changes
+  useEffect(() => {
+    setName(row.name); setCode(row.code); setTitle(row.title);
+    setColor(row.color); setMaxDay(row.maxDay); setMaxWeek(row.maxWeek);
+    setSubjectIds(row.subjectIds);
+    setDirty(false);
+  }, [row.id, row.name, row.code, row.title, row.color, row.maxDay, row.maxWeek, row.subjectIds]);
+
+  function markDirty() { setDirty(true); }
+
+  function autoCode(n: string) {
+    if (!codeManual && n.trim()) {
+      setCode(generateCode(n, existingCodes));
+    }
+  }
+
+  const doSave = useCallback(async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      await onSave({
+        id: row.id, name: name.trim(), code: code.trim(), title, color, maxDay, maxWeek, subjectIds,
+      });
+      setDirty(false);
+      if (isNew) {
+        setName(""); setCode(""); setTitle("Mr."); setMaxDay(6); setMaxWeek(30); setSubjectIds([]);
+        setCodeManual(false);
+      }
+    } catch { /* handled by parent */ }
+    setSaving(false);
+  }, [name, code, title, color, maxDay, maxWeek, subjectIds, row.id, isNew, onSave]);
+
+  // Auto-save on blur for existing rows
+  function handleBlur() {
+    if (dirty && !isNew && name.trim()) {
+      doSave();
+    }
+  }
+
+  // Auto-save when subject list changes for existing rows
+  useEffect(() => {
+    if (row.id && dirty && name.trim()) {
+      const timer = setTimeout(() => doSave(), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [subjectIds]);
+
+  function handleSubjectAdd(sid: number) {
+    setSubjectIds(prev => [...prev, sid]);
+    markDirty();
+  }
+
+  function handleSubjectRemove(sid: number) {
+    setSubjectIds(prev => prev.filter(id => id !== sid));
+    markDirty();
+  }
+
+  async function handleSubjectCreate(subjectName: string) {
+    try {
+      const created = await api.createSubject(pid, { name: subjectName });
+      subjects.push(created);
+      setSubjectIds(prev => [...prev, created.id]);
+      markDirty();
+      toast("success", `Subject "${created.name}" created.`);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to create subject");
+    }
+  }
+
+  function handleColorChange(c: string) {
+    setColor(c); markDirty();
+    // Auto-save color change for existing rows
+    if (row.id && name.trim()) {
+      setTimeout(() => doSave(), 100);
+    }
+  }
+
+  const rowBg = isNew ? "var(--primary-50, #eef2ff)" : dirty ? "#fffbeb" : undefined;
+
+  return (
+    <>
+      <tr style={{ background: rowBg, transition: "background 0.2s" }}>
+        {/* # */}
+        <td style={{ textAlign: "center", color: "var(--slate-400)", fontSize: "0.78rem", fontWeight: 500, width: 36 }}>
+          {isNew ? "+" : index + 1}
+        </td>
+        {/* Name */}
+        <td>
+          <input
+            ref={nameRef}
+            value={name}
+            onChange={e => { setName(e.target.value); markDirty(); }}
+            onBlur={() => { autoCode(name); handleBlur(); }}
+            placeholder={isNew ? "Type to add new teacher…" : "Teacher name"}
+            style={{
+              width: "100%", border: "none", background: "transparent",
+              fontSize: "0.82rem", fontWeight: 500, padding: "4px 6px",
+              outline: "none", borderRadius: 4,
+            }}
+            onFocus={e => { e.target.style.background = "#f8fafc"; }}
+            onKeyDown={e => {
+              if (e.key === "Enter" && isNew && name.trim()) { autoCode(name); doSave(); }
+              if (e.key === "Tab") autoCode(name);
+            }}
+          />
+        </td>
+        {/* Abbreviation */}
+        <td>
+          <input
+            value={code}
+            onChange={e => { setCode(e.target.value); setCodeManual(true); markDirty(); }}
+            onBlur={handleBlur}
+            placeholder="Auto"
+            style={{
+              width: 60, border: "none", background: "transparent",
+              fontSize: "0.78rem", fontWeight: 700, padding: "4px 6px",
+              textAlign: "center", outline: "none", borderRadius: 4,
+              color: "var(--primary-700)",
+            }}
+            onFocus={e => { e.target.style.background = "#f8fafc"; }}
+          />
+        </td>
+        {/* Title */}
+        <td>
+          <select
+            value={title}
+            onChange={e => { setTitle(e.target.value); markDirty(); if (!isNew) setTimeout(doSave, 100); }}
+            style={{
+              border: "none", background: "transparent", fontSize: "0.78rem",
+              cursor: "pointer", outline: "none", padding: "2px 0",
+            }}
+          >
+            {TITLE_OPTIONS.map(t => <option key={t}>{t}</option>)}
+          </select>
+        </td>
+        {/* Color */}
+        <td style={{ width: 40 }}>
+          <InlineColorPicker color={color} onChange={handleColorChange} />
+        </td>
+        {/* Max/Day */}
+        <td>
+          <input
+            type="number"
+            value={maxDay}
+            onChange={e => { setMaxDay(Math.max(1, Math.min(10, Number(e.target.value) || 1))); markDirty(); }}
+            onBlur={handleBlur}
+            min={1} max={10}
+            style={{
+              width: 44, border: "none", background: "transparent",
+              textAlign: "center", fontSize: "0.82rem", fontWeight: 600,
+              fontFamily: "var(--font-mono)", outline: "none", borderRadius: 4,
+            }}
+            onFocus={e => { e.target.style.background = "#f8fafc"; }}
+          />
+        </td>
+        {/* Max/Week */}
+        <td>
+          <input
+            type="number"
+            value={maxWeek}
+            onChange={e => { setMaxWeek(Math.max(1, Math.min(50, Number(e.target.value) || 1))); markDirty(); }}
+            onBlur={handleBlur}
+            min={1} max={50}
+            style={{
+              width: 44, border: "none", background: "transparent",
+              textAlign: "center", fontSize: "0.82rem", fontWeight: 600,
+              fontFamily: "var(--font-mono)", outline: "none", borderRadius: 4,
+            }}
+            onFocus={e => { e.target.style.background = "#f8fafc"; }}
+          />
+        </td>
+        {/* Subjects */}
+        <td>
+          <SubjectPicker
+            subjectIds={subjectIds}
+            subjects={subjects}
+            onAdd={handleSubjectAdd}
+            onRemove={handleSubjectRemove}
+            onCreateNew={handleSubjectCreate}
+            pid={pid}
+          />
+        </td>
+        {/* Actions */}
+        <td style={{ width: 60, textAlign: "center" }}>
+          {isNew ? (
+            <button
+              type="button"
+              onClick={doSave}
+              disabled={!name.trim() || saving}
+              title="Save new teacher"
+              style={{
+                background: name.trim() ? "var(--primary-500)" : "var(--slate-200)",
+                color: "#fff", border: "none", borderRadius: 6,
+                fontSize: "0.68rem", fontWeight: 700, padding: "3px 10px",
+                cursor: name.trim() ? "pointer" : "default", transition: "all 0.15s",
+              }}
+            >{saving ? "…" : "Save"}</button>
+          ) : (
+            <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+              {dirty && (
+                <button
+                  type="button"
+                  onClick={doSave}
+                  disabled={saving}
+                  title="Save changes"
+                  style={{
+                    background: "var(--success-500, #16a34a)", color: "#fff",
+                    border: "none", borderRadius: 4, fontSize: "0.65rem",
+                    fontWeight: 700, padding: "2px 6px", cursor: "pointer",
+                  }}
+                >{saving ? "…" : "✓"}</button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirmDelete) onDelete(row.id!);
+                  else setConfirmDelete(true);
+                }}
+                title={confirmDelete ? "Click again to confirm" : "Delete"}
+                style={{
+                  background: confirmDelete ? "var(--danger-500, #dc2626)" : "transparent",
+                  color: confirmDelete ? "#fff" : "var(--slate-400)",
+                  border: "none", borderRadius: 4, fontSize: "0.72rem",
+                  cursor: "pointer", padding: "2px 5px",
+                  transition: "all 0.15s",
+                }}
+                onBlur={() => setConfirmDelete(false)}
+              >{confirmDelete ? "Sure?" : "🗑"}</button>
+            </div>
+          )}
+        </td>
+      </tr>
+    </>
+  );
+}
+
+
+/* ── Main Tab ── */
 function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
   const toast = useToast();
   const list = Array.isArray(teachers) ? teachers : [];
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editTeacher, setEditTeacher] = useState<Teacher | null>(null);
   const importRef = React.createRef<HTMLInputElement>();
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success_count: number; total_rows: number; subjects_linked: number; errors: { row: number; message: string }[] } | null>(null);
-  const [addingNewSubject, setAddingNewSubject] = useState(false);
-  const [newSubjectName, setNewSubjectName] = useState("");
 
-  // Inline single-delete confirm
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
-
-  // Teacher → assigned subject IDs map (loaded on mount and after saves)
+  // Teacher → assigned subject IDs map
   const [teacherSubjectIds, setTeacherSubjectIds] = useState<Map<number, number[]>>(new Map());
-
-  // Teacher form fields
-  const [fName, setFName] = useState("");
-  const [fCode, setFCode] = useState("");
-  const [fCodeEditable, setFCodeEditable] = useState(false);
-  const [fTitle, setFTitle] = useState("Mr.");
-  const [fColor, setFColor] = useState("#E8725A");
-  const [fSubjects, setFSubjects] = useState<number[]>([]);
-  const [fMaxDay, setFMaxDay] = useState(6);
-  const [fMaxWeek, setFMaxWeek] = useState(30);
-
-  // Exam duty summary (lazy-loaded per teacher on select)
-  const [examSummary, setExamSummary] = useState<api.TeacherExamSummary | null>(null);
-  const [examSummaryLoading, setExamSummaryLoading] = useState(false);
-
-  // Subject lookup by id
   const subjectMap = new Map(subjects.map(s => [s.id, s]));
-
-
-
-  // ── Load subject assignments for all teachers on mount / when teacher list changes ──
 
   useEffect(() => {
     if (list.length === 0) return;
@@ -91,133 +519,46 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
       results.forEach(r => map.set(r.id, r.ids));
       setTeacherSubjectIds(map);
     });
-    // Run when pid or teacher IDs change (not on every object reference change)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pid, list.map(t => t.id).join(",")]);
 
-  // ── Fetch exam duty summary for selected teacher ──
-
-  useEffect(() => {
-    if (selectedId == null) { setExamSummary(null); return; }
-    setExamSummaryLoading(true);
-    api.getTeacherExamSummary(pid, selectedId)
-      .then(s => setExamSummary(s))
-      .catch(() => setExamSummary(null))
-      .finally(() => setExamSummaryLoading(false));
-  }, [pid, selectedId]);
-
-  // ── Checkbox helpers ──
-
-  function toggleCheck(id: number, e: React.ChangeEvent<HTMLInputElement>) {
-    e.stopPropagation();
-    setCheckedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAll(e: React.ChangeEvent<HTMLInputElement>) {
-    setCheckedIds(e.target.checked ? new Set(list.map(t => t.id)) : new Set());
-  }
-
-  // ── Modal open helpers ──
-
-  function openAdd() {
-    setEditTeacher(null);
-    setFName(""); setFCode(""); setFCodeEditable(false); setFTitle("Mr.");
-    const usedColors = list.map(t => t.color).filter(Boolean) as string[];
-    setFColor(nextAvailableColor(usedColors));
-    setFSubjects([]); setFMaxDay(6); setFMaxWeek(30);
-    setModalOpen(true);
-  }
-
-  function openEdit(t?: Teacher) {
-    const teacher = t || list.find(x => x.id === selectedId);
-    if (!teacher) return;
-    setEditTeacher(teacher);
-    setFName(`${teacher.first_name} ${teacher.last_name}`.trim());
-    setFCode(teacher.code); setFCodeEditable(false);
-    setFTitle(teacher.title); setFColor(teacher.color || "#E8725A");
-    setFSubjects(teacherSubjectIds.get(teacher.id) || []);
-    setFMaxDay(teacher.max_periods_day ?? 6);
-    setFMaxWeek(teacher.max_periods_week ?? 30);
-    setModalOpen(true);
-  }
-
-  // ── Save (create / update) ──
-
-  function handleNameBlur() {
-    if (!fCodeEditable && fName.trim()) {
-      const existingCodes = list
-        .filter(t => !editTeacher || t.id !== editTeacher.id)
-        .map(t => t.code);
-      setFCode(generateCode(fName, existingCodes));
-    }
-  }
-
-  async function saveTeacher() {
-    if (!fName.trim()) return;
-    const nameParts = fName.trim().split(/\s+/);
+  async function handleSave(data: RowData) {
+    const nameParts = data.name.trim().split(/\s+/);
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(" ");
-    // Sync fSubjects from fSubjectId for the subject assignment API
-    const subjectsToSave = fSubjects;
-    const data = {
-      first_name: firstName, last_name: lastName, code: fCode.trim(),
-      title: fTitle, color: fColor, max_periods_day: fMaxDay, max_periods_week: fMaxWeek,
+    const payload = {
+      first_name: firstName, last_name: lastName, code: data.code,
+      title: data.title, color: data.color,
+      max_periods_day: data.maxDay, max_periods_week: data.maxWeek,
     };
     try {
-      if (editTeacher) {
-        await api.updateTeacher(pid, editTeacher.id, data);
-        await api.setTeacherSubjects(pid, editTeacher.id, subjectsToSave);
-        onChange(list.map(t => t.id === editTeacher.id ? { ...t, ...data } : t));
-        setTeacherSubjectIds(prev => new Map(prev).set(editTeacher.id, subjectsToSave));
-        toast("success", "Teacher updated.");
+      if (data.id) {
+        await api.updateTeacher(pid, data.id, payload);
+        await api.setTeacherSubjects(pid, data.id, data.subjectIds);
+        onChange(list.map(t => t.id === data.id ? { ...t, ...payload } : t));
+        setTeacherSubjectIds(prev => new Map(prev).set(data.id!, data.subjectIds));
+        toast("success", "Saved.");
       } else {
-        const created = await api.createTeacher(pid, data);
-        await api.setTeacherSubjects(pid, created.id, subjectsToSave);
-        onChange([...list, { ...created, ...data } as Teacher]);
-        setTeacherSubjectIds(prev => new Map(prev).set(created.id, subjectsToSave));
+        const created = await api.createTeacher(pid, payload);
+        await api.setTeacherSubjects(pid, created.id, data.subjectIds);
+        onChange([...list, { ...created, ...payload } as Teacher]);
+        setTeacherSubjectIds(prev => new Map(prev).set(created.id, data.subjectIds));
         toast("success", "Teacher added.");
       }
-      setModalOpen(false);
-    } catch (err) { toast("error", err instanceof Error ? err.message : "Save failed"); }
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Save failed");
+      throw err;
+    }
   }
 
-  // ── Delete (single, inline confirm) ──
-
-  async function handleDelete() {
-    // If checkboxes are checked, bulk-delete those
-    if (checkedIds.size > 0) {
-      const ids = Array.from(checkedIds);
-      try {
-        const result = await api.bulkDeleteTeachers(pid, ids);
-        onChange(list.filter(t => !ids.includes(t.id)));
-        setCheckedIds(new Set());
-        if (ids.includes(selectedId as number)) setSelectedId(null);
-        const msg = `${result.deleted} teacher${result.deleted !== 1 ? "s" : ""} deleted.` +
-          (result.failed.length > 0 ? ` ${result.failed.length} could not be removed.` : "");
-        toast("success", msg);
-      } catch (err) {
-        toast("error", err instanceof Error ? err.message : "Delete failed");
-      }
-      return;
-    }
-    // Otherwise delete the single selected row
-    if (selectedId == null) return;
+  async function handleDelete(id: number) {
     try {
-      await api.deleteTeacher(pid, selectedId);
-      onChange(list.filter(t => t.id !== selectedId));
-      setSelectedId(null);
-      setConfirmDeleteId(null);
+      await api.deleteTeacher(pid, id);
+      onChange(list.filter(t => t.id !== id));
       toast("success", "Teacher deleted.");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Delete failed");
     }
   }
-
-  // ── Excel import ──
 
   async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
@@ -230,41 +571,54 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
     finally { setImporting(false); e.target.value = ""; }
   }
 
-  const allChecked = list.length > 0 && checkedIds.size === list.length;
-  const someChecked = checkedIds.size > 0 && !allChecked;
+  const existingCodes = list.map(t => t.code);
+  const usedColors = list.map(t => t.color).filter(Boolean) as string[];
+
+  // Build row data from teacher list
+  const rows: RowData[] = list.map(t => ({
+    id: t.id,
+    name: `${t.first_name} ${t.last_name}`.trim(),
+    code: t.code,
+    title: t.title,
+    color: t.color || "#E8725A",
+    maxDay: t.max_periods_day ?? 6,
+    maxWeek: t.max_periods_week ?? 30,
+    subjectIds: teacherSubjectIds.get(t.id) || [],
+  }));
+
+  // Empty "new entry" row
+  const newRow: RowData = {
+    id: null, name: "", code: "", title: "Mr.",
+    color: nextAvailableColor(usedColors),
+    maxDay: 6, maxWeek: 30, subjectIds: [],
+  };
 
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Teachers</h2>
-      <p className="subheading">Add and manage teaching staff. Assign subjects to each teacher.</p>
+      <p className="subheading">Click any cell to edit. Type in the last row to add a new teacher.</p>
 
       {/* ── Toolbar ── */}
       <div className="toolbar" style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-        <button type="button" className="btn btn-primary" onClick={openAdd}>+ Add Teacher</button>
         <input type="file" ref={importRef} accept=".xlsx,.xls" style={{ display: "none" }} onChange={onImportFile} />
         <button type="button" className="btn" onClick={() => importRef.current?.click()} disabled={importing}>
-          {importing ? "⏳ Processing…" : "Import from Excel"}
+          {importing ? "⏳ Processing…" : "📥 Import from Excel"}
         </button>
-        <button type="button" className="btn" onClick={() => api.downloadTemplate("teachers")}>Download Template</button>
-        <button type="button" className="btn" onClick={() => openEdit()} disabled={selectedId == null}>Edit</button>
-        <button
-          type="button" className="btn btn-danger"
-          disabled={selectedId == null && checkedIds.size === 0}
-          onClick={handleDelete}
-        >{checkedIds.size > 0 ? `Delete (${checkedIds.size})` : "Delete"}</button>
+        <button type="button" className="btn" onClick={() => api.downloadTemplate("teachers")}>📋 Download Template</button>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: "0.72rem", color: "var(--slate-400)" }}>
+          {list.length} teacher{list.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
-      {/* ── Import progress bar ── */}
+      {/* ── Import progress ── */}
       {importing && (
         <div style={{ marginBottom: "1rem", borderRadius: 6, overflow: "hidden", height: 4, background: "var(--slate-200)" }}>
-          <div style={{
-            width: "100%", height: "100%", background: "var(--primary-500)",
-            animation: "loadProgress 1.5s ease-in-out infinite",
-          }} />
+          <div style={{ width: "100%", height: "100%", background: "var(--primary-500)", animation: "loadProgress 1.5s ease-in-out infinite" }} />
         </div>
       )}
 
-      {/* ── Import result panel ── */}
+      {/* ── Import result ── */}
       {importResult && (
         <div style={{
           marginBottom: "1rem", borderRadius: 8, padding: "12px 16px",
@@ -273,38 +627,21 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
         }}>
           <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--slate-800)", marginBottom: 4 }}>
             ✅ Imported {importResult.success_count} of {importResult.total_rows} teacher(s)
-            {(importResult).subjects_linked > 0 && (
-              <span style={{ fontWeight: 500, marginLeft: 8, color: "var(--primary-600)" }}>
-                📎 {(importResult).subjects_linked} subject link(s) created
-              </span>
+            {importResult.subjects_linked > 0 && (
+              <span style={{ fontWeight: 500, marginLeft: 8, color: "var(--primary-600)" }}>📎 {importResult.subjects_linked} subject link(s)</span>
             )}
           </div>
           {importResult.errors.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--danger-600)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                {importResult.errors.length} error(s):
-              </div>
-              <div style={{ maxHeight: 120, overflowY: "auto", fontSize: "0.78rem" }}>
-                {importResult.errors.map((e, i) => (
-                  <div key={i} style={{ padding: "2px 0", color: "var(--slate-700)" }}>
-                    <span style={{ fontWeight: 600, color: "var(--danger-600)", fontFamily: "var(--font-mono)", fontSize: "0.72rem" }}>
-                      Row {e.row}:
-                    </span>{" "}
-                    {e.message}
-                  </div>
-                ))}
-              </div>
+            <div style={{ marginTop: 8, maxHeight: 100, overflowY: "auto", fontSize: "0.78rem" }}>
+              {importResult.errors.map((e, i) => (
+                <div key={i} style={{ padding: "2px 0", color: "var(--slate-700)" }}>
+                  <span style={{ fontWeight: 600, color: "var(--danger-600)", fontFamily: "var(--font-mono)", fontSize: "0.72rem" }}>Row {e.row}:</span> {e.message}
+                </div>
+              ))}
             </div>
           )}
-          <button
-            type="button" onClick={() => setImportResult(null)}
-            style={{ marginTop: 8, fontSize: "0.72rem", background: "none", border: "none", color: "var(--slate-400)", cursor: "pointer", textDecoration: "underline" }}
-          >Dismiss</button>
+          <button type="button" onClick={() => setImportResult(null)} style={{ marginTop: 6, fontSize: "0.72rem", background: "none", border: "none", color: "var(--slate-400)", cursor: "pointer", textDecoration: "underline" }}>Dismiss</button>
         </div>
-      )}
-
-      {list.length === 0 && (
-        <p className="subheading" style={{ textAlign: "center" }}>No teachers added yet. Add at least one teacher before creating lessons.</p>
       )}
 
       {/* ── Teachers table ── */}
@@ -312,389 +649,56 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
         <table className="data-table">
           <thead>
             <tr>
-              <th style={{ width: 36 }}>
-                <input
-                  type="checkbox"
-                  checked={allChecked}
-                  ref={el => { if (el) el.indeterminate = someChecked; }}
-                  onChange={toggleAll}
-                  title="Select all"
-                />
-              </th>
               <th style={{ width: 36 }}>#</th>
-              <th>Name</th>
-              <th>Abbreviation</th>
-              <th>Title</th>
-              <th style={{ width: 50 }}>Color</th>
-              <th>Max/Day</th>
-              <th>Max/Week</th>
-              <th>Subjects</th>
+              <th style={{ minWidth: 160 }}>Name</th>
+              <th style={{ width: 80 }}>Abbreviation</th>
+              <th style={{ width: 70 }}>Title</th>
+              <th style={{ width: 40 }}>Color</th>
+              <th style={{ width: 55 }}>Max/Day</th>
+              <th style={{ width: 60 }}>Max/Week</th>
+              <th style={{ minWidth: 130 }}>Subjects</th>
+              <th style={{ width: 60 }}></th>
             </tr>
           </thead>
           <tbody>
-            {list.map((t, i) => {
-              const assignedIds = teacherSubjectIds.get(t.id) || [];
-              return (
-                <React.Fragment key={t.id}>
-                  <tr
-                    className={selectedId === t.id ? "selected" : ""}
-                    onClick={() => setSelectedId(prev => prev === t.id ? null : t.id)}
-                    onDoubleClick={() => openEdit(t)}
-                  >
-                    <td onClick={e => e.stopPropagation()}>
-                      <input type="checkbox" checked={checkedIds.has(t.id)} onChange={e => toggleCheck(t.id, e)} />
-                    </td>
-                    <td>{i + 1}</td>
-                    <td>{t.first_name} {t.last_name}</td>
-                    <td>{t.code}</td>
-                    <td>{t.title}</td>
-                    <td><span className="color-swatch" style={{ backgroundColor: t.color || "#E8725A" }} /></td>
-                    <td>{t.max_periods_day}</td>
-                    <td>{t.max_periods_week}</td>
-                    <td>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, minWidth: 80 }}>
-                        {assignedIds.length === 0
-                          ? <span style={{ fontSize: "0.7rem", color: "var(--slate-400)", fontStyle: "italic" }}>—</span>
-                          : <>
-                              {assignedIds.slice(0, 2).map(sid => {
-                                const subj = subjectMap.get(sid);
-                                if (!subj) return null;
-                                return (
-                                  <span
-                                    key={sid}
-                                    title={subj.name}
-                                    style={{
-                                      display: "inline-block",
-                                      background: subj.color,
-                                      color: "#fff",
-                                      fontSize: "0.6rem",
-                                      fontWeight: 700,
-                                      padding: "1px 5px",
-                                      borderRadius: "var(--radius-sm)",
-                                    }}
-                                  >
-                                    {subj.code || subj.name.slice(0, 4)}
-                                  </span>
-                                );
-                              })}
-                              {assignedIds.length > 2 && (
-                                <span style={{ fontSize: "0.6rem", color: "var(--slate-500)", fontWeight: 600 }}>
-                                  +{assignedIds.length - 2} more
-                                </span>
-                              )}
-                            </>
-                        }
-                      </div>
-                    </td>
-                  </tr>
-
-                  {/* ── Exam duty summary detail strip ── */}
-                  {selectedId === t.id && !confirmDeleteId && (
-                    <tr>
-                      <td colSpan={9} style={{ padding: 0 }}>
-                        <div style={{
-                          background: "var(--surface-card)", border: "1px solid var(--primary-100)",
-                          borderRadius: "var(--radius-sm)", padding: "0.6rem 1rem",
-                          display: "flex", alignItems: "center", gap: "1.25rem", flexWrap: "wrap",
-                          fontSize: "0.78rem", color: "var(--slate-600)",
-                          animation: "slideUp var(--duration-normal) var(--ease-out)",
-                        }}>
-                          <strong style={{ color: "var(--slate-700)", fontSize: "0.82rem" }}>
-                            {t.first_name} {t.last_name}
-                          </strong>
-                          <span>
-                            Subjects: {(teacherSubjectIds.get(t.id) || []).map(sid => subjectMap.get(sid)?.name).filter(Boolean).join(", ") || "—"}
-                          </span>
-                          {examSummaryLoading ? (
-                            <span style={{ color: "var(--slate-400)" }}>Loading exam data…</span>
-                          ) : examSummary && examSummary.teacher_id === t.id ? (
-                            <>
-                              <span>Exam duties: <strong>{examSummary.sessions_assigned}</strong> sessions</span>
-                              <span>Total: <strong>{examSummary.duty_minutes_total}</strong> min</span>
-                              <span>
-                                Exempted: <strong style={{ color: examSummary.exempt ? "var(--warning-600)" : "var(--success-600)" }}>
-                                  {examSummary.exempt ? "Yes" : "No"}
-                                </strong>
-                              </span>
-                              {examSummary.excluded_subjects.length > 0 && (
-                                <span>
-                                  Excluded on: {examSummary.excluded_subjects.map(s => s.name).join(", ")}
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <span style={{ color: "var(--slate-400)" }}>No exam duty data</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-
-                  {/* ── Inline delete confirmation strip ── */}
-                  {confirmDeleteId === t.id && (
-                    <tr>
-                      <td colSpan={9} style={{ padding: 0 }}>
-                        <div style={{
-                          background: "var(--danger-50)", border: "1px solid var(--danger-200)",
-                          borderRadius: "var(--radius-sm)", padding: "0.6rem 1rem",
-                          display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap",
-                        }}>
-                          <span style={{ fontSize: "0.85rem", color: "var(--danger-700)", fontWeight: 500 }}>
-                            Delete "{t.first_name} {t.last_name}"? This cannot be undone.
-                          </span>
-                          <button
-                            type="button" className="btn btn-danger"
-                            style={{ fontSize: "0.78rem" }}
-                            onClick={() => handleDelete()}
-                          >Yes, delete</button>
-                          <button
-                            type="button" className="btn"
-                            style={{ fontSize: "0.78rem" }}
-                            onClick={() => setConfirmDeleteId(null)}
-                          >Cancel</button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
+            {rows.map((row, i) => (
+              <EditableRow
+                key={row.id!}
+                row={row}
+                index={i}
+                existingCodes={existingCodes.filter(c => c !== row.code)}
+                subjects={subjects}
+                pid={pid}
+                onSave={handleSave}
+                onDelete={handleDelete}
+                isNew={false}
+                subjectMap={subjectMap}
+                toast={toast}
+              />
+            ))}
+            {/* Empty "new entry" row */}
+            <EditableRow
+              key="__new__"
+              row={newRow}
+              index={list.length}
+              existingCodes={existingCodes}
+              subjects={subjects}
+              pid={pid}
+              onSave={handleSave}
+              onDelete={async () => {}}
+              isNew={true}
+              subjectMap={subjectMap}
+              toast={toast}
+            />
           </tbody>
         </table>
       </div>
 
       <div className="nav-footer">
-        <button type="button" className="btn" onClick={onNext}>Next: Subjects →</button>
+        <button type="button" className="btn" onClick={onNext}>Next: Classrooms →</button>
       </div>
-
-      {/* ── Add / Edit modal ── */}
-      {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 540 }}>
-            <h3 style={{ marginTop: 0 }}>{editTeacher ? "Edit Teacher" : "New Teacher"}</h3>
-            <div className="modal-form">
-              {/* ── Teacher Name ── */}
-              <div className="modal-field">
-                <label className="modal-label required">Teacher Name:</label>
-                <input
-                  value={fName}
-                  onChange={e => setFName(e.target.value)}
-                  onBlur={handleNameBlur}
-                  placeholder="e.g., Ahmed Ali"
-                  autoFocus
-                />
-              </div>
-
-              {/* ── Auto-generated Code (read-only chip) ── */}
-              <div className="modal-field" style={{ alignItems: "center" }}>
-                <label className="modal-label">Code:</label>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {fCodeEditable ? (
-                    <input
-                      value={fCode}
-                      onChange={e => setFCode(e.target.value)}
-                      maxLength={6}
-                      style={{ width: 80 }}
-                    />
-                  ) : (
-                    <span style={{
-                      display: "inline-block", background: "var(--primary-100)", color: "var(--primary-700)",
-                      fontWeight: 700, fontSize: "0.82rem", padding: "3px 10px",
-                      borderRadius: "var(--radius-sm)", minWidth: 30, textAlign: "center",
-                    }}>
-                      {fCode || "—"}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setFCodeEditable(!fCodeEditable)}
-                    style={{
-                      fontSize: "0.72rem", padding: "2px 8px", cursor: "pointer",
-                      background: "transparent", border: "1px solid var(--slate-300)",
-                      borderRadius: "var(--radius-sm)", color: "var(--primary-600)",
-                    }}
-                  >
-                    {fCodeEditable ? "Auto" : "Edit"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="modal-field">
-                <label className="modal-label">Subjects:</label>
-                {addingNewSubject ? (
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <input
-                      value={newSubjectName}
-                      onChange={e => setNewSubjectName(e.target.value)}
-                      placeholder="New subject name"
-                      autoFocus
-                      onKeyDown={async e => {
-                        if (e.key === "Enter" && newSubjectName.trim()) {
-                          try {
-                            const created = await api.createSubject(pid, { name: newSubjectName.trim() });
-                            subjects.push(created);
-                            setFSubjects(prev => [...prev, created.id]);
-                            setAddingNewSubject(false);
-                            setNewSubjectName("");
-                            toast("success", `Subject "${created.name}" created.`);
-                          } catch (err) { toast("error", err instanceof Error ? err.message : "Failed to create subject"); }
-                        } else if (e.key === "Escape") {
-                          setAddingNewSubject(false);
-                          setNewSubjectName("");
-                        }
-                      }}
-                      style={{ flex: 1 }}
-                    />
-                    <button
-                      type="button" className="btn btn-primary"
-                      style={{ fontSize: "0.78rem", padding: "4px 12px" }}
-                      disabled={!newSubjectName.trim()}
-                      onClick={async () => {
-                        if (!newSubjectName.trim()) return;
-                        try {
-                          const created = await api.createSubject(pid, { name: newSubjectName.trim() });
-                          subjects.push(created);
-                          setFSubjects(prev => [...prev, created.id]);
-                          setAddingNewSubject(false);
-                          setNewSubjectName("");
-                          toast("success", `Subject "${created.name}" created.`);
-                        } catch (err) { toast("error", err instanceof Error ? err.message : "Failed to create subject"); }
-                      }}
-                    >Add</button>
-                    <button
-                      type="button" className="btn"
-                      style={{ fontSize: "0.78rem", padding: "4px 10px" }}
-                      onClick={() => { setAddingNewSubject(false); setNewSubjectName(""); }}
-                    >Cancel</button>
-                  </div>
-                ) : (
-                  <div>
-                    {/* Selected subject chips */}
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: fSubjects.length > 0 ? 8 : 0 }}>
-                      {fSubjects.map(sid => {
-                        const subj = subjectMap.get(sid);
-                        if (!subj) return null;
-                        return (
-                          <span
-                            key={sid}
-                            style={{
-                              display: "inline-flex", alignItems: "center", gap: 4,
-                              background: subj.color || "var(--primary-100)",
-                              color: "#fff",
-                              fontSize: "0.75rem", fontWeight: 600,
-                              padding: "2px 8px", borderRadius: "var(--radius-sm)",
-                            }}
-                          >
-                            {subj.name}
-                            <button
-                              type="button"
-                              onClick={() => setFSubjects(prev => prev.filter(id => id !== sid))}
-                              style={{
-                                background: "none", border: "none", color: "rgba(255,255,255,0.7)",
-                                cursor: "pointer", fontSize: "0.85rem", padding: 0, lineHeight: 1,
-                              }}
-                              title={`Remove ${subj.name}`}
-                            >×</button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                    {/* Searchable multi-select dropdown */}
-                    <select
-                      value=""
-                      onChange={e => {
-                        if (e.target.value === "__add_new__") {
-                          setAddingNewSubject(true);
-                          return;
-                        }
-                        const val = Number(e.target.value);
-                        if (val && !fSubjects.includes(val)) {
-                          setFSubjects(prev => [...prev, val]);
-                        }
-                      }}
-                    >
-                      <option value="">{fSubjects.length === 0 ? "— Select subjects —" : "＋ Add another subject…"}</option>
-                      {(() => {
-                        const seen = new Set<string>();
-                        return subjects.filter(s => {
-                          const key = s.name.trim().toLowerCase();
-                          if (seen.has(key)) return false;
-                          seen.add(key);
-                          return !fSubjects.includes(s.id);
-                        }).map(s => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ));
-                      })()}
-                      <option value="__add_new__" style={{ fontWeight: 700 }}>＋ Add New Subject…</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Max Lessons / Day + Week ── */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div className="modal-field">
-                  <label className="modal-label">Max Lessons / Day:</label>
-                  <input
-                    type="number"
-                    value={fMaxDay}
-                    onChange={e => setFMaxDay(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
-                    min={1}
-                    max={10}
-                    style={{ textAlign: "center", fontFamily: "var(--font-mono)", fontSize: "0.88rem", fontWeight: 600 }}
-                  />
-                </div>
-                <div className="modal-field">
-                  <label className="modal-label">Max Lessons / Week:</label>
-                  <input
-                    type="number"
-                    value={fMaxWeek}
-                    onChange={e => setFMaxWeek(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
-                    min={1}
-                    max={50}
-                    style={{ textAlign: "center", fontFamily: "var(--font-mono)", fontSize: "0.88rem", fontWeight: 600 }}
-                  />
-                </div>
-              </div>
-
-
-              {/* ── Title ── */}
-              <div className="modal-field">
-                <label className="modal-label">Title:</label>
-                <select value={fTitle} onChange={e => setFTitle(e.target.value)}>
-                  {TITLE_OPTIONS.map(t => <option key={t}>{t}</option>)}
-                </select>
-              </div>
-
-              {/* ── Auto-generated Color (click swatch to cycle) ── */}
-              <div className="modal-field" style={{ alignItems: "center" }}>
-                <label className="modal-label">Color:</label>
-                <div
-                  title="Click to cycle color"
-                  onClick={() => {
-                    const idx = COLOR_PALETTE.indexOf(fColor);
-                    setFColor(COLOR_PALETTE[(idx + 1) % COLOR_PALETTE.length]);
-                  }}
-                  style={{
-                    width: 32, height: 32, borderRadius: "var(--radius-sm)",
-                    backgroundColor: fColor, cursor: "pointer",
-                    border: "2px solid var(--slate-300)", transition: "background-color 0.15s",
-                  }}
-                />
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={() => setModalOpen(false)}>Cancel</button>
-              <button type="button" className="btn btn-primary" onClick={saveTeacher}>OK</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
     </div>
   );
 }
 
-// React.memo prevents re-renders when ProjectEditor re-fetches unrelated data (e.g. rooms, subjects)
 export default React.memo(TeachersTab);
