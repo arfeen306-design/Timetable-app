@@ -270,7 +270,7 @@ export default function SubjectsTab({ pid, subjects, rooms, onChange, onNext }: 
                 </div>
               </div>
               <div className="modal-field">
-                <label className="modal-label">Max Periods/Day:</label>
+                <label className="modal-label">Max Lessons/Day:</label>
                 <input type="number" min={1} max={10} value={fMaxPerDay} onChange={e => setFMaxPerDay(Number(e.target.value))} style={{ width: 80 }} />
               </div>
               <div className="modal-field">

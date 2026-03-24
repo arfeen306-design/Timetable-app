@@ -42,17 +42,17 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
     });
   }, [pid, teachers.length]);
 
-  /* Single lesson form */
+  /* Single lesson form — now supports multi-class */
   const [fTeacher, setFTeacher] = useState(0);
   const [fSubject, setFSubject] = useState(0);
-  const [fClass, setFClass] = useState(0);
-  const [fPeriods, setFPeriods] = useState(1);
+  const [fClasses, setFClasses] = useState<number[]>([]);
+  const [fLessons, setFLessons] = useState(1);
   const [saving, setSaving] = useState(false);
 
   /* Bulk assign */
   const [bulkTeacher, setBulkTeacher] = useState(0);
   const [bulkSubject, setBulkSubject] = useState(0);
-  const [bulkPeriods, setBulkPeriods] = useState<Record<number, number>>({});
+  const [bulkLessons, setBulkLessons] = useState<Record<number, number>>({});
   const [bulkSaving, setBulkSaving] = useState(false);
 
   /* Copy from class */
@@ -65,9 +65,9 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
     if (!fTeacher) { setFSubject(0); return; }
     const linked = teacherSubjectMap.get(fTeacher) || [];
     if (linked.length === 1) {
-      setFSubject(linked[0]); // Auto-select sole subject
+      setFSubject(linked[0]);
     } else if (linked.length > 1 && !linked.includes(fSubject)) {
-      setFSubject(linked[0]); // Default to first if current not in list
+      setFSubject(linked[0]);
     } else if (linked.length === 0) {
       setFSubject(0);
     }
@@ -103,7 +103,16 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
   function nameSubject(id: number) { return subjects.find(x => x.id === id)?.name ?? `#${id}`; }
   function nameClass(id: number) { return classes.find(x => x.id === id)?.name ?? `#${id}`; }
 
-  const totalPeriods = lessons.reduce((s, l) => s + l.periods_per_week, 0);
+  const totalLessons = lessons.reduce((s, l) => s + l.periods_per_week, 0);
+
+  /* Max lessons warning */
+  function teacherMaxWeek(tid: number): number {
+    const t = teachers.find(x => x.id === tid);
+    return t?.max_periods_week ?? 30;
+  }
+  function teacherCurrentLoad(tid: number): number {
+    return lessons.filter(l => l.teacher_id === tid).reduce((s, l) => s + l.periods_per_week, 0);
+  }
 
   /* Check prerequisites */
   const missing: string[] = [];
@@ -112,18 +121,37 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
   if (classes.length === 0) missing.push("Classes");
 
   function openAddModal() {
-    setFTeacher(0); setFSubject(0); setFClass(0); setFPeriods(1);
+    setFTeacher(0); setFSubject(0); setFClasses([]); setFLessons(1);
     setModalOpen(true);
   }
 
-  async function addLesson() {
-    if (!fTeacher || !fSubject || !fClass) return;
+  /* ── Multi-class add: creates one lesson per selected class ── */
+  async function addLessons() {
+    if (!fTeacher || !fSubject || fClasses.length === 0) return;
+
+    // Overload warning
+    const adding = fClasses.length * fLessons;
+    const current = teacherCurrentLoad(fTeacher);
+    const max = teacherMaxWeek(fTeacher);
+    if (current + adding > max) {
+      const over = current + adding - max;
+      if (!confirm(`⚠️ This will exceed ${nameTeacher(fTeacher)}'s weekly limit by ${over} lesson(s) (${current + adding}/${max}). Continue?`)) return;
+    }
+
     setSaving(true);
+    let created = 0;
     try {
-      const l = await api.createLesson(pid, { teacher_id: fTeacher, subject_id: fSubject, class_id: fClass, periods_per_week: fPeriods });
-      onChange([...lessons, { id: l.id, teacher_id: fTeacher, subject_id: fSubject, class_id: fClass, periods_per_week: fPeriods } as Lesson]);
+      for (const classId of fClasses) {
+        await api.createLesson(pid, {
+          teacher_id: fTeacher, subject_id: fSubject,
+          class_id: classId, periods_per_week: fLessons,
+        });
+        created++;
+      }
+      const list = await api.listLessons(pid);
+      onChange(list);
       setModalOpen(false);
-      toast("success", "Lesson added.");
+      toast("success", `${created} lesson${created !== 1 ? "s" : ""} added.`);
     } catch (err) { toast("error", err instanceof Error ? err.message : "Save failed"); }
     finally { setSaving(false); }
   }
@@ -141,13 +169,23 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
 
   async function doBulkAssign() {
     if (!bulkTeacher || !bulkSubject) return;
-    const selected = classes.map(c => c.id).filter(id => (bulkPeriods[id] ?? 0) > 0);
-    if (selected.length === 0) { toast("info", "Select at least one class and set periods."); return; }
+    const selected = classes.map(c => c.id).filter(id => (bulkLessons[id] ?? 0) > 0);
+    if (selected.length === 0) { toast("info", "Select at least one class and set lessons."); return; }
+
+    // Overload warning
+    const adding = selected.reduce((s, id) => s + (bulkLessons[id] ?? 0), 0);
+    const current = teacherCurrentLoad(bulkTeacher);
+    const max = teacherMaxWeek(bulkTeacher);
+    if (current + adding > max) {
+      const over = current + adding - max;
+      if (!confirm(`⚠️ This will exceed ${nameTeacher(bulkTeacher)}'s weekly limit by ${over} lesson(s) (${current + adding}/${max}). Continue?`)) return;
+    }
+
     setBulkSaving(true);
     try {
       const res = await api.bulkCreateLessons(pid, {
         teacher_id: bulkTeacher, subject_id: bulkSubject,
-        classes: selected.map(class_id => ({ class_id, periods_per_week: bulkPeriods[class_id] ?? 1 })),
+        classes: selected.map(class_id => ({ class_id, periods_per_week: bulkLessons[class_id] ?? 1 })),
       });
       if (res.created > 0) { const list = await api.listLessons(pid); onChange(list); setBulkOpen(false); toast("success", `Created ${res.created} lesson(s).`); }
       if (res.errors.length > 0) toast("error", "Some rows failed: " + res.errors.map(e => e.message).join("; "));
@@ -164,6 +202,13 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
     } catch (err) { toast("error", err instanceof Error ? err.message : "Copy failed"); }
     finally { setCopySaving(false); }
   }
+
+  /* ── Helper: toggle class in multi-select ── */
+  function toggleClass(id: number) {
+    setFClasses(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
+  function selectAllClasses() { setFClasses(classes.map(c => c.id)); }
+  function clearClasses() { setFClasses([]); }
 
   /* ── Helper: Subject selector with auto-fill indicator ── */
   function SubjectSelector({ value, onChange: onChangeSub, linkedIds, linkedSubjects, allSubjects, isOverride }: {
@@ -194,7 +239,6 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
             </option>
           ))}
         </select>
-        {/* Status line */}
         <div style={{ marginTop: 4, fontSize: "0.72rem" }}>
           {linkedIds.length === 1 && value === linkedIds[0] && (
             <span style={{ color: "var(--success-600, #16a34a)", fontWeight: 600 }}>
@@ -217,7 +261,6 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
             </span>
           )}
         </div>
-        {/* Toggle to show all subjects */}
         {linkedSubjects.length > 0 && !showAll && (
           <button
             type="button"
@@ -245,14 +288,14 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Lesson Assignments</h2>
-      <p className="subheading">Assign teachers to subjects and classes with weekly period counts.</p>
+      <p className="subheading">Assign teachers to subjects and classes with weekly lesson counts.</p>
 
       <div className="toolbar" style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-        <button type="button" className="btn" onClick={openAddModal}>+ Add Single Lesson</button>
-        <button type="button" className="btn btn-primary" onClick={() => { setBulkTeacher(0); setBulkSubject(0); setBulkPeriods({}); setBulkOpen(true); }}>+ Bulk Assign (1 Teacher → Many Classes)</button>
+        <button type="button" className="btn" onClick={openAddModal}>+ Add Lesson</button>
+        <button type="button" className="btn btn-primary" onClick={() => { setBulkTeacher(0); setBulkSubject(0); setBulkLessons({}); setBulkOpen(true); }}>+ Bulk Assign (1 Teacher → Many Classes)</button>
         <button type="button" className="btn" onClick={() => { setCopySource(0); setCopyTargets([]); setCopyOpen(true); }}>Copy from Class</button>
         <button type="button" className="btn btn-danger" onClick={deleteSelected} disabled={selectedId == null}>Delete</button>
-        <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontStyle: "italic", fontSize: "0.85rem" }}>{lessons.length} lessons, {totalPeriods} total periods/week</span>
+        <span style={{ marginLeft: "auto", color: "var(--text-muted)", fontStyle: "italic", fontSize: "0.85rem" }}>{lessons.length} lessons, {totalLessons} total lessons/week</span>
       </div>
 
       {missing.length > 0 && (
@@ -261,7 +304,7 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
 
       {lessons.length === 0 && <p className="subheading" style={{ textAlign: "center" }}>No lessons added yet.</p>}
       <table className="data-table">
-        <thead><tr><th style={{ width: 40 }}>#</th><th>Teacher</th><th>Subject</th><th>Class</th><th>Periods/Week</th></tr></thead>
+        <thead><tr><th style={{ width: 40 }}>#</th><th>Teacher</th><th>Subject</th><th>Class</th><th>Lessons/Week</th></tr></thead>
         <tbody>
           {lessons.map((l, i) => (
             <tr key={l.id} className={selectedId === l.id ? "selected" : ""} onClick={() => setSelectedId(l.id)}>
@@ -275,11 +318,12 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
         <button type="button" className="btn" onClick={onNext}>Next: Constraints →</button>
       </div>
 
-      {/* ═══ Add Single Lesson Modal ═══ */}
+      {/* ═══ Add Lesson Modal (Multi-Class) ═══ */}
       {modalOpen && (
         <div className="modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal-dialog" onClick={e => e.stopPropagation()}>
+          <div className="modal-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <h3 style={{ marginTop: 0 }}>Add Lesson</h3>
+            <p className="subheading" style={{ margin: "0 0 0.75rem" }}>Select a teacher, subject, and one or more classes.</p>
             <div className="modal-form">
               <div className="modal-field">
                 <label className="modal-label required">Teacher:</label>
@@ -308,18 +352,73 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
                   <select disabled><option>Select a teacher first</option></select>
                 )}
               </div>
+
+              {/* Multi-class selector */}
               <div className="modal-field">
-                <label className="modal-label required">Class:</label>
-                <select value={fClass} onChange={e => setFClass(Number(e.target.value))}>
-                  <option value={0}>Select class</option>
-                  {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <label className="modal-label required" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  Classes:
+                  <span style={{ fontSize: "0.68rem", fontWeight: 400, color: "var(--text-muted)" }}>
+                    ({fClasses.length} selected)
+                  </span>
+                  <button type="button" onClick={selectAllClasses} style={{
+                    fontSize: "0.65rem", background: "none", border: "1px solid var(--border-default)",
+                    borderRadius: 4, padding: "1px 6px", cursor: "pointer", color: "var(--primary-600)", fontWeight: 600,
+                  }}>All</button>
+                  <button type="button" onClick={clearClasses} style={{
+                    fontSize: "0.65rem", background: "none", border: "1px solid var(--border-default)",
+                    borderRadius: 4, padding: "1px 6px", cursor: "pointer", color: "var(--text-muted)",
+                  }}>Clear</button>
+                </label>
+                <div style={{
+                  maxHeight: 180, overflowY: "auto",
+                  border: "1px solid var(--border-default, #e2e8f0)", borderRadius: 8,
+                  padding: "6px 10px", background: "var(--surface-card)",
+                }}>
+                  {classes.map(c => (
+                    <label key={c.id} style={{
+                      display: "flex", alignItems: "center", gap: 8, padding: "3px 0",
+                      cursor: "pointer", fontSize: "0.82rem",
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={fClasses.includes(c.id)}
+                        onChange={() => toggleClass(c.id)}
+                        style={{ width: "auto", accentColor: "var(--primary-500)" }}
+                      />
+                      <span style={{ fontWeight: fClasses.includes(c.id) ? 600 : 400 }}>{c.name}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-              <div className="modal-field"><label className="modal-label">Periods/Week:</label><input type="number" min={1} value={fPeriods} onChange={e => setFPeriods(Number(e.target.value))} style={{ width: 80 }} /></div>
+
+              <div className="modal-field">
+                <label className="modal-label">Lessons/Week (per class):</label>
+                <input type="number" min={1} value={fLessons} onChange={e => setFLessons(Math.max(1, Number(e.target.value) || 1))} style={{ width: 80 }} />
+              </div>
             </div>
+
+            {/* Summary */}
+            {fTeacher > 0 && fSubject > 0 && fClasses.length > 0 && (
+              <div style={{
+                marginTop: 8, padding: "8px 12px", borderRadius: 8,
+                background: "var(--surface-input, #f8fafc)",
+                border: "1px solid var(--border-subtle)",
+                fontSize: "0.78rem",
+              }}>
+                Will create <strong>{fClasses.length}</strong> lesson{fClasses.length !== 1 ? "s" : ""} for
+                <strong> {nameTeacher(fTeacher)}</strong> teaching <strong>{nameSubject(fSubject)}</strong> × {fLessons}/week each
+                = <strong>{fClasses.length * fLessons}</strong> total lessons/week
+              </div>
+            )}
+
             <div className="modal-actions">
               <button type="button" className="btn" onClick={() => setModalOpen(false)}>Cancel</button>
-              <button type="button" className="btn btn-primary" onClick={addLesson} disabled={saving}>{saving ? "Saving…" : "OK"}</button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={addLessons}
+                disabled={saving || !fTeacher || !fSubject || fClasses.length === 0}
+              >{saving ? "Creating…" : `Add ${fClasses.length || 0} Lesson${fClasses.length !== 1 ? "s" : ""}`}</button>
             </div>
           </div>
         </div>
@@ -330,7 +429,7 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
         <div className="modal-overlay" onClick={() => setBulkOpen(false)}>
           <div className="modal-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
             <h3 style={{ marginTop: 0 }}>Bulk Assign</h3>
-            <p className="subheading">Select a teacher — their linked subjects will auto-fill. Then set periods per class.</p>
+            <p className="subheading">Select a teacher — their linked subjects will auto-fill. Then set lessons per class.</p>
             <div className="modal-form">
               <div className="modal-field"><label className="modal-label">Teacher:</label>
                 <SearchableSelect
@@ -376,11 +475,11 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
             )}
 
             <table className="data-table" style={{ marginTop: "0.75rem" }}>
-              <thead><tr><th>Class</th><th>Periods / Week</th></tr></thead>
+              <thead><tr><th>Class</th><th>Lessons / Week</th></tr></thead>
               <tbody>
                 {classes.map(c => (
                   <tr key={c.id}><td>{c.name}</td>
-                    <td><input type="number" min={0} value={bulkPeriods[c.id] ?? 0} onChange={e => setBulkPeriods(prev => ({ ...prev, [c.id]: Number(e.target.value) || 0 }))} style={{ width: 80 }} /></td>
+                    <td><input type="number" min={0} value={bulkLessons[c.id] ?? 0} onChange={e => setBulkLessons(prev => ({ ...prev, [c.id]: Number(e.target.value) || 0 }))} style={{ width: 80 }} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -429,5 +528,4 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
   );
 }
 
-// React.memo prevents re-renders when ProjectEditor re-fetches unrelated data (e.g. rooms list changes)
 export default React.memo(LessonsTab);
