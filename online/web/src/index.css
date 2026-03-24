@@ -534,9 +534,9 @@ th { background: #1C2E4A; font-weight: 600; color: #FFFFFF; font-size: 0.75rem; 
 
 /* ── Tables ── */
 [data-theme="dark"] th {
-  background: #0F172A;
+  background: #1E293B;
   color: #94A3B8;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 2px solid rgba(255,255,255,0.08);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 600;
@@ -550,7 +550,7 @@ th { background: #1C2E4A; font-weight: 600; color: #FFFFFF; font-size: 0.75rem; 
   border-left: 3px solid var(--primary-400);
 }
 [data-theme="dark"] .data-table tbody tr.selected {
-  background: rgba(59,130,246,0.12);
+  background: rgba(59,130,246,0.15);
   border-left: 3px solid var(--primary-500);
 }
 
