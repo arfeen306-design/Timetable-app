@@ -179,51 +179,79 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 [data-theme="dark"] {
   /* ── Surfaces ── */
-  --surface-page:       #0E1926;
-  --surface-card:       #162232;
-  --surface-raised:     #1C2B3D;
-  --surface-input:      #1C2B3D;
-  --surface-dirty:      #2A2510;
-  --primary-50-alpha:   rgba(99,102,241,0.1);
+  --surface-page:       #0F172A;
+  --surface-card:       #1E293B;
+  --surface-raised:     #253347;
+  --surface-input:      #1E293B;
+  --surface-dirty:      rgba(234,179,8,0.08);
+  --primary-50-alpha:   rgba(99,102,241,0.12);
 
   /* ── Text ── */
-  --text-primary:       #E2E8F0;
+  --text-primary:       #F1F5F9;
   --text-secondary:     #94A3B8;
   --text-muted:         #64748B;
   --text-hint:          #475569;
 
-  /* ── Borders ── */
-  --border-subtle:      #1E293B;
-  --border-default:     #2D3A4F;
-  --border-strong:      #3B4A63;
+  /* ── Borders — softer for dark ── */
+  --border-subtle:      rgba(255,255,255,0.05);
+  --border-default:     rgba(255,255,255,0.08);
+  --border-strong:      rgba(255,255,255,0.14);
 
-  /* ── Semantic – toned down for dark ── */
-  --success-50:  #052E16;
-  --success-100: #0A3D20;
-  --danger-50:   #2D1F00;
-  --danger-100:  #3B2A06;
-  --danger-200:  #5C3D10;
-  --warning-50:  #2D1F00;
-  --warning-100: #3B2A06;
+  /* ── Semantic – proper tints for dark ── */
+  --success-50:  rgba(34,197,94,0.08);
+  --success-100: rgba(34,197,94,0.14);
+  --success-200: rgba(34,197,94,0.22);
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+  --success-700: #4ade80;
+
+  --warning-50:  rgba(234,179,8,0.08);
+  --warning-100: rgba(234,179,8,0.14);
+  --warning-200: rgba(234,179,8,0.22);
+  --warning-400: #fbbf24;
+  --warning-500: #f59e0b;
+  --warning-600: #FDE047;
+  --warning-700: #FDE68A;
+
+  --danger-50:   rgba(239,68,68,0.08);
+  --danger-100:  rgba(239,68,68,0.14);
+  --danger-200:  rgba(239,68,68,0.22);
+  --danger-400:  #f87171;
+  --danger-500:  #ef4444;
+  --danger-600:  #dc2626;
+  --danger-700:  #fca5a5;
+
+  --color-sub:          #FB923C;
+  --color-sub-bg:       rgba(249,115,22,0.1);
 
   /* ── Shadows ── */
-  --shadow-xs:  0 1px 2px rgba(0,0,0,0.2);
-  --shadow-sm:  0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-  --shadow-md:  0 4px 12px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.2);
-  --shadow-lg:  0 8px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3);
-  --shadow-xl:  0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.3);
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.3);
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
+  --shadow-xl:  0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.4);
 
   /* ── Layout / cards ── */
-  --content-bg:   #0B1120;
-  --card-bg:      #151D2E;
+  --content-bg:   #0F172A;
+  --card-bg:      #1E293B;
   --card-border:  rgba(255,255,255,0.06);
 
   /* ── Slate overrides for dark ── */
-  --slate-50:  #131E2E;
-  --slate-100: #1B2838;
-  --slate-200: #2A3B50;
-  --slate-800: #E8EDF2;
-  --slate-900: #F4F6F9;
+  --slate-50:  rgba(255,255,255,0.04);
+  --slate-100: rgba(255,255,255,0.06);
+  --slate-200: rgba(255,255,255,0.10);
+  --slate-300: #64748B;
+  --slate-400: #94A3B8;
+  --slate-500: #94A3B8;
+  --slate-600: #CBD5E1;
+  --slate-700: #E2E8F0;
+  --slate-800: #F1F5F9;
+  --slate-900: #F8FAFC;
+
+  /* ── Sidebar ── */
+  --sidebar-bg:    #0F172A;
+  --sidebar-text:  #94A3B8;
+  --sidebar-hover: rgba(255,255,255,0.06);
 
   /* ── Skeleton ── */
   color-scheme: dark;
