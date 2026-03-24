@@ -718,7 +718,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
       </div>
 
       <div className="nav-footer">
-        <button type="button" className="btn" onClick={onNext}>Next: Classrooms →</button>
+        <button type="button" className="btn" onClick={onNext}>Next: Classes →</button>
       </div>
     </div>
   );

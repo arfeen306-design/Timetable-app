@@ -12,8 +12,8 @@ import TeachersTab from "./tabs/TeachersTab";
 import LessonsTab from "./tabs/LessonsTab";
 import ConstraintsTab from "./tabs/ConstraintsTab";
 
-type Tab = "settings" | "teachers" | "rooms" | "classes" | "subjects" | "lessons" | "constraints";
-const TAB_SEGMENTS: Tab[] = ["settings", "teachers", "rooms", "classes", "subjects", "lessons", "constraints"];
+type Tab = "settings" | "teachers" | "classes" | "rooms" | "subjects" | "lessons" | "constraints";
+const TAB_SEGMENTS: Tab[] = ["settings", "teachers", "classes", "rooms", "subjects", "lessons", "constraints"];
 
 export default function ProjectEditor() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -71,13 +71,13 @@ export default function ProjectEditor() {
         <SettingsTab pid={pid} settings={settings} onSave={() => { api.getSchoolSettings(pid).then(setSettings); }} />
       )}
       {tab === "teachers" && (
-        <TeachersTab pid={pid} teachers={teachers} subjects={subjects} onChange={setTeachers} onNext={() => navigateTab("rooms")} />
-      )}
-      {tab === "rooms" && (
-        <ClassroomsTab pid={pid} rooms={rooms} onChange={setRooms} onNext={() => navigateTab("classes")} />
+        <TeachersTab pid={pid} teachers={teachers} subjects={subjects} onChange={setTeachers} onNext={() => navigateTab("classes")} />
       )}
       {tab === "classes" && (
-        <ClassesTab pid={pid} classes={classes} teachers={teachers} rooms={rooms} onChange={setClasses} onNext={() => navigateTab("subjects")} />
+        <ClassesTab pid={pid} classes={classes} teachers={teachers} rooms={rooms} onChange={setClasses} onNext={() => navigateTab("rooms")} />
+      )}
+      {tab === "rooms" && (
+        <ClassroomsTab pid={pid} rooms={rooms} onChange={setRooms} onNext={() => navigateTab("subjects")} />
       )}
       {tab === "subjects" && (
         <SubjectsTab pid={pid} subjects={subjects} rooms={rooms} onChange={setSubjects} onNext={() => navigateTab("lessons")} />
