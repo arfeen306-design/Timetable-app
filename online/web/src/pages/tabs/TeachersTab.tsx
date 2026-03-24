@@ -402,8 +402,8 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
         <td style={{ width: 40 }}>
           <InlineColorPicker color={color} onChange={handleColorChange} />
         </td>
-        {/* Max/Day */}
-        <td>
+        {/* Max Lessons/Day */}
+        <td style={{ minWidth: 100 }}>
           <input
             type="number"
             inputMode="numeric"
@@ -425,15 +425,15 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
             }}
             min={1} max={10}
             style={{
-              width: 44, border: "none", background: "transparent",
+              width: 56, border: "none", background: "transparent",
               textAlign: "center", fontSize: "0.82rem", fontWeight: 600,
               fontFamily: "var(--font-mono)", outline: "none", borderRadius: 4,
             }}
             onFocus={e => { e.target.style.background = "var(--surface-input, #f8fafc)"; }}
           />
         </td>
-        {/* Max/Week */}
-        <td>
+        {/* Max Lessons/Week */}
+        <td style={{ minWidth: 105 }}>
           <input
             type="number"
             inputMode="numeric"
@@ -455,7 +455,7 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
             }}
             min={1} max={50}
             style={{
-              width: 44, border: "none", background: "transparent",
+              width: 56, border: "none", background: "transparent",
               textAlign: "center", fontSize: "0.82rem", fontWeight: 600,
               fontFamily: "var(--font-mono)", outline: "none", borderRadius: 4,
             }}
@@ -747,8 +747,8 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
               <th style={{ width: 80 }}>Abbreviation</th>
               <th style={{ width: 70 }}>Title</th>
               <th style={{ width: 40 }}>Color</th>
-              <th style={{ width: 55 }}>Max/Day</th>
-              <th style={{ width: 60 }}>Max/Week</th>
+              <th style={{ minWidth: 100 }}>Max Lessons/Day</th>
+              <th style={{ minWidth: 105 }}>Max Lessons/Week</th>
               <th style={{ minWidth: 130 }}>Subjects</th>
               <th style={{ width: 60 }}></th>
             </tr>

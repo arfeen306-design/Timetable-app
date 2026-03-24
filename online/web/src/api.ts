@@ -159,6 +159,10 @@ export function deleteSubject(projectId: number, id: number) {
   return api(`/api/projects/${projectId}/subjects/${id}`, { method: "DELETE" });
 }
 
+export function bulkCreateSubjects(projectId: number, items: { name: string; code?: string; color?: string; category?: string; max_per_day?: number; double_allowed?: boolean; preferred_room_type?: string }[]) {
+  return api<{ created: number; skipped: number }>(`/api/projects/${projectId}/subjects/bulk`, { method: "POST", body: JSON.stringify(items) });
+}
+
 // Classes
 export type SchoolClass = { id: number; name: string; grade: string; section: string; stream: string; code: string; color: string; strength: number; class_teacher_id: number | null; home_room_id: number | null };
 

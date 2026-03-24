@@ -3,11 +3,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
 
 from backend.auth.project_scope import get_project_or_404
 from backend.models.base import get_db
-from backend.models.project import Project
+from backend.models.project import Project, Subject
 from backend.repositories.subject_repo import list_by_project, get_by_id_and_project, create as create_subject, update as update_subject, delete as delete_subject
 
 router = APIRouter()
@@ -90,6 +90,42 @@ def create_subject_endpoint(
         preferred_room_type=data.preferred_room_type,
     )
     return SubjectResponse.model_validate(s)
+
+
+class BulkSubjectsResult(BaseModel):
+    created: int
+    skipped: int
+
+
+@router.post("/bulk", response_model=BulkSubjectsResult)
+def bulk_create_subjects(
+    data: List[SubjectCreate],
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    """Batch-insert subjects in a single transaction. Skips duplicates by name."""
+    existing_names = {s.name.strip().lower() for s in list_by_project(db, project.id)}
+    created = 0
+    skipped = 0
+    for item in data:
+        if item.name.strip().lower() in existing_names:
+            skipped += 1
+            continue
+        db.add(Subject(
+            project_id=project.id,
+            name=item.name,
+            code=item.code or item.name[:3].upper(),
+            color=item.color,
+            category=item.category,
+            max_per_day=item.max_per_day,
+            double_allowed=item.double_allowed,
+            preferred_room_type=item.preferred_room_type,
+        ))
+        existing_names.add(item.name.strip().lower())
+        created += 1
+    if created:
+        db.commit()
+    return BulkSubjectsResult(created=created, skipped=skipped)
 
 
 @router.patch("/{subject_id}", response_model=SubjectResponse)

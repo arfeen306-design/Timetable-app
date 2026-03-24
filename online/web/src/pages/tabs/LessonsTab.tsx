@@ -56,6 +56,7 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
   const [bulkSelectedClasses, setBulkSelectedClasses] = useState<number[]>([]);
   const [bulkLpw, setBulkLpw] = useState(1);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [syncingLessons, setSyncingLessons] = useState(false);
 
   /* Copy from class */
   const [copySource, setCopySource] = useState(0);
@@ -182,16 +183,43 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
       if (!confirm(`⚠️ This will exceed ${nameTeacher(bulkTeacher)}'s weekly limit by ${over} lesson(s) (${current + adding}/${max}). Continue?`)) return;
     }
 
-    setBulkSaving(true);
+    // Optimistic update — add placeholder rows instantly, close modal
+    const optimisticLessons = bulkSelectedClasses.map((class_id, i) => ({
+      id: -(Date.now() + i),
+      project_id: pid,
+      teacher_id: bulkTeacher,
+      subject_id: bulkSubject,
+      class_id,
+      periods_per_week: bulkLpw,
+      group_id: null as number | null,
+      duration: 1,
+      priority: 5,
+      locked: false,
+      preferred_room_id: null as number | null,
+      notes: "",
+      allowed_room_ids: [] as number[],
+    }));
+    const previousLessons = lessons;
+    onChange([...lessons, ...optimisticLessons]);
+    setBulkOpen(false);
+    toast("success", `${bulkSelectedClasses.length} lesson${bulkSelectedClasses.length !== 1 ? "s" : ""} added — syncing…`);
+
+    // Background sync
+    setSyncingLessons(true);
     try {
       const res = await api.bulkCreateLessons(pid, {
         teacher_id: bulkTeacher, subject_id: bulkSubject,
         classes: bulkSelectedClasses.map(class_id => ({ class_id, periods_per_week: bulkLpw })),
       });
-      if (res.created > 0) { const list = await api.listLessons(pid); onChange(list); setBulkOpen(false); toast("success", `Created ${res.created} lesson(s).`); }
+      const list = await api.listLessons(pid);
+      onChange(list);
       if (res.errors.length > 0) toast("error", "Some rows failed: " + res.errors.map(e => e.message).join("; "));
-    } catch (err) { toast("error", err instanceof Error ? err.message : "Bulk assign failed"); }
-    finally { setBulkSaving(false); }
+    } catch (err) {
+      onChange(previousLessons); // rollback
+      toast("error", (err instanceof Error ? err.message : "Bulk assign failed") + " — changes rolled back.");
+    } finally {
+      setSyncingLessons(false);
+    }
   }
 
   async function doCopy() {
@@ -315,7 +343,16 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
         </tbody>
       </table>
 
-      <div className="nav-footer">
+      <div className="nav-footer" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+        {syncingLessons && (
+          <span style={{
+            fontSize: "0.72rem", fontWeight: 600,
+            color: "var(--primary-600)", display: "flex", alignItems: "center", gap: 5,
+          }}>
+            <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "var(--primary-500)", animation: "pulse 1.2s ease-in-out infinite" }} />
+            Syncing…
+          </span>
+        )}
         <button type="button" className="btn" onClick={onNext}>Next: Constraints →</button>
       </div>
 

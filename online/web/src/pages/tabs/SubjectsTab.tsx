@@ -162,17 +162,15 @@ export default function SubjectsTab({ pid, subjects, rooms, onChange, onNext }: 
     const toAdd = DEFAULT_SUBJECTS.filter((_, i) => libraryChecked.has(i))
       .filter(s => !existingCodes.has(s.code.trim().toUpperCase()) && !existingNames.has(s.name.trim().toLowerCase()));
     if (toAdd.length === 0) { toast("info", "No new subjects to import."); return; }
-    let added = 0;
-    for (const s of toAdd) {
-      try {
-        await api.createSubject(pid, { name: s.name, code: s.code, category: s.category, color: s.color, max_per_day: 2 });
-        added++;
-      } catch { /* skip duplicates */ }
+    try {
+      const result = await api.bulkCreateSubjects(pid, toAdd.map(s => ({ name: s.name, code: s.code, category: s.category, color: s.color, max_per_day: 2 })));
+      const list = await api.listSubjects(pid);
+      onChange(list);
+      setLibraryOpen(false);
+      toast("success", `Added ${result.created} subject(s) from library.`);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Import failed");
     }
-    const list = await api.listSubjects(pid);
-    onChange(list);
-    setLibraryOpen(false);
-    toast("success", `Added ${added} subject(s) from library.`);
   }
 
   function toggleLibraryAll(checked: boolean) {
@@ -208,15 +206,14 @@ export default function SubjectsTab({ pid, subjects, rooms, onChange, onNext }: 
             const nameSet = new Set(subjects.map(s => s.name.trim().toLowerCase()));
             const toAdd = DEFAULT_SUBJECTS.filter(s => !nameSet.has(s.name.trim().toLowerCase()));
             if (toAdd.length === 0) { toast("info", "All O/A Level subjects already exist."); setSeeding(false); return; }
-            let added = 0;
-            for (const s of toAdd) {
-              try {
-                await api.createSubject(pid, { name: s.name, code: s.code, category: s.category, color: s.color, max_per_day: 2 });
-                added++;
-              } catch { /* skip duplicates */ }
+            try {
+              const result = await api.bulkCreateSubjects(pid, toAdd.map(s => ({ name: s.name, code: s.code, category: s.category, color: s.color, max_per_day: 2 })));
+              const list = await api.listSubjects(pid);
+              onChange(list);
+              toast("success", `⚡ Added ${result.created} O/A Level subject${result.created !== 1 ? "s" : ""} instantly.`);
+            } catch (err) {
+              toast("error", err instanceof Error ? err.message : "Seed failed");
             }
-            const list = await api.listSubjects(pid); onChange(list);
-            toast("success", `⚡ Added ${added} O/A Level subject${added !== 1 ? "s" : ""} instantly.`);
             setSeeding(false);
           }}
           disabled={seeding}
