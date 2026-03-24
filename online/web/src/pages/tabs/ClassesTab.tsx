@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import * as api from "../../api";
 import type { SchoolClass, Room } from "../../api";
 import { useToast } from "../../context/ToastContext";
@@ -14,138 +14,134 @@ interface Props {
   onNext: () => void;
 }
 
-function ClassesTab({ pid, classes, teachers, rooms, onChange, onNext }: Props) {
-  const toast = useToast();
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
-  const [modalOpen, setModalOpen] = useState(false);
+const GRADE_OPTIONS = Array.from({ length: 14 }, (_, i) => i); // 0-13
+const CLASS_COLORS = ['#50C878','#4F46E5','#0891B2','#D97706','#7C3AED','#0F766E','#9333EA','#0369A1','#15803D','#C2410C','#B45309','#16A34A','#DC2626','#6366F1'];
 
-  const [editClass, setEditClass] = useState<SchoolClass | null>(null);
+function parseSections(input: string): string[] {
+  return input
+    .split(",")
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+}
+
+function ClassesTab({ pid, classes, onChange, onNext }: Props) {
+  const toast = useToast();
+
+  // ── Bulk creation state ──
+  const [selectedGrades, setSelectedGrades] = useState<number[]>([]);
+  const [sameForAll, setSameForAll] = useState(true);
+  const [sharedSections, setSharedSections] = useState("");
+  const [perGradeSections, setPerGradeSections] = useState<Record<number, string>>({});
+  const [editMode, setEditMode] = useState(classes.length === 0);
+  const [saving, setSaving] = useState(false);
+
+  // Import
   const importRef = React.createRef<HTMLInputElement>();
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success_count: number; errors: { row: number; message: string }[] } | null>(null);
 
-  /* Form state */
-  const [fGrade, setFGrade] = useState("");
-  const [fSection, setFSection] = useState("");
-  const [fStream, setFStream] = useState("");
-  const [fName, setFName] = useState("");
-  const [fCode, setFCode] = useState("");
-  const [fColor, setFColor] = useState("#50C878");
-  const [fStrength, setFStrength] = useState(30);
-  const [fTeacherId, setFTeacherId] = useState<number | null>(null);
-  const [fRoomId, setFRoomId] = useState<number | null>(null);
+  // Delete state
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
 
-  function toggleCheck(id: number, e: React.ChangeEvent<HTMLInputElement>) {
-    e.stopPropagation();
-    setCheckedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+  // ── Grade selection ──
+  function toggleGrade(g: number) {
+    setSelectedGrades(prev =>
+      prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g].sort((a, b) => a - b)
+    );
   }
 
-  function toggleAll(e: React.ChangeEvent<HTMLInputElement>) {
-    setCheckedIds(e.target.checked ? new Set(classes.map(c => c.id)) : new Set());
-  }
+  // ── Preview what will be created ──
+  const preview = useMemo(() => {
+    const result: { grade: string; section: string; name: string; code: string; color: string }[] = [];
+    let colorIdx = 0;
+    for (const g of selectedGrades) {
+      const sectionsStr = sameForAll ? sharedSections : (perGradeSections[g] || "");
+      const sects = parseSections(sectionsStr);
+      if (sects.length === 0) {
+        // No sections — create one class for the grade
+        result.push({
+          grade: String(g),
+          section: "",
+          name: `Grade ${g}`,
+          code: `${g}-X`,
+          color: CLASS_COLORS[colorIdx++ % CLASS_COLORS.length],
+        });
+      } else {
+        for (const sec of sects) {
+          result.push({
+            grade: String(g),
+            section: sec,
+            name: `Grade ${g} ${sec}`,
+            code: `${g}-${sec}`.toUpperCase(),
+            color: CLASS_COLORS[colorIdx++ % CLASS_COLORS.length],
+          });
+        }
+      }
+    }
+    return result;
+  }, [selectedGrades, sameForAll, sharedSections, perGradeSections]);
 
-  /* ── Auto-generate display name and code from grade/section/stream ── */
-  function autoName(grade: string, section: string, stream: string): string {
-    const parts = [`Grade ${grade.trim()}`];
-    if (section.trim()) parts.push(section.trim());
-    if (stream.trim()) parts.push(stream.trim());
-    return parts.join(" ");
-  }
-
-  function autoCode(grade: string, section: string): string {
-    return `${grade.trim()}-${section.trim() || "X"}`.toUpperCase();
-  }
-
-  function openAdd() {
-    setEditClass(null);
-    setFGrade(""); setFSection(""); setFStream(""); setFName(""); setFCode("");
-    setFColor("#50C878"); setFStrength(30); setFTeacherId(null); setFRoomId(null);
-    setModalOpen(true);
-  }
-
-  function openEdit(c?: SchoolClass) {
-    const cls = c || classes.find(x => x.id === selectedId);
-    if (!cls) return;
-    setEditClass(cls);
-    setFGrade(cls.grade); setFSection(cls.section); setFStream(cls.stream);
-    setFName(cls.name); setFCode(cls.code); setFColor(cls.color || "#50C878");
-    setFStrength(cls.strength);
-    setFTeacherId(cls.class_teacher_id ?? null);
-    setFRoomId(cls.home_room_id ?? null);
-    setModalOpen(true);
-  }
-
-  async function saveClass() {
-    if (!fGrade.trim()) {
-      toast("error", "Grade is required.");
+  // ── Save all ──
+  async function saveConfiguration() {
+    if (preview.length === 0) {
+      toast("error", "Select at least one grade.");
       return;
     }
-
-    const displayName = fName.trim() || autoName(fGrade, fSection, fStream);
-    const code = fCode.trim() || autoCode(fGrade, fSection);
-
-    const data = {
-      grade: fGrade.trim(),
-      section: fSection.trim(),
-      stream: fStream.trim(),
-      name: displayName,
-      code,
-      color: fColor,
-      strength: fStrength,
-      class_teacher_id: fTeacherId || null,
-      home_room_id: fRoomId || null,
-    };
-
+    setSaving(true);
+    let created = 0;
+    let errors = 0;
     try {
-      if (editClass) {
-        const updated = await api.updateClass(pid, editClass.id, data);
-        onChange(classes.map(c => c.id === editClass.id ? updated : c));
-        toast("success", "Class updated.");
-      } else {
-        const created = await api.createClass(pid, data);
-        onChange([...classes, created]);
-        toast("success", "Class added.");
+      for (const item of preview) {
+        // Check if this exact grade+section already exists
+        const exists = classes.some(
+          c => c.grade === item.grade && c.section === item.section
+        );
+        if (exists) continue;
+        try {
+          await api.createClass(pid, {
+            grade: item.grade,
+            section: item.section,
+            stream: "",
+            name: item.name,
+            code: item.code,
+            color: item.color,
+            strength: 30,
+            class_teacher_id: null,
+            home_room_id: null,
+          });
+          created++;
+        } catch {
+          errors++;
+        }
       }
-      setModalOpen(false);
+      const fresh = await api.listClasses(pid);
+      onChange(fresh);
+      setEditMode(false);
+      setSelectedGrades([]);
+      setSharedSections("");
+      setPerGradeSections({});
+      toast("success", `${created} class${created !== 1 ? "es" : ""} created.${errors > 0 ? ` ${errors} failed.` : ""}`);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Save failed");
     }
+    setSaving(false);
   }
 
+  // ── Delete ──
   async function handleDelete() {
-    // If checkboxes are checked, bulk-delete those
-    if (checkedIds.size > 0) {
-      const ids = Array.from(checkedIds);
-      try {
-        const result = await api.bulkDeleteClasses(pid, ids);
-        onChange(classes.filter(c => !ids.includes(c.id)));
-        setCheckedIds(new Set());
-        if (ids.includes(selectedId as number)) setSelectedId(null);
-        const msg = `${result.deleted} class${result.deleted !== 1 ? "es" : ""} deleted.` +
-          (result.failed.length > 0 ? ` ${result.failed.length} could not be removed.` : "");
-        toast("success", msg);
-      } catch (err) {
-        toast("error", err instanceof Error ? err.message : "Delete failed");
-      }
-      return;
-    }
-    // Otherwise delete the single selected row
-    if (selectedId == null) return;
+    if (checkedIds.size === 0) return;
+    const ids = Array.from(checkedIds);
     try {
-      await api.deleteClass(pid, selectedId);
-      onChange(classes.filter(c => c.id !== selectedId));
-      setSelectedId(null);
-      toast("success", "Class deleted.");
+      const result = await api.bulkDeleteClasses(pid, ids);
+      onChange(classes.filter(c => !ids.includes(c.id)));
+      setCheckedIds(new Set());
+      toast("success", `${result.deleted} class${result.deleted !== 1 ? "es" : ""} deleted.`);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Delete failed");
     }
   }
 
+  // ── Import ──
   async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
     setImporting(true); setImportResult(null);
@@ -162,138 +158,265 @@ function ClassesTab({ pid, classes, teachers, rooms, onChange, onNext }: Props) 
 
   return (
     <div className="card">
-      <h2 style={{ marginTop: 0 }}>Classes &amp; Sections</h2>
-      <p className="subheading">Add and manage classes, sections, and streams.</p>
+      <h2 style={{ marginTop: 0 }}>Classes & Sections</h2>
+      <p className="subheading">
+        {classes.length > 0 && !editMode
+          ? `${classes.length} class${classes.length !== 1 ? "es" : ""} configured. Click "Edit Configuration" to modify.`
+          : "Select grades and define sections to bulk-create your class structure."}
+      </p>
 
       {/* ── Toolbar ── */}
       <div className="toolbar" style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-        <button type="button" className="btn btn-primary" onClick={openAdd}>+ Add Class</button>
+        {!editMode && classes.length > 0 && (
+          <button type="button" className="btn btn-primary" onClick={() => setEditMode(true)}>✏️ Edit Configuration</button>
+        )}
         <input type="file" ref={importRef} accept=".xlsx,.xls" style={{ display: "none" }} onChange={onImportFile} />
-        <button type="button" className="btn" onClick={() => importRef.current?.click()} disabled={importing}>{importing ? "Importing…" : "Import from Excel"}</button>
-        <button type="button" className="btn" onClick={() => api.downloadTemplate("classes")}>Download Template</button>
-        <button type="button" className="btn" onClick={() => openEdit()} disabled={selectedId == null}>Edit</button>
-        <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={selectedId == null && checkedIds.size === 0}>
-          {checkedIds.size > 0 ? `Delete (${checkedIds.size})` : "Delete"}
+        <button type="button" className="btn" onClick={() => importRef.current?.click()} disabled={importing}>
+          {importing ? "⏳ Processing…" : "📥 Import from Excel"}
         </button>
+        <button type="button" className="btn" onClick={() => api.downloadTemplate("classes")}>📋 Download Template</button>
+        {checkedIds.size > 0 && (
+          <button type="button" className="btn btn-danger" onClick={handleDelete}>
+            🗑 Delete ({checkedIds.size})
+          </button>
+        )}
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: "0.72rem", color: "var(--slate-400)" }}>
+          {classes.length} class{classes.length !== 1 ? "es" : ""}
+        </span>
       </div>
 
-      {/* ── Import Result ── */}
+      {/* ── Import result ── */}
       {importResult && (
-        <div className="alert alert-success" style={{ marginBottom: "1rem" }}>
-          Imported {importResult.success_count} class(es).
-          {importResult.errors.length > 0 && ` Errors: ${importResult.errors.map(e => `Row ${e.row}: ${e.message}`).join("; ")}`}
+        <div style={{
+          marginBottom: "1rem", borderRadius: 8, padding: "12px 16px",
+          background: importResult.errors.length > 0 ? "#FFFBEB" : "#F0FDF4",
+          border: `1px solid ${importResult.errors.length > 0 ? "#FDE68A" : "#BBF7D0"}`,
+        }}>
+          <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>
+            ✅ Imported {importResult.success_count} class(es)
+          </div>
+          <button type="button" onClick={() => setImportResult(null)} style={{ marginTop: 4, fontSize: "0.72rem", background: "none", border: "none", color: "var(--slate-400)", cursor: "pointer", textDecoration: "underline" }}>Dismiss</button>
         </div>
       )}
 
-      {/* ── Data Table ── */}
-      {classes.length === 0 && <p className="subheading" style={{ textAlign: "center" }}>No classes added yet. Import from Excel or add manually.</p>}
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th style={{ width: 36 }}>
-              <input
-                type="checkbox"
-                checked={allChecked}
-                ref={el => { if (el) el.indeterminate = someChecked; }}
-                onChange={toggleAll}
-                title="Select all"
-              />
-            </th>
-            <th style={{ width: 40 }}>#</th>
-            <th>Name</th><th>Grade</th><th>Section</th><th>Stream</th><th>Code</th>
-            <th style={{ width: 60 }}>Color</th><th>Strength</th>
-          </tr>
-        </thead>
-        <tbody>
-          {classes.map((c, i) => (
-            <tr
-              key={c.id}
-              className={selectedId === c.id ? "selected" : ""}
-              onClick={() => setSelectedId(c.id)}
-              onDoubleClick={() => openEdit(c)}
+      {/* ═══ BULK CREATION INTERFACE ═══ */}
+      {editMode && (
+        <div style={{
+          background: "var(--surface-card, #f8fafc)",
+          border: "1px solid var(--slate-200, #e2e8f0)",
+          borderRadius: 12, padding: "1.25rem", marginBottom: "1.5rem",
+        }}>
+          {/* ── Step A: Grade Selection ── */}
+          <div style={{ marginBottom: "1.25rem" }}>
+            <h3 style={{ margin: "0 0 0.5rem", fontSize: "0.92rem", fontWeight: 700, color: "var(--slate-700)" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: "var(--primary-500)", color: "#fff", fontSize: "0.68rem", fontWeight: 700, marginRight: 8 }}>1</span>
+              Select Grades
+            </h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+              {GRADE_OPTIONS.map(g => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => toggleGrade(g)}
+                  style={{
+                    padding: "6px 14px", borderRadius: 8,
+                    border: selectedGrades.includes(g) ? "2px solid var(--primary-500)" : "2px solid var(--slate-200)",
+                    background: selectedGrades.includes(g) ? "var(--primary-50, #eef2ff)" : "#fff",
+                    color: selectedGrades.includes(g) ? "var(--primary-700)" : "var(--slate-600)",
+                    fontWeight: 600, fontSize: "0.82rem", cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {g === 0 ? "Pre" : g}
+                </button>
+              ))}
+            </div>
+            {selectedGrades.length > 0 && (
+              <p style={{ margin: "6px 0 0", fontSize: "0.72rem", color: "var(--slate-500)" }}>
+                {selectedGrades.length} grade{selectedGrades.length !== 1 ? "s" : ""} selected: {selectedGrades.map(g => g === 0 ? "Pre" : g).join(", ")}
+              </p>
+            )}
+          </div>
+
+          {/* ── Step B: Section Strategy ── */}
+          {selectedGrades.length > 0 && (
+            <div style={{ marginBottom: "1.25rem" }}>
+              <h3 style={{ margin: "0 0 0.5rem", fontSize: "0.92rem", fontWeight: 700, color: "var(--slate-700)" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: "var(--primary-500)", color: "#fff", fontSize: "0.68rem", fontWeight: 700, marginRight: 8 }}>2</span>
+                Define Sections
+              </h3>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "0.82rem", marginBottom: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={sameForAll}
+                  onChange={e => setSameForAll(e.target.checked)}
+                  style={{ width: "auto", accentColor: "var(--primary-500)" }}
+                />
+                <span style={{ fontWeight: 500 }}>Apply same sections to all selected grades</span>
+              </label>
+
+              {sameForAll ? (
+                <div>
+                  <input
+                    value={sharedSections}
+                    onChange={e => setSharedSections(e.target.value)}
+                    placeholder="e.g. A, B, C, D (comma separated)"
+                    style={{
+                      width: "100%", maxWidth: 400, padding: "8px 12px",
+                      borderRadius: 8, border: "1px solid var(--slate-200)",
+                      fontSize: "0.82rem",
+                    }}
+                  />
+                  {sharedSections && (
+                    <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
+                      {parseSections(sharedSections).map((s, i) => (
+                        <span key={i} style={{
+                          background: "var(--primary-100)", color: "var(--primary-700)",
+                          fontSize: "0.72rem", fontWeight: 600, padding: "2px 8px",
+                          borderRadius: 4,
+                        }}>{s}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {selectedGrades.map(g => (
+                    <div key={g} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{
+                        fontWeight: 700, fontSize: "0.82rem", minWidth: 70,
+                        color: "var(--slate-700)",
+                      }}>Grade {g === 0 ? "Pre" : g}:</span>
+                      <input
+                        value={perGradeSections[g] || ""}
+                        onChange={e => setPerGradeSections(prev => ({ ...prev, [g]: e.target.value }))}
+                        placeholder="e.g. A, B, C"
+                        style={{
+                          flex: 1, maxWidth: 300, padding: "6px 10px",
+                          borderRadius: 6, border: "1px solid var(--slate-200)",
+                          fontSize: "0.82rem",
+                        }}
+                      />
+                      {(perGradeSections[g] || "").includes(",") && (
+                        <span style={{ fontSize: "0.68rem", color: "var(--slate-400)" }}>
+                          {parseSections(perGradeSections[g] || "").length} sections
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Step C: Preview ── */}
+          {preview.length > 0 && (
+            <div style={{ marginBottom: "1rem" }}>
+              <h3 style={{ margin: "0 0 0.5rem", fontSize: "0.92rem", fontWeight: 700, color: "var(--slate-700)" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: "var(--primary-500)", color: "#fff", fontSize: "0.68rem", fontWeight: 700, marginRight: 8 }}>3</span>
+                Preview — {preview.length} class{preview.length !== 1 ? "es" : ""} will be created
+              </h3>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 120, overflowY: "auto" }}>
+                {preview.map((p, i) => {
+                  const exists = classes.some(c => c.grade === p.grade && c.section === p.section);
+                  return (
+                    <span key={i} style={{
+                      display: "inline-block", padding: "3px 10px",
+                      borderRadius: 6, fontSize: "0.72rem", fontWeight: 600,
+                      background: exists ? "var(--slate-100)" : p.color,
+                      color: exists ? "var(--slate-400)" : "#fff",
+                      textDecoration: exists ? "line-through" : "none",
+                    }} title={exists ? "Already exists" : ""}>
+                      {p.name}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Save button ── */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={saveConfiguration}
+              disabled={preview.length === 0 || saving}
+              style={{ minWidth: 160 }}
             >
-              <td onClick={e => e.stopPropagation()}>
-                <input type="checkbox" checked={checkedIds.has(c.id)} onChange={e => toggleCheck(c.id, e)} />
-              </td>
-              <td>{i + 1}</td>
-              <td>{c.name}</td>
-              <td>{c.grade}</td>
-              <td>{c.section}</td>
-              <td>{c.stream}</td>
-              <td>{c.code}</td>
-              <td><span className="color-swatch" style={{ backgroundColor: c.color || "#50C878" }} /></td>
-              <td>{c.strength}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* ── Footer nav ── */}
-      <div className="nav-footer">
-        <button type="button" className="btn" onClick={onNext}>Next: Classrooms →</button>
-      </div>
-
-      {/* ── Add/Edit Modal ── */}
-      {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal-dialog" onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>{editClass ? "Edit Class" : "New Class"}</h3>
-            <div className="modal-form">
-              <div className="modal-field">
-                <label className="modal-label required">Grade:</label>
-                <input value={fGrade} onChange={e => setFGrade(e.target.value)} placeholder="e.g. 9, 10, 11" autoFocus />
-              </div>
-              <div className="modal-field">
-                <label className="modal-label">Section:</label>
-                <input value={fSection} onChange={e => setFSection(e.target.value)} placeholder="e.g. A, B, Science" />
-              </div>
-              <div className="modal-field">
-                <label className="modal-label">Stream:</label>
-                <input value={fStream} onChange={e => setFStream(e.target.value)} placeholder="e.g. Science, Co..." />
-              </div>
-              <div className="modal-field">
-                <label className="modal-label">Display Name:</label>
-                <input value={fName} onChange={e => setFName(e.target.value)} placeholder={`e.g. ${autoName(fGrade || "9", fSection || "Scie...", "")}`} />
-              </div>
-              <div className="modal-field">
-                <label className="modal-label">Code:</label>
-                <input value={fCode} onChange={e => setFCode(e.target.value)} placeholder={`e.g. ${autoCode(fGrade || "9", fSection || "SCI")}`} />
-              </div>
-              <div className="modal-field">
-                <label className="modal-label">Color:</label>
-                <input type="color" value={fColor} onChange={e => setFColor(e.target.value)} style={{ width: 48, height: 36, padding: 0, border: "1px solid #e2e8f0", borderRadius: 6, cursor: "pointer" }} />
-              </div>
-              <div className="modal-field">
-                <label className="modal-label">Student Strength:</label>
-                <input type="number" min={1} max={500} value={fStrength} onChange={e => setFStrength(Number(e.target.value))} style={{ width: 80 }} />
-              </div>
-              <div className="modal-field">
-                <label className="modal-label">Class Teacher:</label>
-                <select value={fTeacherId ?? 0} onChange={e => setFTeacherId(Number(e.target.value) || null)}>
-                  <option value={0}>(None)</option>
-                  {teachers.map(t => <option key={t.id} value={t.id}>{t.title} {t.first_name} {t.last_name}</option>)}
-                </select>
-              </div>
-              <div className="modal-field">
-                <label className="modal-label">Home Room:</label>
-                <select value={fRoomId ?? 0} onChange={e => setFRoomId(Number(e.target.value) || null)}>
-                  <option value={0}>(None)</option>
-                  {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={() => setModalOpen(false)}>Cancel</button>
-              <button type="button" className="btn btn-primary" onClick={saveClass}>OK</button>
-            </div>
+              {saving ? "⏳ Saving…" : `💾 Save Configuration (${preview.filter(p => !classes.some(c => c.grade === p.grade && c.section === p.section)).length} new)`}
+            </button>
+            {classes.length > 0 && (
+              <button type="button" className="btn" onClick={() => setEditMode(false)}>Cancel</button>
+            )}
           </div>
         </div>
       )}
 
+      {/* ═══ EXISTING CLASSES TABLE ═══ */}
+      {classes.length > 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th style={{ width: 36 }}>
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    ref={el => { if (el) el.indeterminate = someChecked; }}
+                    onChange={e => setCheckedIds(e.target.checked ? new Set(classes.map(c => c.id)) : new Set())}
+                    title="Select all"
+                  />
+                </th>
+                <th style={{ width: 40 }}>#</th>
+                <th>Name</th>
+                <th>Grade</th>
+                <th>Section</th>
+                <th>Code</th>
+                <th style={{ width: 50 }}>Color</th>
+                <th>Strength</th>
+              </tr>
+            </thead>
+            <tbody>
+              {classes.map((c, i) => (
+                <tr key={c.id}>
+                  <td onClick={e => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={checkedIds.has(c.id)}
+                      onChange={() => setCheckedIds(prev => {
+                        const next = new Set(prev);
+                        next.has(c.id) ? next.delete(c.id) : next.add(c.id);
+                        return next;
+                      })}
+                    />
+                  </td>
+                  <td>{i + 1}</td>
+                  <td style={{ fontWeight: 500 }}>{c.name}</td>
+                  <td>{c.grade}</td>
+                  <td>{c.section || "—"}</td>
+                  <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.78rem" }}>{c.code}</td>
+                  <td><span className="color-swatch" style={{ backgroundColor: c.color || "#50C878" }} /></td>
+                  <td>{c.strength}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
+      {classes.length === 0 && !editMode && (
+        <p className="subheading" style={{ textAlign: "center", padding: "2rem 0" }}>
+          No classes configured yet. Use the bulk creator above or import from Excel.
+        </p>
+      )}
+
+      <div className="nav-footer">
+        <button type="button" className="btn" onClick={onNext}>Next: Classrooms →</button>
+      </div>
     </div>
   );
 }
 
-// React.memo prevents re-renders when ProjectEditor re-fetches unrelated data (e.g. teachers list changes)
 export default React.memo(ClassesTab);

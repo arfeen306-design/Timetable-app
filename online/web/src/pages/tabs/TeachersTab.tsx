@@ -38,13 +38,12 @@ interface Props {
 }
 
 /* ── Inline Subject Picker ── */
-function SubjectPicker({ subjectIds, subjects, onAdd, onRemove, onCreateNew, pid }: {
+function SubjectPicker({ subjectIds, subjects, onAdd, onRemove, onCreateNew }: {
   subjectIds: number[];
   subjects: Subject[];
   onAdd: (id: number) => void;
   onRemove: (id: number) => void;
   onCreateNew: (name: string) => void;
-  pid: number;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -232,7 +231,7 @@ interface RowData {
   subjectIds: number[];
 }
 
-function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelete, isNew, subjectMap, toast }: {
+function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelete, isNew, toast }: {
   row: RowData;
   index: number;
   existingCodes: string[];
@@ -241,7 +240,6 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
   onSave: (data: RowData) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   isNew: boolean;
-  subjectMap: Map<number, Subject>;
   toast: ReturnType<typeof useToast>;
 }) {
   const [name, setName] = useState(row.name);
@@ -436,7 +434,6 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
             onAdd={handleSubjectAdd}
             onRemove={handleSubjectRemove}
             onCreateNew={handleSubjectCreate}
-            pid={pid}
           />
         </td>
         {/* Actions */}
@@ -504,7 +501,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
 
   // Teacher → assigned subject IDs map
   const [teacherSubjectIds, setTeacherSubjectIds] = useState<Map<number, number[]>>(new Map());
-  const subjectMap = new Map(subjects.map(s => [s.id, s]));
+
 
   useEffect(() => {
     if (list.length === 0) return;
@@ -672,7 +669,6 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
                 onSave={handleSave}
                 onDelete={handleDelete}
                 isNew={false}
-                subjectMap={subjectMap}
                 toast={toast}
               />
             ))}
@@ -687,7 +683,6 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
               onSave={handleSave}
               onDelete={async () => {}}
               isNew={true}
-              subjectMap={subjectMap}
               toast={toast}
             />
           </tbody>
