@@ -57,6 +57,9 @@
   --surface-page:       #FAF8F5;
   --surface-card:       #FFFFFF;
   --surface-raised:     #F5F0EB;
+  --surface-input:      #F8FAFC;
+  --surface-dirty:      #FFFBEB;
+  --primary-50-alpha:   rgba(99,102,241,0.06);
 
   /* ── Text ── */
   --text-primary:       #0F1A2B;
@@ -179,6 +182,9 @@
   --surface-page:       #0E1926;
   --surface-card:       #162232;
   --surface-raised:     #1C2B3D;
+  --surface-input:      #1C2B3D;
+  --surface-dirty:      #2A2510;
+  --primary-50-alpha:   rgba(99,102,241,0.1);
 
   /* ── Text ── */
   --text-primary:       #E2E8F0;

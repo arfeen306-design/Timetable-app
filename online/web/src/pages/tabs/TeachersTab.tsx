@@ -107,10 +107,10 @@ function SubjectPicker({ subjectIds, subjects, onAdd, onRemove, onCreateNew }: {
       {/* Dropdown */}
       {open && (
         <div style={{
-          position: "absolute", top: "100%", left: 0, zIndex: 100,
-          background: "#fff", border: "1px solid var(--slate-200)",
-          borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-          minWidth: 200, maxHeight: 220, overflow: "hidden",
+          position: "absolute", top: "100%", left: 0, zIndex: 9999,
+          background: "var(--surface-card, #fff)", border: "1px solid var(--slate-200)",
+          borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+          minWidth: 220, maxHeight: 240, overflow: "hidden",
           animation: "slideUp 0.15s ease-out",
         }}>
           <div style={{ padding: "6px 8px", borderBottom: "1px solid var(--slate-100)" }}>
@@ -197,7 +197,7 @@ function InlineColorPicker({ color, onChange }: { color: string; onChange: (c: s
       {open && (
         <div style={{
           position: "absolute", top: 28, left: -20, zIndex: 100,
-          background: "#fff", border: "1px solid var(--slate-200)",
+          background: "var(--surface-card, #fff)", border: "1px solid var(--slate-200)",
           borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
           padding: 6, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4,
         }}>
@@ -332,7 +332,7 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
     }
   }
 
-  const rowBg = isNew ? "var(--primary-50, #eef2ff)" : dirty ? "#fffbeb" : undefined;
+  const rowBg = isNew ? "var(--surface-input)" : dirty ? "var(--surface-dirty)" : undefined;
 
   return (
     <>
@@ -354,7 +354,7 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
               fontSize: "0.82rem", fontWeight: 500, padding: "4px 6px",
               outline: "none", borderRadius: 4,
             }}
-            onFocus={e => { e.target.style.background = "#f8fafc"; }}
+            onFocus={e => { e.target.style.background = "var(--surface-input, #f8fafc)"; }}
             onKeyDown={e => {
               if (e.key === "Enter" && isNew && name.trim()) { autoCode(name); doSave(); }
               if (e.key === "Tab") autoCode(name);
@@ -421,7 +421,7 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
               textAlign: "center", fontSize: "0.82rem", fontWeight: 600,
               fontFamily: "var(--font-mono)", outline: "none", borderRadius: 4,
             }}
-            onFocus={e => { e.target.style.background = "#f8fafc"; }}
+            onFocus={e => { e.target.style.background = "var(--surface-input, #f8fafc)"; }}
           />
         </td>
         {/* Max/Week */}
@@ -451,7 +451,7 @@ function EditableRow({ row, index, existingCodes, subjects, pid, onSave, onDelet
               textAlign: "center", fontSize: "0.82rem", fontWeight: 600,
               fontFamily: "var(--font-mono)", outline: "none", borderRadius: 4,
             }}
-            onFocus={e => { e.target.style.background = "#f8fafc"; }}
+            onFocus={e => { e.target.style.background = "var(--surface-input, #f8fafc)"; }}
           />
         </td>
         {/* Subjects */}
@@ -670,7 +670,7 @@ function TeachersTab({ pid, teachers, subjects, onChange, onNext }: Props) {
       )}
 
       {/* ── Teachers table ── */}
-      <div style={{ overflowX: "auto" }}>
+      <div style={{ overflowX: "auto", overflowY: "visible", position: "relative" }}>
         <table className="data-table">
           <thead>
             <tr>
