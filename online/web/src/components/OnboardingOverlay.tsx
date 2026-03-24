@@ -265,7 +265,7 @@ const STEPS = [
     icon: CalendarIcon,
     emoji: "📋",
     title: "Lessons",
-    desc: "Map which teacher teaches which subject to which class, and how many periods per week. This is the core scheduling data.",
+    desc: "Map which teacher teaches which subject to which class, and how many lessons per week. This is the core scheduling data.",
     color: "#64ffda",
     highlight: true,
   },

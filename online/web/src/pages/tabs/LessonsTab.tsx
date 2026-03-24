@@ -442,6 +442,11 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
               <p className="subheading" style={{ margin: "0 0 0.75rem" }}>Select teacher → grades → sections → lessons/week.</p>
 
               {/* Step 1: Teacher + Subject */}
+              <div style={{ marginBottom: "0.25rem" }}>
+                <label style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--text-secondary)", display: "block" }}>
+                  Step 1 — Select Teacher &amp; Subject
+                </label>
+              </div>
               <div className="modal-form">
                 <div className="modal-field"><label className="modal-label required">Teacher:</label>
                   <SearchableSelect
@@ -587,8 +592,11 @@ function LessonsTab({ pid, lessons, subjects, classes, teachers, onChange, onNex
               {/* Step 4: Lessons/Week */}
               {bulkSelectedClasses.length > 0 && (
                 <div style={{ marginTop: "0.75rem" }}>
+                  <label style={{ fontWeight: 600, fontSize: "0.82rem", color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>
+                    Step 4 — Set Lessons/Week
+                  </label>
                   <div className="modal-field">
-                    <label className="modal-label" style={{ fontWeight: 600 }}>Lessons/Week:</label>
+                    <label className="modal-label" style={{ fontWeight: 600 }}>Lessons/Week (per class):</label>
                     <input type="number" min={1} value={bulkLpw} onChange={e => setBulkLpw(Math.max(1, Number(e.target.value) || 1))} style={{ width: 80 }} />
                   </div>
                 </div>
