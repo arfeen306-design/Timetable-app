@@ -13,7 +13,10 @@ offline/
 online/
 packaging/
 release/
+desktop/
 ui/
+app/
+imports/
 
 # Dev/test files
 .git/

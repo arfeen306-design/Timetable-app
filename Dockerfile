@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-# requirements-server.txt: ortools + exports (no PySide6/Qt desktop libs)
+# requirements-server.txt: ortools + exports (no desktop GUI libs)
 # backend/requirements.txt: fastapi, sqlalchemy, psycopg2, etc.
 COPY requirements-server.txt ./server-requirements.txt
 COPY backend/requirements.txt ./backend-requirements.txt

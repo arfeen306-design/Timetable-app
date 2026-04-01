@@ -1,5 +1,5 @@
-# Server-side requirements (used in Docker/Railway — no desktop GUI libs)
-# The desktop app uses requirements.txt (includes PySide6) — this file is for the web backend only.
+# Server-side requirements (used in Docker/Railway)
+# This file is for the web backend only — no desktop GUI libs.
 ortools==9.10.4067
 openpyxl==3.1.5
 pandas>=2.0.0,<3.0.0

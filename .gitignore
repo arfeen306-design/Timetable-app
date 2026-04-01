@@ -39,6 +39,10 @@ web/.vite/
 *.spec
 dist/
 
+# Desktop app (purged — never re-add)
+desktop/
+online/
+
 # Storage uploads
 storage/
 
