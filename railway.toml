@@ -1,12 +1,8 @@
 [build]
-builder = "docker"
+builder = "DOCKER"
 dockerfilePath = "Dockerfile"
-watchPatterns = ["backend/**", "web/**", "core/**", "solver/**", "models/**", "utils/**", "exports/**", "database/**", "Dockerfile", "requirements-server.txt"]
 
 [deploy]
-serviceName = "timetable-api"
 startCommand = "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}"
 healthcheckPath = "/"
-healthcheckTimeout = 10
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3
+healthcheckTimeout = 15
