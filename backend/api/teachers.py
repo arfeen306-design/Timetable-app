@@ -8,6 +8,7 @@ from typing import Optional, List
 from backend.auth.project_scope import get_project_or_404
 from backend.models.base import get_db
 from backend.models.project import Project
+from backend.models.teacher_model import Teacher
 from backend.repositories import teacher_repo
 from backend.services.excel_import_service import import_teachers_from_excel, ImportResult, RowError
 
@@ -103,6 +104,47 @@ def bulk_create_teachers(
         except Exception as e:
             errors.append({"row": i + 1, "message": str(e)})
     return BulkResult(created=created, errors=errors)
+
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+
+
+class BulkDeleteResult(BaseModel):
+    deleted: int
+    failed: List[int]
+
+
+@router.delete("/bulk", response_model=BulkDeleteResult)
+def bulk_delete_teachers(
+    data: BulkDeleteRequest,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    if not data.ids:
+        return BulkDeleteResult(deleted=0, failed=[])
+    foreign = (
+        db.query(Teacher)
+        .filter(Teacher.id.in_(data.ids), Teacher.project_id != project.id)
+        .first()
+    )
+    if foreign:
+        raise HTTPException(status_code=403, detail="One or more IDs do not belong to this project")
+    to_delete = (
+        db.query(Teacher)
+        .filter(Teacher.id.in_(data.ids), Teacher.project_id == project.id)
+        .all()
+    )
+    deleted_ids = {t.id for t in to_delete}
+    failed = [tid for tid in data.ids if tid not in deleted_ids]
+    try:
+        for t in to_delete:
+            db.delete(t)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Bulk delete failed")
+    return BulkDeleteResult(deleted=len(to_delete), failed=failed)
 
 
 class ImportExcelResult(BaseModel):
@@ -212,4 +254,11 @@ def set_teacher_subjects_endpoint(
     t = teacher_repo.get_by_id_and_project(db, teacher_id, project.id)
     if not t:
         raise HTTPException(status_code=404, detail="Teacher not found")
-    teacher_repo.set_teacher_subjects(db, teacher_id, data.subject_ids)
+    try:
+        teacher_repo.set_teacher_subjects(db, teacher_id, data.subject_ids)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to update teacher subjects: {e}",
+        )

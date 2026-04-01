@@ -105,7 +105,21 @@ def get_subject_ids_for_teacher(db: Session, teacher_id: int) -> List[int]:
 
 
 def set_teacher_subjects(db: Session, teacher_id: int, subject_ids: List[int]) -> None:
+    """Set the subjects linked to a teacher, validating each subject_id exists first."""
     db.query(TeacherSubject).filter(TeacherSubject.teacher_id == teacher_id).delete()
+
+    if not subject_ids:
+        db.commit()
+        return
+
+    # Validate: only keep IDs that actually exist in the subjects table
+    valid_ids = {
+        row[0]
+        for row in db.query(Subject.id).filter(Subject.id.in_(subject_ids)).all()
+    }
+
     for sid in subject_ids:
-        db.add(TeacherSubject(teacher_id=teacher_id, subject_id=sid))
+        if sid in valid_ids:
+            db.add(TeacherSubject(teacher_id=teacher_id, subject_id=sid))
+
     db.commit()
