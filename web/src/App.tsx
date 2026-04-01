@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
+import { TimetableProvider } from "./context/TimetableContext";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -30,7 +31,9 @@ export default function App() {
         path="/"
         element={
           <ProtectedRoute>
-            <Layout />
+            <TimetableProvider>
+              <Layout />
+            </TimetableProvider>
           </ProtectedRoute>
         }
       >

@@ -265,28 +265,46 @@ export function getLatestRun(projectId: number) {
 }
 
 // Review
+
+export interface TimetableRunSummary {
+  id: number;
+  status: string;
+  started_at: string | null;
+  finished_at: string | null;
+  message: string | null;
+  entries_count: number;
+}
+
+export function listRuns(projectId: number) {
+  return api<{ runs: TimetableRunSummary[] }>(`/api/projects/${projectId}/review/runs`);
+}
+
 export function getRunSummary(projectId: number) {
-  return api<{ run: { id: number; status: string; entries_count: number; finished_at: string | null } | null }>(`/api/projects/${projectId}/review/run-summary`);
+  return api<{ run: TimetableRunSummary | null }>(`/api/projects/${projectId}/review/run-summary`);
 }
 
-export function getClassTimetable(projectId: number, classId: number) {
-  return api<{ class_id: number; entries: unknown[]; grid: unknown[][]; days: number; periods: number }>(`/api/projects/${projectId}/review/class/${classId}`);
+function _runQ(runId?: number | null) {
+  return runId ? `?run_id=${runId}` : "";
 }
 
-export function getTeacherTimetable(projectId: number, teacherId: number) {
-  return api<{ teacher_id: number; entries: unknown[]; grid: unknown[][]; days: number; periods: number }>(`/api/projects/${projectId}/review/teacher/${teacherId}`);
+export function getClassTimetable(projectId: number, classId: number, runId?: number | null) {
+  return api<{ class_id: number; run_id: number; entries: unknown[]; grid: unknown[][]; days: number; periods: number }>(`/api/projects/${projectId}/review/class/${classId}${_runQ(runId)}`);
 }
 
-export function getRoomTimetable(projectId: number, roomId: number) {
-  return api<{ room_id: number; entries: unknown[]; grid: unknown[][]; days: number; periods: number }>(`/api/projects/${projectId}/review/room/${roomId}`);
+export function getTeacherTimetable(projectId: number, teacherId: number, runId?: number | null) {
+  return api<{ teacher_id: number; run_id: number; entries: unknown[]; grid: unknown[][]; days: number; periods: number }>(`/api/projects/${projectId}/review/teacher/${teacherId}${_runQ(runId)}`);
 }
 
-export function getMasterTimetable(projectId: number) {
-  return api<{ entries: unknown[]; grid: unknown[][][]; days: number; periods: number }>(`/api/projects/${projectId}/review/master`);
+export function getRoomTimetable(projectId: number, roomId: number, runId?: number | null) {
+  return api<{ room_id: number; run_id: number; entries: unknown[]; grid: unknown[][]; days: number; periods: number }>(`/api/projects/${projectId}/review/room/${roomId}${_runQ(runId)}`);
 }
 
-export function getWorkload(projectId: number) {
-  return api<{ workload: { teacher_id: number; teacher_name: string; periods_scheduled: number }[] }>(`/api/projects/${projectId}/review/workload`);
+export function getMasterTimetable(projectId: number, runId?: number | null) {
+  return api<{ run_id: number; entries: unknown[]; grid: unknown[][][]; days: number; periods: number }>(`/api/projects/${projectId}/review/master${_runQ(runId)}`);
+}
+
+export function getWorkload(projectId: number, runId?: number | null) {
+  return api<{ run_id: number; workload: { teacher_id: number; teacher_name: string; periods_scheduled: number }[] }>(`/api/projects/${projectId}/review/workload${_runQ(runId)}`);
 }
 
 // Templates — download Excel templates for bulk import (same as desktop)

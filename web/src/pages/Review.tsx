@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import * as api from "../api";
+import { useTimetable } from "../context/TimetableContext";
 import TimetableGrid from "../components/TimetableGrid";
 
 interface Entry {
@@ -24,6 +25,7 @@ interface Entry {
 export default function Review() {
   const { projectId } = useParams<{ projectId: string }>();
   const pid = Number(projectId);
+  const { runs, activeRunId, setActiveRunId, refreshRuns, loading: runsLoading } = useTimetable();
   const [runSummary, setRunSummary] = useState<Awaited<ReturnType<typeof api.getRunSummary>> | null>(null);
   const [classes, setClasses] = useState<Awaited<ReturnType<typeof api.listClasses>>>([]);
   const [teachers, setTeachers] = useState<Awaited<ReturnType<typeof api.listTeachers>>>([]);
@@ -39,19 +41,21 @@ export default function Review() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Load runs list + base data on mount
   useEffect(() => {
     if (isNaN(pid)) return;
+    refreshRuns(pid);
     api.getRunSummary(pid).then(setRunSummary).catch(() => setRunSummary(null));
     api.listClasses(pid).then(setClasses);
     api.listTeachers(pid).then(setTeachers);
     api.listRooms(pid).then(setRooms);
   }, [pid]);
 
-  // Load timetable data for the selected view
+  // Load timetable data for the selected view + active run
   useEffect(() => {
     if (view === "class" && classId) {
       setLoading(true);
-      api.getClassTimetable(pid!, classId)
+      api.getClassTimetable(pid!, classId, activeRunId)
         .then((data) => {
           setEntries((data.entries || []) as Entry[]);
           setGridDays(data.days);
@@ -61,7 +65,7 @@ export default function Review() {
         .finally(() => setLoading(false));
     } else if (view === "teacher" && teacherId) {
       setLoading(true);
-      api.getTeacherTimetable(pid!, teacherId)
+      api.getTeacherTimetable(pid!, teacherId, activeRunId)
         .then((data) => {
           setEntries((data.entries || []) as Entry[]);
           setGridDays(data.days);
@@ -71,7 +75,7 @@ export default function Review() {
         .finally(() => setLoading(false));
     } else if (view === "room" && roomId) {
       setLoading(true);
-      api.getRoomTimetable(pid!, roomId)
+      api.getRoomTimetable(pid!, roomId, activeRunId)
         .then((data) => {
           setEntries((data.entries || []) as Entry[]);
           setGridDays(data.days);
@@ -81,9 +85,8 @@ export default function Review() {
         .finally(() => setLoading(false));
     } else if (view === "master") {
       setLoading(true);
-      api.getMasterTimetable(pid!)
+      api.getMasterTimetable(pid!, activeRunId)
         .then((data) => {
-          // Flatten master grid (each cell is an array) into a flat entries list
           const flat: Entry[] = (data.entries || []) as Entry[];
           setEntries(flat);
           setGridDays(data.days);
@@ -93,18 +96,19 @@ export default function Review() {
         .finally(() => setLoading(false));
     } else if (view === "workload") {
       setLoading(true);
-      api.getWorkload(pid!)
+      api.getWorkload(pid!, activeRunId)
         .then(setWorkloadData)
         .catch((e) => setError(e instanceof Error ? e.message : String(e)))
         .finally(() => setLoading(false));
     } else {
       setEntries([]);
     }
-  }, [view, classId, teacherId, roomId, pid]);
+  }, [view, classId, teacherId, roomId, pid, activeRunId]);
 
   if (isNaN(pid)) return <div>Invalid project</div>;
   const run = runSummary?.run;
   const noRun = !run || run.status !== "completed";
+  const completedRuns = runs.filter((r) => r.status === "completed");
 
   const showGrid = (view === "class" && classId > 0) ||
     (view === "teacher" && teacherId > 0) ||
@@ -117,6 +121,28 @@ export default function Review() {
         <Link to={`/project/${pid}`}>← Editor</Link>
       </p>
       <h1>Review Timetable</h1>
+
+      {/* ── Run Switcher ── */}
+      {completedRuns.length > 1 && (
+        <div className="card" style={{ marginBottom: "1rem", padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+          <label style={{ fontWeight: 600, whiteSpace: "nowrap" }}>Timetable Version:</label>
+          <select
+            value={activeRunId ?? ""}
+            onChange={(e) => setActiveRunId(e.target.value ? Number(e.target.value) : null)}
+            style={{ flex: 1, maxWidth: 360 }}
+          >
+            {completedRuns.map((r, i) => (
+              <option key={r.id} value={r.id}>
+                Run #{r.id} — {r.entries_count} entries
+                {r.finished_at ? ` (${new Date(r.finished_at).toLocaleString()})` : ""}
+                {i === 0 ? " ★ Latest" : ""}
+              </option>
+            ))}
+          </select>
+          {runsLoading && <span style={{ fontSize: "0.85rem", color: "#64748b" }}>Loading runs…</span>}
+        </div>
+      )}
+
       {noRun && (
         <div className="alert alert-warning">
           No completed timetable run. <Link to={`/project/${pid}/generate`}>Generate</Link> first.

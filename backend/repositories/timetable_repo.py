@@ -54,6 +54,24 @@ def get_latest_run(db: Session, project_id: int) -> Optional[TimetableRun]:
     )
 
 
+def list_runs(db: Session, project_id: int) -> List[TimetableRun]:
+    """All runs for a project, newest first."""
+    return (
+        db.query(TimetableRun)
+        .filter(TimetableRun.project_id == project_id)
+        .order_by(TimetableRun.created_at.desc())
+        .all()
+    )
+
+
+def get_run_by_id(db: Session, run_id: int, project_id: int) -> Optional[TimetableRun]:
+    return (
+        db.query(TimetableRun)
+        .filter(TimetableRun.id == run_id, TimetableRun.project_id == project_id)
+        .first()
+    )
+
+
 def delete_entries_for_run(db: Session, project_id: int, run_id: Optional[int] = None) -> None:
     """Delete non-locked entries for project (and optionally for a specific run)."""
     q = db.query(TimetableEntry).filter(
