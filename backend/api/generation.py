@@ -1,10 +1,10 @@
 """Generation API — validate and generate timetable; project-scoped."""
 from __future__ import annotations
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from backend.auth.project_scope import get_project_or_404
-from backend.models.base import get_db
+from backend.models.base import get_db, SessionLocal
 from backend.models.project import Project
 from backend.core.postgres_data_provider import PostgresDataProvider
 from backend.services.timetable_engine_service import validate_project_data, generate_timetable
@@ -20,6 +20,27 @@ from backend.repositories.timetable_repo import (
 router = APIRouter()
 
 
+def _run_solver_in_background(project_id: int, run_id: int) -> None:
+    """Execute solver in a background thread with its own DB session."""
+    db = SessionLocal()
+    try:
+        provider = PostgresDataProvider(db, project_id)
+        result = generate_timetable(provider, time_limit_seconds=120)
+        if not result["success"]:
+            finish_run(db, run_id, status="failed", entries_count=0,
+                       message="; ".join(result.get("messages", [])))
+            return
+
+        entries = result.get("entries", [])
+        delete_entries_for_run(db, project_id, run_id=None)
+        save_entries(db, project_id, run_id, entries)
+        finish_run(db, run_id, status="completed", entries_count=len(entries), message=None)
+    except Exception as e:
+        finish_run(db, run_id, status="failed", entries_count=0, message=str(e))
+    finally:
+        db.close()
+
+
 @router.post("/validate")
 def validate_project(
     project: Project = Depends(get_project_or_404),
@@ -32,12 +53,13 @@ def validate_project(
 
 @router.post("/generate")
 def generate_timetable_endpoint(
+    background_tasks: BackgroundTasks,
     project: Project = Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
     """
-    Validate, then run solver. On success: create TimetableRun, clear old non-locked entries,
-    save new entries, finish run. On failure: create run with status failed, return messages.
+    Validate, then kick off solver in background. Returns immediately with run_id.
+    Poll GET /runs/latest to check status.
     """
     provider = PostgresDataProvider(db, project.id)
     validation = validate_project_data(provider)
@@ -50,35 +72,12 @@ def generate_timetable_endpoint(
         }
 
     run = create_run(db, project.id, status="running", message=None)
-    try:
-        result = generate_timetable(provider, time_limit_seconds=60)
-        if not result["success"]:
-            finish_run(db, run.id, status="failed", entries_count=0, message="; ".join(result.get("messages", [])))
-            return {
-                "success": False,
-                "message": result.get("messages", ["Generation failed."])[-1] if result.get("messages") else "Generation failed.",
-                "messages": result.get("messages", []),
-                "run_id": run.id,
-            }
-
-        entries = result.get("entries", [])
-        # Remove previous non-locked entries for this project (any run)
-        delete_entries_for_run(db, project.id, run_id=None)
-        save_entries(db, project.id, run.id, entries)
-        finish_run(db, run.id, status="completed", entries_count=len(entries), message=None)
-        return {
-            "success": True,
-            "message": f"Scheduled {len(entries)} entries.",
-            "run_id": run.id,
-            "entries_count": len(entries),
-        }
-    except Exception as e:
-        finish_run(db, run.id, status="failed", entries_count=0, message=str(e))
-        return {
-            "success": False,
-            "message": str(e),
-            "run_id": run.id,
-        }
+    background_tasks.add_task(_run_solver_in_background, project.id, run.id)
+    return {
+        "success": True,
+        "message": "Generation started. Poll /runs/latest for progress.",
+        "run_id": run.id,
+    }
 
 
 @router.get("/runs/latest")
