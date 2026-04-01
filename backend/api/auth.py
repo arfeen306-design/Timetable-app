@@ -1,5 +1,6 @@
-"""Auth API: login, me, logout."""
+"""Auth API: register, login, me, logout."""
 from __future__ import annotations
+import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
@@ -7,12 +8,20 @@ from sqlalchemy.orm import Session
 
 from backend.auth.deps import get_current_user_optional
 from backend.auth.jwt import create_access_token
-from backend.auth.password import verify_password
+from backend.auth.password import get_password_hash, verify_password
 from backend.models.base import get_db
+from backend.models.user import User
+from backend.models.school import School, SchoolMembership
 from backend.repositories.user_repo import get_by_email
 from backend.repositories.membership_repo import get_first_school_id_for_user
 
 router = APIRouter()
+
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
 
 
 class LoginRequest(BaseModel):
@@ -32,6 +41,72 @@ class UserResponse(BaseModel):
     name: str
     role: str
     school_id: Optional[int] = None
+
+
+def _make_slug(name: str) -> str:
+    """Turn 'My Great School' into 'my-great-school'."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+    return slug or "my-school"
+
+
+@router.post("/register", response_model=LoginResponse)
+def register(data: RegisterRequest, db: Session = Depends(get_db)):
+    """Create a new user + school + membership, return JWT."""
+    email = data.email.strip().lower()
+    if not email or not data.password or not data.name.strip():
+        raise HTTPException(status_code=400, detail="All fields are required")
+    if len(data.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    existing = get_by_email(db, email)
+    if existing:
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+
+    user = User(
+        email=email,
+        password_hash=get_password_hash(data.password),
+        name=data.name.strip(),
+        role="school_admin",
+    )
+    db.add(user)
+    db.flush()  # get user.id
+
+    school_name = f"{data.name.strip()}'s School"
+    base_slug = _make_slug(data.name.strip())
+    # Ensure slug uniqueness
+    slug = base_slug
+    counter = 1
+    while db.query(School).filter(School.slug == slug).first():
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+
+    school = School(name=school_name, slug=slug)
+    db.add(school)
+    db.flush()  # get school.id
+
+    membership = SchoolMembership(school_id=school.id, user_id=user.id, role="admin")
+    db.add(membership)
+    db.commit()
+    db.refresh(user)
+
+    payload = {
+        "id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "role": user.role,
+        "school_id": school.id,
+    }
+    access_token = create_access_token(subject=user.email, payload=payload)
+    return LoginResponse(
+        access_token=access_token,
+        user={
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "school_id": school.id,
+        },
+    )
 
 
 @router.post("/login", response_model=LoginResponse)

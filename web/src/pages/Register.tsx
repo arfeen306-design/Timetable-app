@@ -1,24 +1,35 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
+import { api } from "../api";
 
-export default function Login() {
+export default function Register() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
-  const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
     setLoading(true);
     try {
-      await login(email.trim(), password);
-      navigate("/", { replace: true });
+      const res = await api<{ access_token: string }>("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+        }),
+      });
+      localStorage.setItem("timetable_token", res.access_token);
+      window.location.href = "/";
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -27,9 +38,22 @@ export default function Login() {
   return (
     <div className="container" style={{ maxWidth: 400, marginTop: "3rem" }}>
       <div className="card">
-        <h1 style={{ marginTop: 0 }}>Timetable</h1>
-        <p style={{ color: "#64748b", marginBottom: "1.5rem" }}>Sign in to manage your school timetable.</p>
+        <h1 style={{ marginTop: 0 }}>Create Account</h1>
+        <p style={{ color: "#64748b", marginBottom: "1.5rem" }}>
+          Sign up to start building your school timetable.
+        </p>
         <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="name">Full Name</label>
+            <input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoComplete="name"
+            />
+          </div>
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
@@ -49,18 +73,19 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              autoComplete="current-password"
+              minLength={6}
+              autoComplete="new-password"
             />
           </div>
           {error && <div className="alert alert-error">{error}</div>}
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? "Creating account…" : "Create Account"}
           </button>
         </form>
         <p style={{ textAlign: "center", marginTop: "1rem", color: "#64748b" }}>
-          Don't have an account?{" "}
-          <Link to="/register" style={{ color: "#3b82f6" }}>
-            Create one
+          Already have an account?{" "}
+          <Link to="/login" style={{ color: "#3b82f6" }}>
+            Sign in
           </Link>
         </p>
       </div>
