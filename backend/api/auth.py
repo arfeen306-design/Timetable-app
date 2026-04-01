@@ -1,7 +1,9 @@
-"""Auth API: register, login, me, logout."""
+"""Auth API: register, login, me, logout — with rate limiting."""
 from __future__ import annotations
 import re
-from fastapi import APIRouter, Depends, HTTPException
+import time
+from collections import defaultdict
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -16,6 +18,25 @@ from backend.repositories.user_repo import get_by_email
 from backend.repositories.membership_repo import get_first_school_id_for_user
 
 router = APIRouter()
+
+# --- Rate limiter: 5 attempts per 60s per IP ---
+_rate_store: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT = 5
+_RATE_WINDOW = 60  # seconds
+
+
+def _check_rate_limit(request: Request) -> None:
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    attempts = _rate_store[ip]
+    # Prune old entries
+    _rate_store[ip] = [t for t in attempts if now - t < _RATE_WINDOW]
+    if len(_rate_store[ip]) >= _RATE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many attempts. Please wait a minute and try again.",
+        )
+    _rate_store[ip].append(now)
 
 
 class RegisterRequest(BaseModel):
@@ -50,8 +71,9 @@ def _make_slug(name: str) -> str:
 
 
 @router.post("/register", response_model=LoginResponse)
-def register(data: RegisterRequest, db: Session = Depends(get_db)):
+def register(data: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     """Create a new user + school + membership, return JWT."""
+    _check_rate_limit(request)
     email = data.email.strip().lower()
     if not email or not data.password or not data.name.strip():
         raise HTTPException(status_code=400, detail="All fields are required")
@@ -110,8 +132,9 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(data: LoginRequest, db: Session = Depends(get_db)):
+def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     """Authenticate with email and password. Returns JWT."""
+    _check_rate_limit(request)
     if not data.email or not data.password:
         raise HTTPException(status_code=400, detail="Email and password required")
     user = get_by_email(db, data.email.strip().lower())

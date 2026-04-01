@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # Auth
     secret_key: str = "change-me-in-production-use-openssl-rand-hex-32"
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+    access_token_expire_minutes: int = 60 * 24  # 24 hours (was 7 days)
 
     # CORS: comma-separated list of allowed origins.
     # e.g. ALLOWED_ORIGINS=https://your-app.vercel.app,https://www.yourdomain.com
@@ -44,8 +44,8 @@ class Settings(BaseSettings):
         import os, warnings
         if v == "change-me-in-production-use-openssl-rand-hex-32":
             if os.environ.get("ENVIRONMENT", "").lower() in ("production", "prod"):
-                raise ValueError(
-                    "SECRET_KEY must be changed in production. "
+                raise RuntimeError(
+                    "FATAL: SECRET_KEY must be changed in production. "
                     "Generate one with: openssl rand -hex 32"
                 )
             warnings.warn(
