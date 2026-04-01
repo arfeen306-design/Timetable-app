@@ -61,8 +61,8 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api")
 
 @app.get("/")
-def root():
-    return {"status": "online"}
+async def root():
+    return {"status": "ok", "project": "Myzynca"}
 
 @app.get("/health")
 def health():
