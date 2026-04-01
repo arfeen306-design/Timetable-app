@@ -62,7 +62,7 @@ app.include_router(api_router, prefix="/api")
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "project": "Myzynca"}
+    return {"status": "healthy"}
 
 @app.get("/health")
 def health():
@@ -100,7 +100,7 @@ def debug_solver():
 
 
 
-# Serve built frontend so you only need backend + http://localhost:8000
+# Serve built frontend (SPA) when web/dist exists
 if os.path.isdir(_static_dir):
     app.mount("/assets", StaticFiles(directory=os.path.join(_static_dir, "assets")), name="assets")
 
