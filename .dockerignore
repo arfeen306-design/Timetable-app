@@ -1,0 +1,29 @@
+# Dependencies (installed fresh inside Docker)
+node_modules/
+web/node_modules/
+
+# Build artifacts
+web/dist/
+dist/
+__pycache__/
+*.pyc
+
+# Desktop-only (not needed for web deploy)
+offline/
+online/
+packaging/
+release/
+ui/
+
+# Dev/test files
+.git/
+.env
+.env.*
+*.md
+tests/
+sample_data/
+docs/
+
+# IDE
+.vscode/
+.idea/
