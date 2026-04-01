@@ -60,6 +60,10 @@ app.add_middleware(
 
 app.include_router(api_router, prefix="/api")
 
+@app.get("/")
+def root():
+    return {"status": "online"}
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -109,7 +113,4 @@ if os.path.isdir(_static_dir):
             return FileResponse(file_path)
         return FileResponse(os.path.join(_static_dir, "index.html"))
 else:
-
-    @app.get("/")
-    def root():
-        return {"message": "Timetable API", "health": "/health", "docs": "/docs" if settings.debug else None, "hint": "Run: cd web && npm run build, then restart backend. Then open http://localhost:8000"}
+    pass  # Root GET / is already registered unconditionally above
