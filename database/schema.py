@@ -1,4 +1,20 @@
-"""SQLite schema definition for the timetable project database."""
+"""SQLite schema definition for the timetable project database.
+
+This schema is also used by backend/services/export_adapter.py to materialise
+a temp SQLite from Postgres data, which is why the indexes and constraints
+must match the Postgres-side `__table_args__` defined in backend/models/.
+
+Phase-3 additions:
+  - UNIQUE indexes on the join tables (teacher_subject, lesson_allowed_room,
+    time_constraint).
+  - Performance indexes on the hot lookup paths
+    (lesson.{teacher,class}_id, timetable_entry.lesson_id,
+     time_constraint.entity_type/entity_id).
+  - Denormalised `teacher_id` and `class_id` on timetable_entry, plus three
+    partial UNIQUE indexes guarding "one entry per (day, period) per
+    {teacher, class, room}". Triggers fill the denormalised columns from the
+    parent lesson on INSERT / UPDATE so existing writers don't have to.
+"""
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS school (
@@ -129,12 +145,81 @@ CREATE TABLE IF NOT EXISTS timetable_entry (
     period_index INTEGER NOT NULL,
     room_id INTEGER,
     locked INTEGER NOT NULL DEFAULT 0,
+    teacher_id INTEGER,
+    class_id INTEGER,
     FOREIGN KEY (lesson_id) REFERENCES lesson(id) ON DELETE CASCADE,
-    FOREIGN KEY (room_id) REFERENCES room(id) ON DELETE SET NULL
+    FOREIGN KEY (room_id) REFERENCES room(id) ON DELETE SET NULL,
+    FOREIGN KEY (teacher_id) REFERENCES teacher(id) ON DELETE CASCADE,
+    FOREIGN KEY (class_id) REFERENCES school_class(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS project_settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL DEFAULT ''
 );
+
+-- ----------------------------------------------------------------------------
+-- Phase 3: integrity + performance indexes.
+-- ----------------------------------------------------------------------------
+
+-- UNIQUE indexes on the join tables (one membership row per pair).
+CREATE UNIQUE INDEX IF NOT EXISTS ux_teacher_subject
+    ON teacher_subject(teacher_id, subject_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_lesson_allowed_room
+    ON lesson_allowed_room(lesson_id, room_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_time_constraint
+    ON time_constraint(entity_type, entity_id, day_index, period_index);
+
+-- Slot-uniqueness on timetable_entry, partial on the resource being NOT NULL.
+-- Catches start-slot collisions per resource. Multi-period overlaps on
+-- trailing periods are still defended by the solver (NoOverlap intervals)
+-- and the move validator (validate_move in backend/services/move_validator.py).
+CREATE UNIQUE INDEX IF NOT EXISTS ux_te_teacher
+    ON timetable_entry(day_index, period_index, teacher_id)
+    WHERE teacher_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_te_class
+    ON timetable_entry(day_index, period_index, class_id)
+    WHERE class_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_te_room
+    ON timetable_entry(day_index, period_index, room_id)
+    WHERE room_id IS NOT NULL;
+
+-- Hot-path lookup indexes.
+CREATE INDEX IF NOT EXISTS ix_lesson_class ON lesson(class_id);
+CREATE INDEX IF NOT EXISTS ix_lesson_teacher ON lesson(teacher_id);
+CREATE INDEX IF NOT EXISTS ix_te_lesson ON timetable_entry(lesson_id);
+CREATE INDEX IF NOT EXISTS ix_te_room ON timetable_entry(room_id);
+CREATE INDEX IF NOT EXISTS ix_tc_entity
+    ON time_constraint(entity_type, entity_id);
+
+-- ----------------------------------------------------------------------------
+-- Triggers: keep timetable_entry.teacher_id and .class_id in sync with
+-- the parent lesson, so existing writers (which only set lesson_id) don't
+-- need to know about the denormalised columns. The UNIQUE indexes above
+-- depend on these columns being populated.
+-- ----------------------------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS timetable_entry_fill_denorm_insert
+AFTER INSERT ON timetable_entry
+WHEN NEW.teacher_id IS NULL OR NEW.class_id IS NULL
+BEGIN
+    UPDATE timetable_entry
+       SET teacher_id = COALESCE(NEW.teacher_id,
+                                 (SELECT teacher_id FROM lesson WHERE lesson.id = NEW.lesson_id)),
+           class_id   = COALESCE(NEW.class_id,
+                                 (SELECT class_id   FROM lesson WHERE lesson.id = NEW.lesson_id))
+     WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS timetable_entry_fill_denorm_update
+AFTER UPDATE OF lesson_id ON timetable_entry
+BEGIN
+    UPDATE timetable_entry
+       SET teacher_id = (SELECT teacher_id FROM lesson WHERE lesson.id = NEW.lesson_id),
+           class_id   = (SELECT class_id   FROM lesson WHERE lesson.id = NEW.lesson_id)
+     WHERE id = NEW.id;
+END;
 """

@@ -1,6 +1,6 @@
 """Teacher and TeacherSubject models."""
 from __future__ import annotations
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -30,10 +30,13 @@ class Teacher(Base):
 
 class TeacherSubject(Base):
     __tablename__ = "teacher_subjects"
+    __table_args__ = (
+        UniqueConstraint("teacher_id", "subject_id", name="ux_teacher_subjects"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False)
-    subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False, index=True)
+    subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     teacher = relationship("Teacher", back_populates="teacher_subjects")

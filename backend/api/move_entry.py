@@ -1,22 +1,29 @@
-"""Move / swap timetable entries with conflict checking."""
+"""Move / swap timetable entries with full constraint re-validation.
+
+All conflict-checking work lives in backend.services.move_validator. This
+module is now a thin HTTP layer that:
+  - resolves the project and current run,
+  - builds a MoveContext once per request,
+  - either commits the move (200) or returns structured conflicts (400).
+"""
 from __future__ import annotations
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
 
 from backend.auth.project_scope import get_project_or_404
 from backend.models.base import get_db
 from backend.models.project import Project
 from backend.models.timetable_model import TimetableEntry
-from backend.models.lesson_model import Lesson
-from backend.models.teacher_model import Teacher
-from backend.models.project import Subject
-from backend.models.class_model import SchoolClass
-from backend.models.room_model import Room
-from backend.repositories.timetable_repo import get_latest_run, get_entries_with_joins
-from backend.repositories.school_settings_repo import get_by_project
+from backend.repositories.timetable_repo import get_latest_run
+from backend.services.move_validator import (
+    Conflict,
+    build_move_context,
+    has_non_overridable,
+    validate_move,
+)
 
 router = APIRouter()
 
@@ -25,79 +32,11 @@ class MoveEntryRequest(BaseModel):
     entry_id: int
     new_day_index: int
     new_period_index: int
-    force: bool = False  # If true, move even with conflicts
+    force: bool = False  # True overrides ordinary conflicts (not bounds / locked_target).
 
 
-def _find_conflicts(
-    db: Session,
-    project_id: int,
-    run_id: int,
-    entry: TimetableEntry,
-    new_day: int,
-    new_period: int,
-) -> list[dict]:
-    """Check for teacher/class/room clashes at (new_day, new_period)."""
-    lesson = db.query(Lesson).filter(Lesson.id == entry.lesson_id).first()
-    if not lesson:
-        return [{"type": "error", "message": "Lesson not found"}]
-
-    conflicts = []
-
-    # Get all entries at the target slot (excluding the entry being moved)
-    entries_at_slot = (
-        db.query(TimetableEntry)
-        .filter(
-            TimetableEntry.project_id == project_id,
-            TimetableEntry.run_id == run_id,
-            TimetableEntry.day_index == new_day,
-            TimetableEntry.period_index == new_period,
-            TimetableEntry.id != entry.id,
-        )
-        .all()
-    )
-
-    for other_entry in entries_at_slot:
-        other_lesson = db.query(Lesson).filter(Lesson.id == other_entry.lesson_id).first()
-        if not other_lesson:
-            continue
-
-        # Teacher clash
-        if other_lesson.teacher_id == lesson.teacher_id:
-            teacher = db.query(Teacher).filter(Teacher.id == lesson.teacher_id).first()
-            other_class = db.query(SchoolClass).filter(SchoolClass.id == other_lesson.class_id).first()
-            other_subj = db.query(Subject).filter(Subject.id == other_lesson.subject_id).first()
-            tname = f"{teacher.first_name} {teacher.last_name}".strip() if teacher else "Unknown"
-            conflicts.append({
-                "type": "teacher_clash",
-                "message": f"{tname} is already teaching {other_subj.name if other_subj else '?'} in {other_class.name if other_class else '?'} at this slot",
-                "clashing_entry_id": other_entry.id,
-            })
-
-        # Class clash
-        if other_lesson.class_id == lesson.class_id:
-            cls = db.query(SchoolClass).filter(SchoolClass.id == lesson.class_id).first()
-            other_subj = db.query(Subject).filter(Subject.id == other_lesson.subject_id).first()
-            other_teacher = db.query(Teacher).filter(Teacher.id == other_lesson.teacher_id).first()
-            conflicts.append({
-                "type": "class_clash",
-                "message": f"{cls.name if cls else '?'} already has {other_subj.name if other_subj else '?'} with {other_teacher.first_name if other_teacher else '?'} at this slot",
-                "clashing_entry_id": other_entry.id,
-            })
-
-        # Room clash
-        if (
-            entry.room_id
-            and other_entry.room_id
-            and other_entry.room_id == entry.room_id
-        ):
-            room = db.query(Room).filter(Room.id == entry.room_id).first()
-            conflicts.append({
-                "type": "room_clash",
-                "message": f"Room {room.name if room else '?'} is already occupied at this slot",
-                "clashing_entry_id": other_entry.id,
-            })
-
-    return conflicts
+def _conflict_payload(conflicts: list[Conflict]) -> list[dict]:
+    return [c.to_dict() for c in conflicts]
 
 
 @router.post("/move-entry")
@@ -106,11 +45,58 @@ def move_entry(
     project: Project = Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
-    """Move a timetable entry to a new (day, period). Returns conflicts if any."""
+    """Move a timetable entry to (new_day, new_period).
+
+    Returns:
+        200 with `{success: true, conflicts: [...overridden]}` on commit.
+        400 with `{detail: {success: false, conflicts: [...]}}` when the move is
+            rejected because the validator found conflicts that aren't being
+            overridden (either force=false, or the conflicts are non-overridable
+            like 'bounds' / 'locked_target').
+        404 if no completed run exists or the entry is not in this project/run.
+    """
     run = get_latest_run(db, project.id)
     if not run or run.status != "completed":
         raise HTTPException(status_code=404, detail="No completed timetable run.")
 
+    ctx = build_move_context(db, project.id, run.id, body.entry_id)
+    if ctx is None:
+        raise HTTPException(status_code=404, detail="Entry not found.")
+
+    # Source-locked: existing semantics — overridable with force=true.
+    if ctx.entry_locked and not body.force:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "conflicts": [{
+                    "type": "locked",
+                    "message": "This entry is locked. Unlock it or pass force=true.",
+                }],
+            },
+        )
+
+    # No-op: already on the target slot.
+    if (ctx.entry_day, ctx.entry_period) == (body.new_day_index, body.new_period_index):
+        return {"success": True, "conflicts": [], "message": "Already at this slot."}
+
+    conflicts = validate_move(ctx, body.new_day_index, body.new_period_index)
+
+    # Hard rejection: bounds or locked_target — never overridable, even with force.
+    if has_non_overridable(conflicts):
+        raise HTTPException(
+            status_code=400,
+            detail={"success": False, "conflicts": _conflict_payload(conflicts)},
+        )
+
+    # Soft rejection: ordinary conflicts, force=false.
+    if conflicts and not body.force:
+        raise HTTPException(
+            status_code=400,
+            detail={"success": False, "conflicts": _conflict_payload(conflicts)},
+        )
+
+    # Commit.
     entry = (
         db.query(TimetableEntry)
         .filter(
@@ -120,42 +106,17 @@ def move_entry(
         )
         .first()
     )
-    if not entry:
+    if entry is None:
+        # Race: entry vanished between context build and commit.
         raise HTTPException(status_code=404, detail="Entry not found.")
 
-    if entry.locked and not body.force:
-        return {
-            "success": False,
-            "conflicts": [{"type": "locked", "message": "This entry is locked and cannot be moved."}],
-        }
-
-    # Validate slot bounds
-    settings = get_by_project(db, project.id)
-    days = settings.days_per_week if settings else 5
-    periods = settings.periods_per_day if settings else 7
-    if body.new_day_index < 0 or body.new_day_index >= days:
-        raise HTTPException(status_code=400, detail=f"day_index must be 0-{days - 1}")
-    if body.new_period_index < 0 or body.new_period_index >= periods:
-        raise HTTPException(status_code=400, detail=f"period_index must be 0-{periods - 1}")
-
-    # Same slot — no-op
-    if entry.day_index == body.new_day_index and entry.period_index == body.new_period_index:
-        return {"success": True, "conflicts": [], "message": "Already at this slot."}
-
-    # Check conflicts
-    conflicts = _find_conflicts(db, project.id, run.id, entry, body.new_day_index, body.new_period_index)
-
-    if conflicts and not body.force:
-        return {"success": False, "conflicts": conflicts}
-
-    # Move the entry
     entry.day_index = body.new_day_index
     entry.period_index = body.new_period_index
     db.commit()
 
     return {
         "success": True,
-        "conflicts": conflicts,  # may be non-empty if force=True
+        "conflicts": _conflict_payload(conflicts),  # may be non-empty if force=True
         "message": f"Moved to Day {body.new_day_index + 1}, Period {body.new_period_index + 1}.",
     }
 
@@ -166,44 +127,37 @@ def get_valid_slots(
     project: Project = Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
-    """
-    Returns a grid of valid/conflict status for every (day, period) slot
-    for a specific entry. Used by frontend to highlight green/red while dragging.
+    """For each (day, period), tell the frontend whether the entry can move there.
+
+    Reuses the shared validator. Query budget is O(1) — context is built once
+    and the per-cell check is pure Python.
     """
     run = get_latest_run(db, project.id)
     if not run or run.status != "completed":
         raise HTTPException(status_code=404, detail="No completed timetable run.")
 
-    entry = (
-        db.query(TimetableEntry)
-        .filter(
-            TimetableEntry.id == entry_id,
-            TimetableEntry.project_id == project.id,
-            TimetableEntry.run_id == run.id,
-        )
-        .first()
-    )
-    if not entry:
+    ctx = build_move_context(db, project.id, run.id, entry_id)
+    if ctx is None:
         raise HTTPException(status_code=404, detail="Entry not found.")
 
-    settings = get_by_project(db, project.id)
-    days = settings.days_per_week if settings else 5
-    periods = settings.periods_per_day if settings else 7
-
-    # Build grid: for each (day, period), check conflicts
     grid = []
-    for d in range(days):
+    for d in range(ctx.days_per_week):
         row = []
-        for p in range(periods):
-            if d == entry.day_index and p == entry.period_index:
+        for p in range(ctx.periods_per_day):
+            if d == ctx.entry_day and p == ctx.entry_period:
                 row.append({"valid": True, "current": True, "conflicts": []})
-            else:
-                conflicts = _find_conflicts(db, project.id, run.id, entry, d, p)
-                row.append({
-                    "valid": len(conflicts) == 0,
-                    "current": False,
-                    "conflicts": [c["message"] for c in conflicts],
-                })
+                continue
+            conflicts = validate_move(ctx, d, p)
+            row.append({
+                "valid": len(conflicts) == 0,
+                "current": False,
+                "conflicts": [c.message for c in conflicts],
+            })
         grid.append(row)
 
-    return {"entry_id": entry_id, "days": days, "periods": periods, "slots": grid}
+    return {
+        "entry_id": entry_id,
+        "days": ctx.days_per_week,
+        "periods": ctx.periods_per_day,
+        "slots": grid,
+    }

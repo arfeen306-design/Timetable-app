@@ -90,8 +90,24 @@ def save_entries(
     run_id: int,
     entries: List[dict],
 ) -> None:
-    """entries: list of {lesson_id, day_index, period_index, room_id, locked}"""
+    """entries: list of {lesson_id, day_index, period_index, room_id, locked}.
+
+    Looks up each lesson once to populate the denormalised teacher_id /
+    class_id columns required by the Phase-3 slot-uniqueness constraints.
+    """
+    if not entries:
+        return
+    lesson_ids = {e["lesson_id"] for e in entries}
+    lesson_rows = (
+        db.query(Lesson.id, Lesson.teacher_id, Lesson.class_id)
+        .filter(Lesson.id.in_(lesson_ids))
+        .all()
+    )
+    lesson_map: dict[int, tuple[int, int]] = {
+        r.id: (r.teacher_id, r.class_id) for r in lesson_rows
+    }
     for e in entries:
+        tid, cid = lesson_map.get(e["lesson_id"], (None, None))
         row = TimetableEntry(
             project_id=project_id,
             run_id=run_id,
@@ -100,6 +116,8 @@ def save_entries(
             period_index=e["period_index"],
             room_id=e.get("room_id"),
             locked=e.get("locked", False),
+            teacher_id=tid,
+            class_id=cid,
         )
         db.add(row)
     db.commit()

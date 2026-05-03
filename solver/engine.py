@@ -1,26 +1,20 @@
 """Timetable constraint solver using Google OR-Tools CP-SAT."""
 from __future__ import annotations
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from ortools.sat.python import cp_model
 
 from models.domain import TimetableEntry
 
 if TYPE_CHECKING:
-    from database.connection import DatabaseConnection
     from core.data_provider import TimetableDataProvider
-
-from database.data_provider_sqlite import SqliteDataProvider
 
 
 class TimetableSolver:
     """Generates a clash-free timetable using CP-SAT constraint programming."""
 
-    def __init__(self, data: Union[DatabaseConnection, TimetableDataProvider]) -> None:
-        if hasattr(data, "fetchone"):
-            self._provider: TimetableDataProvider = SqliteDataProvider(data)
-        else:
-            self._provider = data
+    def __init__(self, data: "TimetableDataProvider") -> None:
+        self._provider = data
         self.messages: list[str] = []
 
     def solve(self, time_limit_seconds: int = 30) -> tuple[bool, list[TimetableEntry], list[str]]:
@@ -129,8 +123,14 @@ class TimetableSolver:
                         forbidden.add(day * num_periods + sp)
             occ_forbidden_slots.append(forbidden)
 
-        # Decision variables: slot_var = day * num_periods + period
+        # Decision variables: slot_var = day * num_periods + period (start of the lesson).
+        # interval_vars[i] spans [slot_vars[i], slot_vars[i] + duration) on the absolute
+        # day-major time axis. The slot-domain restriction (start_period <= num_periods - duration)
+        # guarantees an interval never crosses a day boundary, so a single global NoOverlap
+        # per teacher / per class is sufficient.
         slot_vars = []
+        interval_vars = []
+        occ_durations: list[int] = []
         day_vars = []
         period_vars = []
         room_vars = []
@@ -149,13 +149,35 @@ class TimetableSolver:
                         all_slots.append(s)
 
             if not all_slots:
-                all_slots = list(range(total_slots))
+                t = teacher_map.get(lesson["teacher_id"]) or {}
+                t_name = (
+                    f"{t.get('first_name', '') or ''} {t.get('last_name', '') or ''}".strip()
+                    or "?"
+                )
+                c_name = (class_map.get(lesson["class_id"]) or {}).get("name", "?")
+                self.messages.append(
+                    f"Lesson {lid} ({c_name} / {t_name}, duration {duration}): "
+                    "no feasible start slot — every candidate is blocked by teacher/class "
+                    "unavailability. Reduce unavailability or shorten the lesson."
+                )
+                return False, [], self.messages
 
             slot_var = model.new_int_var_from_domain(
                 cp_model.Domain.from_values(all_slots),
                 f"slot_{lid}_{occ_idx}",
             )
             slot_vars.append(slot_var)
+            occ_durations.append(duration)
+
+            # Mandatory interval [slot, slot + duration) on the absolute time axis.
+            # Used by teacher / class NoOverlap constraints below.
+            iv = model.new_interval_var(
+                slot_var,
+                duration,
+                slot_var + duration,
+                f"iv_{lid}_{occ_idx}",
+            )
+            interval_vars.append(iv)
 
             # Derived day and period from slot
             day_var = model.new_int_var(0, num_days - 1, f"day_{lid}_{occ_idx}")
@@ -204,51 +226,59 @@ class TimetableSolver:
             teacher_occs.setdefault(lesson["teacher_id"], []).append(i)
             class_occs.setdefault(lesson["class_id"], []).append(i)
 
-        # 2. Teacher no double-booking: all occurrences of a teacher have different slots
+        # 2. Teacher no overlap on intervals (handles multi-period lessons correctly):
+        #    forbids any two of a teacher's intervals from sharing any period, not just
+        #    the start slot. This is the C1 fix.
         for tid, occ_indices in teacher_occs.items():
             if len(occ_indices) > 1:
-                model.add_all_different([slot_vars[i] for i in occ_indices])
+                model.add_no_overlap([interval_vars[i] for i in occ_indices])
 
-        # 3. Class no double-booking: all occurrences of a class have different slots
+        # 3. Class no overlap on intervals (same reasoning as #2).
         for cid, occ_indices in class_occs.items():
             if len(occ_indices) > 1:
-                model.add_all_different([slot_vars[i] for i in occ_indices])
+                model.add_no_overlap([interval_vars[i] for i in occ_indices])
 
-        # 4. Room no double-booking (efficient per-room approach)
+        # 4. Room no overlap on intervals (handles multi-period lessons correctly).
+        # 5. Room unavailability rolled into the same NoOverlap as fixed-presence intervals.
+        # For each room: the optional intervals of every occurrence (present iff that occurrence
+        # is assigned to this room) plus a 1-slot fixed interval per (day, period) marked
+        # unavailable. NoOverlap then forbids any two of these from sharing a period.
         if use_rooms:
-            # For each room, the occurrences assigned to it must have different slots.
-            # We use optional interval variables with NoOverlap.
-            # Create a room_slot variable: room * total_slots + slot
-            # Then all room_slot values must be different.
-            room_slot_vars = []
+            room_intervals: dict[int, list] = {ridx: [] for ridx in range(num_rooms)}
             for i in range(num_occ):
-                rs_var = model.new_int_var(
-                    0, num_rooms * total_slots - 1, f"rs_{i}"
-                )
-                model.add(rs_var == room_vars[i] * total_slots + slot_vars[i])
-                room_slot_vars.append(rs_var)
-            model.add_all_different(room_slot_vars)
+                duration = occ_durations[i]
+                for ridx in range(num_rooms):
+                    present = model.new_bool_var(f"present_{i}_{ridx}")
+                    model.add(room_vars[i] == ridx).only_enforce_if(present)
+                    model.add(room_vars[i] != ridx).only_enforce_if(present.negated())
+                    opt_iv = model.new_optional_interval_var(
+                        slot_vars[i],
+                        duration,
+                        slot_vars[i] + duration,
+                        present,
+                        f"oiv_{i}_{ridx}",
+                    )
+                    room_intervals[ridx].append(opt_iv)
 
-        # 5. Room unavailability
-        if use_rooms:
             for rid_val, unavail in room_unavailable.items():
                 if rid_val not in room_ids:
                     continue
                 ridx = room_ids.index(rid_val)
-                for i in range(num_occ):
-                    dur = occurrences[i][0]["duration"]
-                    for day, period in unavail:
-                        for p_off in range(dur):
-                            start_p = period - p_off
-                            if 0 <= start_p <= num_periods - dur:
-                                forbidden_slot = day * num_periods + start_p
-                                # If assigned to this room, cannot use this slot
-                                b_room = model.new_bool_var(
-                                    f"runavail_{i}_{rid_val}_{day}_{start_p}"
-                                )
-                                model.add(room_vars[i] == ridx).only_enforce_if(b_room)
-                                model.add(room_vars[i] != ridx).only_enforce_if(b_room.negated())
-                                model.add(slot_vars[i] != forbidden_slot).only_enforce_if(b_room)
+                for day, period in unavail:
+                    fixed_start = day * num_periods + period
+                    if 0 <= fixed_start < total_slots:
+                        fixed_iv = model.new_interval_var(
+                            model.new_constant(fixed_start),
+                            1,
+                            model.new_constant(fixed_start + 1),
+                            f"runavail_iv_{rid_val}_{day}_{period}",
+                        )
+                        room_intervals[ridx].append(fixed_iv)
+
+            for ridx in range(num_rooms):
+                ivs = room_intervals[ridx]
+                if len(ivs) > 1:
+                    model.add_no_overlap(ivs)
 
         # 6. Subject max per day per class
         for subj in subjects:

@@ -104,13 +104,20 @@ def debug_solver():
 if os.path.isdir(_static_dir):
     app.mount("/assets", StaticFiles(directory=os.path.join(_static_dir, "assets")), name="assets")
 
+    _static_root = os.path.realpath(_static_dir)
+    _index_html = os.path.join(_static_root, "index.html")
+
     @app.get("/{full_path:path}")
     def serve_spa(full_path: str):
         if full_path.startswith("api/") or full_path == "api":
             return JSONResponse(content={"detail": "Not Found"}, status_code=404)
-        file_path = os.path.join(_static_dir, full_path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
-        return FileResponse(os.path.join(_static_dir, "index.html"))
+        # Resolve the candidate path and require it to live inside the static root.
+        # Anything resolving outside (e.g. via ".." segments) falls back to index.html.
+        candidate = os.path.realpath(os.path.join(_static_root, full_path))
+        if candidate != _static_root and not candidate.startswith(_static_root + os.sep):
+            return FileResponse(_index_html)
+        if os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(_index_html)
 else:
     pass  # Root GET / is already registered unconditionally above

@@ -1,6 +1,6 @@
 """Lesson and LessonAllowedRoom models."""
 from __future__ import annotations
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -31,6 +31,9 @@ class Lesson(Base):
 
 class LessonAllowedRoom(Base):
     __tablename__ = "lesson_allowed_rooms"
+    __table_args__ = (
+        UniqueConstraint("lesson_id", "room_id", name="ux_lesson_allowed_rooms"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     lesson_id = Column(Integer, ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True)

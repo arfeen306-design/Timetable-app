@@ -1,34 +1,44 @@
-"""Exports API — Excel, PDF, CSV download; project-scoped, uses temp SQLite + core export engine."""
+"""Export API — Excel / PDF / CSV. Streamed in-memory; project-scoped.
+
+Replaces the previous SQLite-materialisation flow (export_adapter →
+desktop exports/*_export.py) with backend.services.export_engine, which:
+  - takes a TimetableDataProvider directly (no temp SQLite),
+  - emits bytes via io.BytesIO (no /tmp files),
+  - is returned as StreamingResponse so the browser starts downloading
+    as soon as the buffer is ready.
+"""
 from __future__ import annotations
-import os
-import tempfile
-import atexit
+import io
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from backend.auth.project_scope import get_project_or_404
+from backend.core.postgres_data_provider import PostgresDataProvider
 from backend.models.base import get_db
 from backend.models.project import Project
-from backend.core.postgres_data_provider import PostgresDataProvider
-from backend.repositories.timetable_repo import get_latest_run, get_entries_with_joins
-from backend.services.export_adapter import build_sqlite_from_provider
+from backend.repositories.timetable_repo import (
+    get_entries_with_joins,
+    get_latest_run,
+)
+from backend.services.export_engine import build_csv, build_excel, build_pdf
 
 router = APIRouter()
 
 
-def _get_entries_for_run(db: Session, project_id: int, run_id: int) -> list[dict]:
-    """Raw entries for adapter: lesson_id, day_index, period_index, room_id, locked."""
+def _fetch_entries(db: Session, project_id: int, run_id: int) -> list[dict]:
     rows = get_entries_with_joins(db, project_id, run_id=run_id)
     return [
         {
-            "lesson_id": e["lesson_id"],
-            "day_index": e["day_index"],
-            "period_index": e["period_index"],
-            "room_id": e.get("room_id"),
-            "locked": e.get("locked", False),
+            "lesson_id": r["lesson_id"],
+            "day_index": r["day_index"],
+            "period_index": r["period_index"],
+            "room_id": r.get("room_id"),
+            "locked": r.get("locked", False),
         }
-        for e in rows
+        for r in rows
     ]
 
 
@@ -42,59 +52,34 @@ def _ensure_completed_run(db: Session, project_id: int) -> int:
     return run.id
 
 
+def _content_disposition(filename: str) -> str:
+    """RFC 5987 — quote non-ASCII filenames safely for Content-Disposition."""
+    fallback = "".join(c if c.isalnum() or c in "._- " else "_" for c in filename) or "timetable"
+    return f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{quote(filename)}'
+
+
+def _project_filename(project: Project, ext: str) -> str:
+    base = (project.name or f"project_{project.id}").strip() or f"project_{project.id}"
+    return f"timetable_{base}.{ext}"
+
+
 @router.get("/excel")
 def export_excel(
     project: Project = Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
-    """Generate and download Excel timetable. Requires a completed generation run."""
     run_id = _ensure_completed_run(db, project.id)
-    entries = _get_entries_for_run(db, project.id, run_id)
+    entries = _fetch_entries(db, project.id, run_id)
     provider = PostgresDataProvider(db, project.id)
-    try:
-        sqlite_db, sqlite_path = build_sqlite_from_provider(provider, entries)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Export setup failed: {e}")
-    try:
-        from exports.excel_export import export_excel as core_export_excel
-    except ImportError:
-        sqlite_db.close()
-        if os.path.exists(sqlite_path):
-            try:
-                os.unlink(sqlite_path)
-            except OSError:
-                pass
-        raise HTTPException(status_code=501, detail="Excel export not available (PYTHONPATH).")
-    _fd, out_path = tempfile.mkstemp(suffix=".xlsx")
-    os.close(_fd)
-    atexit.register(lambda p=out_path: os.path.exists(p) and os.unlink(p))
-    try:
-        core_export_excel(sqlite_db, out_path)
-        sqlite_db.close()
-        if os.path.exists(sqlite_path):
-            try:
-                os.unlink(sqlite_path)
-            except OSError:
-                pass
-        return FileResponse(
-            out_path,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            filename=f"timetable_{project.name or project.id}.xlsx",
-        )
-    except Exception as e:
-        if os.path.exists(out_path):
-            try:
-                os.unlink(out_path)
-            except OSError:
-                pass
-        raise HTTPException(status_code=500, detail=f"Excel export failed: {e}")
-    finally:
-        sqlite_db.close()
-        if os.path.exists(sqlite_path):
-            try:
-                os.unlink(sqlite_path)
-            except OSError:
-                pass
+    payload = build_excel(provider, entries)
+    return StreamingResponse(
+        io.BytesIO(payload),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": _content_disposition(_project_filename(project, "xlsx")),
+            "Content-Length": str(len(payload)),
+        },
+    )
 
 
 @router.get("/pdf")
@@ -102,54 +87,18 @@ def export_pdf(
     project: Project = Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
-    """Generate and download PDF timetable."""
     run_id = _ensure_completed_run(db, project.id)
-    entries = _get_entries_for_run(db, project.id, run_id)
+    entries = _fetch_entries(db, project.id, run_id)
     provider = PostgresDataProvider(db, project.id)
-    try:
-        sqlite_db, sqlite_path = build_sqlite_from_provider(provider, entries)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Export setup failed: {e}")
-    try:
-        from exports.pdf_export import export_pdf as core_export_pdf
-    except ImportError:
-        sqlite_db.close()
-        if os.path.exists(sqlite_path):
-            try:
-                os.unlink(sqlite_path)
-            except OSError:
-                pass
-        raise HTTPException(status_code=501, detail="PDF export not available (PYTHONPATH).")
-    _fd, out_path = tempfile.mkstemp(suffix=".pdf")
-    os.close(_fd)
-    atexit.register(lambda p=out_path: os.path.exists(p) and os.unlink(p))
-    try:
-        core_export_pdf(sqlite_db, out_path)
-        sqlite_db.close()
-        if os.path.exists(sqlite_path):
-            try:
-                os.unlink(sqlite_path)
-            except OSError:
-                pass
-        return FileResponse(
-            out_path,
-            media_type="application/pdf",
-            filename=f"timetable_{project.name or project.id}.pdf",
-        )
-    except Exception as e:
-        if os.path.exists(out_path):
-            try:
-                os.unlink(out_path)
-            except OSError:
-                pass
-        raise HTTPException(status_code=500, detail=f"PDF export failed: {e}")
-    finally:
-        sqlite_db.close()
-        if os.path.exists(sqlite_path):
-            try:
-                os.unlink(sqlite_path)
-            except OSError:
-                pass
+    payload = build_pdf(provider, entries)
+    return StreamingResponse(
+        io.BytesIO(payload),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": _content_disposition(_project_filename(project, "pdf")),
+            "Content-Length": str(len(payload)),
+        },
+    )
 
 
 @router.get("/csv")
@@ -157,59 +106,21 @@ def export_csv(
     project: Project = Depends(get_project_or_404),
     db: Session = Depends(get_db),
 ):
-    """Generate and download CSV timetable."""
     run_id = _ensure_completed_run(db, project.id)
-    entries = _get_entries_for_run(db, project.id, run_id)
+    entries = _fetch_entries(db, project.id, run_id)
     provider = PostgresDataProvider(db, project.id)
-    try:
-        sqlite_db, sqlite_path = build_sqlite_from_provider(provider, entries)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Export setup failed: {e}")
-    try:
-        from exports.csv_export import export_csv as core_export_csv
-    except ImportError:
-        sqlite_db.close()
-        if os.path.exists(sqlite_path):
-            try:
-                os.unlink(sqlite_path)
-            except OSError:
-                pass
-        raise HTTPException(status_code=501, detail="CSV export not available (PYTHONPATH).")
-    _fd, out_path = tempfile.mkstemp(suffix=".csv")
-    os.close(_fd)
-    atexit.register(lambda p=out_path: os.path.exists(p) and os.unlink(p))
-    try:
-        core_export_csv(sqlite_db, out_path)
-        sqlite_db.close()
-        if os.path.exists(sqlite_path):
-            try:
-                os.unlink(sqlite_path)
-            except OSError:
-                pass
-        return FileResponse(
-            out_path,
-            media_type="text/csv",
-            filename=f"timetable_{project.name or project.id}.csv",
-        )
-    except Exception as e:
-        if os.path.exists(out_path):
-            try:
-                os.unlink(out_path)
-            except OSError:
-                pass
-        raise HTTPException(status_code=500, detail=f"CSV export failed: {e}")
-    finally:
-        sqlite_db.close()
-        if os.path.exists(sqlite_path):
-            try:
-                os.unlink(sqlite_path)
-            except OSError:
-                pass
+    payload = build_csv(provider, entries)
+    return StreamingResponse(
+        io.BytesIO(payload),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": _content_disposition(_project_filename(project, "csv")),
+            "Content-Length": str(len(payload)),
+        },
+    )
 
 
 @router.get("")
-def list_exports(
-    project: Project = Depends(get_project_or_404),
-):
-    """Placeholder: list recent exports (metadata if stored)."""
+def list_exports(project: Project = Depends(get_project_or_404)):
+    """Placeholder — kept for API stability; export history is not persisted."""
     return {"exports": []}

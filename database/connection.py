@@ -17,6 +17,95 @@ def _ensure_teacher_contact_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE teacher ADD COLUMN whatsapp_number TEXT NOT NULL DEFAULT ''")
 
 
+def _table_has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    cur = conn.execute(f"PRAGMA table_info({table})")
+    return any(row[1] == column for row in cur.fetchall())
+
+
+def _ensure_phase3_integrity(conn: sqlite3.Connection) -> None:
+    """Idempotent migration for Phase-3 integrity (Postgres-side mirror lives in
+    backend/scripts/migrate_dedupe_indexes.py).
+
+    Order matters:
+      1. Add denormalised teacher_id/class_id columns to timetable_entry.
+      2. Backfill them from the parent lesson row.
+      3. Dedupe every table that's about to receive a UNIQUE index — UNIQUE
+         creation fails on existing duplicates, so cleanup must come first.
+      4. Re-apply SCHEMA_SQL: every CREATE … IF NOT EXISTS is a no-op when the
+         object exists, but the new indexes/triggers will land here.
+    """
+    # 1. Denormalised columns on existing DBs.
+    if not _table_has_column(conn, "timetable_entry", "teacher_id"):
+        conn.execute("ALTER TABLE timetable_entry ADD COLUMN teacher_id INTEGER")
+    if not _table_has_column(conn, "timetable_entry", "class_id"):
+        conn.execute("ALTER TABLE timetable_entry ADD COLUMN class_id INTEGER")
+
+    # 2. Backfill anything still NULL.
+    conn.execute(
+        """UPDATE timetable_entry
+              SET teacher_id = (SELECT teacher_id FROM lesson WHERE lesson.id = timetable_entry.lesson_id)
+            WHERE teacher_id IS NULL"""
+    )
+    conn.execute(
+        """UPDATE timetable_entry
+              SET class_id = (SELECT class_id FROM lesson WHERE lesson.id = timetable_entry.lesson_id)
+            WHERE class_id IS NULL"""
+    )
+
+    # 3a. Dedupe teacher_subject. Keep the lowest id per pair.
+    conn.execute(
+        """DELETE FROM teacher_subject
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM teacher_subject GROUP BY teacher_id, subject_id
+            )"""
+    )
+    # 3b. Dedupe lesson_allowed_room.
+    conn.execute(
+        """DELETE FROM lesson_allowed_room
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM lesson_allowed_room GROUP BY lesson_id, room_id
+            )"""
+    )
+    # 3c. Dedupe time_constraint.
+    conn.execute(
+        """DELETE FROM time_constraint
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM time_constraint
+                 GROUP BY entity_type, entity_id, day_index, period_index
+            )"""
+    )
+    # 3d. Dedupe timetable_entry per (slot, teacher) — keep the lowest id.
+    conn.execute(
+        """DELETE FROM timetable_entry
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM timetable_entry
+                 WHERE teacher_id IS NOT NULL
+                 GROUP BY day_index, period_index, teacher_id
+            )
+              AND teacher_id IS NOT NULL"""
+    )
+    # 3e. Dedupe per (slot, class) — keep the lowest id remaining.
+    conn.execute(
+        """DELETE FROM timetable_entry
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM timetable_entry
+                 WHERE class_id IS NOT NULL
+                 GROUP BY day_index, period_index, class_id
+            )
+              AND class_id IS NOT NULL"""
+    )
+    # 3f. Dedupe per (slot, room).
+    conn.execute(
+        """DELETE FROM timetable_entry
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM timetable_entry
+                 WHERE room_id IS NOT NULL
+                 GROUP BY day_index, period_index, room_id
+            )
+              AND room_id IS NOT NULL"""
+    )
+
+
 class DatabaseConnection:
     """Manages a single SQLite project database."""
 
@@ -43,6 +132,18 @@ class DatabaseConnection:
         self._conn.execute("PRAGMA foreign_keys=ON")
         if self._db_path != ":memory:":
             _ensure_teacher_contact_columns(self._conn)
+            # Phase-3 migration: only run on existing DBs that have the lesson
+            # table (i.e. were initialised by a prior version). Brand-new DBs
+            # (initialize_schema not yet called) skip this — the schema's CREATE
+            # … IF NOT EXISTS will lay everything down on first use.
+            cur = self._conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='lesson'"
+            )
+            if cur.fetchone() is not None:
+                _ensure_phase3_integrity(self._conn)
+                # Re-run the schema script so the new indexes + triggers land.
+                self._conn.executescript(SCHEMA_SQL)
+                self._conn.commit()
 
     def clone_for_thread(self) -> "DatabaseConnection":
         """Create a new connection to the same DB file, safe for use in another thread."""

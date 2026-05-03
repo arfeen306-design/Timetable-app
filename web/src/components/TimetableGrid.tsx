@@ -158,7 +158,26 @@ export default function TimetableGrid({ projectId, entries, days, periods, onEnt
           showConflict(result.conflicts.map((c) => c.message).join(" · "));
         }
       } catch (err) {
-        showConflict(err instanceof Error ? err.message : "Move failed");
+        // Backend returns 400 with body { detail: { success, conflicts } } on
+        // rejected moves; api.ts stringifies that detail into Error.message.
+        // Try to recover the structured conflict list before falling back.
+        if (err instanceof Error) {
+          try {
+            const body = JSON.parse(err.message);
+            const conflicts = body?.conflicts;
+            if (Array.isArray(conflicts) && conflicts.length > 0) {
+              showConflict(
+                conflicts.map((c: { message: string }) => c.message).join(" · ")
+              );
+              return;
+            }
+          } catch {
+            /* not JSON — fall through to plain message */
+          }
+          showConflict(err.message);
+        } else {
+          showConflict("Move failed");
+        }
       }
     },
     [projectId, entries, onEntriesChange, showConflict]

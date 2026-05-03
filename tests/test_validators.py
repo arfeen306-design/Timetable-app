@@ -1,91 +1,62 @@
-"""Tests for pre-generation validators."""
-import unittest
-import sys
+"""Pre-generation validator tests, provider-only.
+
+`core.validators.validate_for_generation` consumes a TimetableDataProvider
+(it calls `data.get_school()`, `data.get_subjects()`, etc.). The legacy
+version of this file passed a raw `DatabaseConnection`, which has never
+satisfied that contract — those tests have been silently broken. This
+rewrite uses the same in-memory FakeProvider as `tests/test_solver.py` so
+the validator's logic is actually exercised.
+"""
+from __future__ import annotations
 import os
+import sys
+import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database.connection import DatabaseConnection
 from core.validators import validate_for_generation
+from tests.test_solver import (
+    FakeProvider,
+    _add_class,
+    _add_lesson,
+    _add_subject,
+    _add_teacher,
+    _make_provider,
+)
 
 
 class TestValidators(unittest.TestCase):
-    def _make_db(self) -> DatabaseConnection:
-        db = DatabaseConnection(":memory:")
-        db.open()
-        db.initialize_schema()
-        db.commit()
-        return db
 
-    def test_empty_db_fails(self):
-        db = self._make_db()
-        result = validate_for_generation(db)
+    def test_empty_provider_fails(self):
+        p = FakeProvider()  # no school configured
+        result = validate_for_generation(p)
         self.assertFalse(result.is_valid)
         self.assertTrue(any("School settings" in e for e in result.errors))
-        db.close()
 
     def test_no_subjects_fails(self):
-        db = self._make_db()
-        db.execute(
-            "INSERT INTO school (name, academic_year, days_per_week, periods_per_day, weekend_days) "
-            "VALUES (?,?,?,?,?)",
-            ("Test", "2025", 5, 7, "5,6"),
-        )
-        db.commit()
-        result = validate_for_generation(db)
+        p = _make_provider()
+        result = validate_for_generation(p)
         self.assertFalse(result.is_valid)
         self.assertTrue(any("No subjects" in e for e in result.errors))
-        db.close()
 
     def test_valid_minimal(self):
-        db = self._make_db()
-        db.execute(
-            "INSERT INTO school (name, academic_year, days_per_week, periods_per_day, weekend_days) "
-            "VALUES (?,?,?,?,?)",
-            ("Test", "2025", 5, 7, "5,6"),
-        )
-        db.execute("INSERT INTO subject (name, code) VALUES (?,?)", ("Maths", "MAT"))
-        db.execute("INSERT INTO school_class (grade, section, name) VALUES (?,?,?)", ("9", "A", "G9A"))
-        db.execute(
-            "INSERT INTO teacher (first_name, last_name, code, max_periods_day, max_periods_week) "
-            "VALUES (?,?,?,?,?)",
-            ("Test", "Teacher", "TT", 6, 30),
-        )
-        db.execute(
-            "INSERT INTO lesson (teacher_id, subject_id, class_id, periods_per_week, duration) "
-            "VALUES (?,?,?,?,?)",
-            (1, 1, 1, 3, 1),
-        )
-        db.commit()
-        result = validate_for_generation(db)
-        self.assertTrue(result.is_valid)
-        db.close()
+        p = _make_provider()
+        _add_subject(p, sid=1, name="Maths")
+        _add_class(p, cid=1, name="G9A")
+        _add_teacher(p, tid=1, first="Test", last="Teacher")
+        _add_lesson(p, lid=1, teacher_id=1, subject_id=1, class_id=1, ppw=3, duration=1)
+        result = validate_for_generation(p)
+        self.assertTrue(result.is_valid, msg=f"unexpected errors: {result.errors}")
 
     def test_overloaded_class_fails(self):
-        db = self._make_db()
-        db.execute(
-            "INSERT INTO school (name, academic_year, days_per_week, periods_per_day, weekend_days) "
-            "VALUES (?,?,?,?,?)",
-            ("Test", "2025", 5, 7, "5,6"),
-        )
-        db.execute("INSERT INTO subject (name, code) VALUES (?,?)", ("Maths", "MAT"))
-        db.execute("INSERT INTO school_class (grade, section, name) VALUES (?,?,?)", ("9", "A", "G9A"))
-        db.execute(
-            "INSERT INTO teacher (first_name, last_name, code, max_periods_day, max_periods_week) "
-            "VALUES (?,?,?,?,?)",
-            ("Test", "Teacher", "TT", 6, 40),
-        )
-        # 36 periods > 35 slots
-        db.execute(
-            "INSERT INTO lesson (teacher_id, subject_id, class_id, periods_per_week, duration) "
-            "VALUES (?,?,?,?,?)",
-            (1, 1, 1, 36, 1),
-        )
-        db.commit()
-        result = validate_for_generation(db)
+        p = _make_provider(days=5, periods=7)  # 35 slots/week
+        _add_subject(p, sid=1, name="Maths")
+        _add_class(p, cid=1, name="G9A")
+        _add_teacher(p, tid=1, first="Test", last="Teacher", max_week=40)
+        _add_lesson(p, lid=1, teacher_id=1, subject_id=1, class_id=1, ppw=36, duration=1)  # 36 > 35
+        result = validate_for_generation(p)
         self.assertFalse(result.is_valid)
         self.assertTrue(any("requires" in e and "periods" in e for e in result.errors))
-        db.close()
 
 
 if __name__ == "__main__":
